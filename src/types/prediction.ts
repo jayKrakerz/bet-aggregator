@@ -1,5 +1,5 @@
 export type PickType = 'spread' | 'moneyline' | 'over_under' | 'prop' | 'parlay';
-export type Side = 'home' | 'away' | 'over' | 'under';
+export type Side = 'home' | 'away' | 'over' | 'under' | 'draw' | 'yes' | 'no';
 export type Confidence = 'low' | 'medium' | 'high' | 'best_bet';
 
 /** Directly extracted from site HTML. Minimal normalization. */

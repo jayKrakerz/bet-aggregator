@@ -1,5 +1,5 @@
 import type { RawPrediction } from '../types/prediction.js';
-import { resolveTeamId } from './team-resolver.js';
+import { resolveOrCreateTeamId } from './team-resolver.js';
 import { computeDedupKey } from './dedup.js';
 import { findOrCreateMatch, insertPrediction } from '../db/queries.js';
 import { logger } from '../utils/logger.js';
@@ -8,8 +8,8 @@ export async function normalizeAndInsert(raw: RawPrediction[]): Promise<number> 
   let inserted = 0;
 
   for (const pred of raw) {
-    const homeTeamId = resolveTeamId(pred.homeTeamRaw);
-    const awayTeamId = resolveTeamId(pred.awayTeamRaw);
+    const homeTeamId = await resolveOrCreateTeamId(pred.homeTeamRaw, pred.sport);
+    const awayTeamId = await resolveOrCreateTeamId(pred.awayTeamRaw, pred.sport);
 
     if (!homeTeamId || !awayTeamId) {
       logger.warn(

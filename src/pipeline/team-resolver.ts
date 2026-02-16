@@ -1,4 +1,5 @@
 import { sql } from '../db/pool.js';
+import { createTeamWithAlias } from '../db/queries.js';
 import { logger } from '../utils/logger.js';
 
 // In-memory cache: lowercase alias -> team ID
@@ -31,4 +32,24 @@ export function resolveTeamId(rawName: string): number | null {
 
 export function getAliasCount(): number {
   return aliasMap.size;
+}
+
+/**
+ * Resolve a team name, auto-creating the team if the sport allows it.
+ * NBA uses a curated alias list; other sports auto-create unknown teams.
+ */
+export async function resolveOrCreateTeamId(rawName: string, sport: string): Promise<number | null> {
+  const existing = resolveTeamId(rawName);
+  if (existing) return existing;
+
+  // Only auto-create for non-NBA sports
+  if (sport === 'nba') return null;
+
+  const trimmed = rawName.trim();
+  if (!trimmed) return null;
+
+  const teamId = await createTeamWithAlias(trimmed, sport);
+  // Add to in-memory cache so subsequent lookups in same batch are instant
+  aliasMap.set(trimmed.toLowerCase(), teamId);
+  return teamId;
 }

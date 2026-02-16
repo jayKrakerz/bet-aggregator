@@ -69,3 +69,27 @@ export async function updateSourceLastFetched(slug: string): Promise<void> {
     UPDATE sources SET last_fetched_at = NOW() WHERE slug = ${slug}
   `;
 }
+
+/**
+ * Create a team and its lowercase alias in one go.
+ * Used for auto-creating football teams that aren't in the curated seed data.
+ * Uses team name as abbreviation since football teams don't have standard abbreviations.
+ */
+export async function createTeamWithAlias(name: string, sport: string): Promise<number> {
+  const [team] = await sql<{ id: number }[]>`
+    INSERT INTO teams (name, abbreviation, sport)
+    VALUES (${name}, ${name}, ${sport})
+    ON CONFLICT (abbreviation, sport) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id
+  `;
+
+  const teamId = team!.id;
+
+  await sql`
+    INSERT INTO team_aliases (team_id, alias)
+    VALUES (${teamId}, ${name.toLowerCase()})
+    ON CONFLICT (alias, team_id) DO NOTHING
+  `;
+
+  return teamId;
+}

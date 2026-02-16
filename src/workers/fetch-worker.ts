@@ -91,8 +91,7 @@ export function createFetchWorker() {
               isSubUrl: true,
             });
           }
-          // Landing page itself doesn't get parsed (no direct picks)
-          return;
+          // Fall through — landing page may also contain predictions
         }
       }
 
