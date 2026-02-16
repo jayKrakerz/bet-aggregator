@@ -3,6 +3,8 @@ import { CoversComAdapter } from './covers-com.js';
 import { OddSharkAdapter } from './oddshark.js';
 import { PickswiseAdapter } from './pickswise.js';
 import { OneMillionPredictionsAdapter } from './onemillionpredictions.js';
+import { OddsTraderAdapter } from './oddstrader.js';
+import { ForebetAdapter } from './forebet.js';
 
 const adapters: Map<string, SiteAdapter> = new Map();
 
@@ -14,6 +16,8 @@ register(new CoversComAdapter());
 register(new OddSharkAdapter());
 register(new PickswiseAdapter());
 register(new OneMillionPredictionsAdapter());
+register(new OddsTraderAdapter());
+register(new ForebetAdapter());
 
 export function getAdapter(id: string): SiteAdapter {
   const adapter = adapters.get(id);

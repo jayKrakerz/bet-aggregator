@@ -116,7 +116,8 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     `;
 
     // Group by date, compute best 2-leg multi per day
-    const byDate: Record<string, typeof picks> = {};
+    type Pick = (typeof picks)[number];
+    const byDate: Record<string, Pick[]> = {};
     for (const p of picks) {
       const raw = p.game_date.toString();
       const d = raw.includes('T') ? raw.split('T')[0]! : new Date(raw).toISOString().split('T')[0]!;
