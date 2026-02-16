@@ -2,7 +2,7 @@ import postgres from 'postgres';
 
 const sql = postgres(
   process.env['DATABASE_URL'] ||
-    'postgres://betagg:betagg_dev@localhost:5433/bet_aggregator',
+    'postgres://betagg:betagg_dev@127.0.0.1:5433/bet_aggregator',
 );
 
 const NBA_TEAMS = [
