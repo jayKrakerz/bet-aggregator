@@ -74,6 +74,135 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     return { data: matches, count: matches.length };
   });
 
+  // GET /predictions/best-multis — best 2-leg parlay per day
+  app.get('/best-multis', async () => {
+    const picks = await sql<
+      {
+        game_date: string;
+        game_time: string | null;
+        sport: string;
+        home_team: string;
+        away_team: string;
+        pick_type: string;
+        side: string;
+        value: number | null;
+        source_name: string;
+        picker_name: string;
+        confidence: string | null;
+        reasoning: string | null;
+      }[]
+    >`
+      SELECT
+        to_char(m.game_date, 'YYYY-MM-DD') as game_date,
+        m.game_time,
+        m.sport,
+        ht.name as home_team,
+        att.name as away_team,
+        p.pick_type,
+        p.side,
+        p.value,
+        s.name as source_name,
+        p.picker_name,
+        p.confidence,
+        p.reasoning
+      FROM predictions p
+      JOIN matches m ON m.id = p.match_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams att ON att.id = m.away_team_id
+      JOIN sources s ON s.id = p.source_id
+      WHERE p.pick_type = 'moneyline'
+        AND p.value IS NOT NULL
+      ORDER BY m.game_date, m.sport, p.value ASC
+    `;
+
+    // Group by date, compute best 2-leg multi per day
+    const byDate: Record<string, typeof picks> = {};
+    for (const p of picks) {
+      const raw = p.game_date.toString();
+      const d = raw.includes('T') ? raw.split('T')[0]! : new Date(raw).toISOString().split('T')[0]!;
+      if (!byDate[d]) byDate[d] = [];
+      byDate[d]!.push(p);
+    }
+
+    const multis = [];
+    for (const [date, dayPicks] of Object.entries(byDate)) {
+      // Convert to decimal odds
+      const withDecimal = dayPicks.map((p) => {
+        let decOdds: number;
+        if (p.sport === 'football') {
+          decOdds = p.value!;
+        } else if (p.value! < 0) {
+          decOdds = 1 + 100 / Math.abs(p.value!);
+        } else {
+          decOdds = 1 + p.value! / 100;
+        }
+        return { ...p, decOdds, impliedProb: 1 / decOdds };
+      });
+
+      // Filter to strong favorites (decimal odds 1.05 - 1.60, i.e. ~63-95% implied)
+      // then sort by implied probability descending
+      const candidates = withDecimal
+        .filter((p) => p.decOdds >= 1.05 && p.decOdds <= 1.60)
+        .sort((a, b) => b.impliedProb - a.impliedProb);
+
+      // Pick the best 2 from different matches, targeting combined odds ~1.4-1.8
+      const legs: typeof withDecimal = [];
+      const usedMatchups = new Set<string>();
+      for (const p of candidates) {
+        const key = `${p.home_team} vs ${p.away_team}`;
+        if (usedMatchups.has(key)) continue;
+        // If we already have one leg, prefer the pair that lands combined ~1.5-1.8
+        if (legs.length === 1) {
+          const combo = legs[0]!.decOdds * p.decOdds;
+          // Skip if combined is too low (both legs too safe = bad payout)
+          if (combo < 1.3) continue;
+        }
+        legs.push(p);
+        usedMatchups.add(key);
+        if (legs.length === 2) break;
+      }
+
+      // Fallback: if we couldn't find 2 in the sweet spot, just take top 2 favorites
+      if (legs.length < 2) {
+        legs.length = 0;
+        usedMatchups.clear();
+        const fallback = withDecimal.sort((a, b) => b.impliedProb - a.impliedProb);
+        for (const p of fallback) {
+          const key = `${p.home_team} vs ${p.away_team}`;
+          if (usedMatchups.has(key)) continue;
+          legs.push(p);
+          usedMatchups.add(key);
+          if (legs.length === 2) break;
+        }
+      }
+
+      if (legs.length === 2) {
+        const combinedOdds = legs[0]!.decOdds * legs[1]!.decOdds;
+        const combinedProb = legs[0]!.impliedProb * legs[1]!.impliedProb;
+        multis.push({
+          date,
+          combinedOdds: Math.round(combinedOdds * 100) / 100,
+          combinedProb: Math.round(combinedProb * 1000) / 10,
+          legs: legs.map((l) => ({
+            sport: l.sport,
+            homeTeam: l.home_team,
+            awayTeam: l.away_team,
+            side: l.side,
+            decOdds: Math.round(l.decOdds * 100) / 100,
+            impliedProb: Math.round(l.impliedProb * 1000) / 10,
+            gameTime: l.game_time,
+            source: l.source_name,
+            picker: l.picker_name,
+            confidence: l.confidence,
+            league: l.reasoning,
+          })),
+        });
+      }
+    }
+
+    return { data: multis };
+  });
+
   // GET /predictions?sport=nba&date=2026-02-16&source=covers-com
   app.get('/', async (request) => {
     const { sport, date, source } = request.query as {
