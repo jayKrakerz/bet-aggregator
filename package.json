@@ -1,0 +1,45 @@
+{
+  "name": "bet-aggregator",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "migrate": "tsx scripts/migrate.ts",
+    "seed": "tsx seeds/nba-teams.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/ test/",
+    "typecheck": "tsc --noEmit",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d && sleep 3 && pnpm migrate && pnpm seed"
+  },
+  "dependencies": {
+    "@bull-board/api": "^6.6.2",
+    "@bull-board/fastify": "^6.6.2",
+    "bullmq": "^5.34.8",
+    "cheerio": "^1.0.0",
+    "fastify": "^5.2.1",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0",
+    "playwright": "^1.50.1",
+    "postgres": "^3.4.5",
+    "undici": "^6.23.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "@types/node": "^18.19.74",
+    "eslint": "^9.19.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.22.0",
+    "vitest": "^3.0.5"
+  }
+}
