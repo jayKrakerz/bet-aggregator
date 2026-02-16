@@ -65,6 +65,45 @@ describe('OneMillionPredictionsAdapter', () => {
     });
   });
 
+  describe('parse (1X2 page)', () => {
+    it('should parse 1X2 predictions from real fixture', () => {
+      const html = loadFixture('onemillionpredictions', '1x2.html');
+      const predictions = adapter.parse(html, 'football', new Date('2026-02-16'));
+
+      expect(predictions).toBeInstanceOf(Array);
+      expect(predictions.length).toBeGreaterThan(0);
+
+      predictions.forEach((p) => {
+        expect(p.sourceId).toBe('onemillionpredictions');
+        expect(p.sport).toBe('football');
+        expect(p.pickType).toBe('moneyline');
+        expect(['home', 'draw', 'away']).toContain(p.side);
+        expect(p.homeTeamRaw).toBeTruthy();
+        expect(p.awayTeamRaw).toBeTruthy();
+      });
+    });
+
+    it('should produce all three 1X2 sides', () => {
+      const html = loadFixture('onemillionpredictions', '1x2.html');
+      const predictions = adapter.parse(html, 'football', new Date('2026-02-16'));
+
+      const sides = new Set(predictions.map((p) => p.side));
+      expect(sides).toContain('home');
+      expect(sides).toContain('draw');
+      expect(sides).toContain('away');
+    });
+
+    it('should detect page type as 1x2 from title', () => {
+      const html = loadFixture('onemillionpredictions', '1x2.html');
+      const predictions = adapter.parse(html, 'football', new Date('2026-02-16'));
+
+      // All predictions should be moneyline (1X2 page)
+      predictions.forEach((p) => {
+        expect(p.pickType).toBe('moneyline');
+      });
+    });
+  });
+
   describe('discoverUrls', () => {
     it('should discover sub-page URLs from navigation table', () => {
       const html = loadFixture('onemillionpredictions', 'btts.html');
