@@ -10,6 +10,14 @@ import { ScoresAndOddsAdapter } from './scores-and-odds.js';
 import { CbsSportsAdapter } from './cbs-sports.js';
 import { BettingProsAdapter } from './bettingpros.js';
 import { DimersAdapter } from './dimers.js';
+import { VitibetAdapter } from './vitibet.js';
+import { FootballPredictionsAdapter } from './footballpredictions.js';
+import { TopBetPredictAdapter } from './topbetpredict.js';
+import { PredictzAdapter } from './predictz.js';
+import { StatAreaAdapter } from './statarea.js';
+import { EaglePredictAdapter } from './eaglepredict.js';
+import { WinDrawWinAdapter } from './windrawwin.js';
+import { BetMinesAdapter } from './betmines.js';
 
 const adapters: Map<string, SiteAdapter> = new Map();
 
@@ -28,6 +36,14 @@ register(new ScoresAndOddsAdapter());
 register(new CbsSportsAdapter());
 register(new BettingProsAdapter());
 register(new DimersAdapter());
+register(new VitibetAdapter());
+register(new FootballPredictionsAdapter());
+register(new TopBetPredictAdapter());
+register(new PredictzAdapter());
+register(new StatAreaAdapter());
+register(new EaglePredictAdapter());
+register(new WinDrawWinAdapter());
+register(new BetMinesAdapter());
 
 export function getAdapter(id: string): SiteAdapter {
   const adapter = adapters.get(id);
