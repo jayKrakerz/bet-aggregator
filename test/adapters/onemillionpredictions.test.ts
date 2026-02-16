@@ -104,6 +104,71 @@ describe('OneMillionPredictionsAdapter', () => {
     });
   });
 
+  describe('parse (Goals page)', () => {
+    it('should parse over/under predictions with line values', () => {
+      const html = loadFixture('onemillionpredictions', 'goals.html');
+      const predictions = adapter.parse(html, 'football', new Date('2026-02-16'));
+
+      expect(predictions).toBeInstanceOf(Array);
+      expect(predictions.length).toBeGreaterThan(0);
+
+      predictions.forEach((p) => {
+        expect(p.sourceId).toBe('onemillionpredictions');
+        expect(p.sport).toBe('football');
+        expect(p.pickType).toBe('over_under');
+        expect(['over', 'under']).toContain(p.side);
+        expect(p.homeTeamRaw).toBeTruthy();
+        expect(p.awayTeamRaw).toBeTruthy();
+      });
+    });
+
+    it('should store the line (e.g. 2.5) in value, not odds', () => {
+      const html = loadFixture('onemillionpredictions', 'goals.html');
+      const predictions = adapter.parse(html, 'football', new Date('2026-02-16'));
+
+      const withLine = predictions.filter((p) => p.value !== null);
+      expect(withLine.length).toBeGreaterThan(0);
+
+      // Line values should be typical goal totals (0.5 - 6.5), not decimal odds (1.xx - 10+)
+      withLine.forEach((p) => {
+        expect(p.value).toBeGreaterThanOrEqual(0.5);
+        expect(p.value).toBeLessThanOrEqual(6.5);
+      });
+    });
+
+    it('should produce both over and under sides', () => {
+      const html = loadFixture('onemillionpredictions', 'goals.html');
+      const predictions = adapter.parse(html, 'football', new Date('2026-02-16'));
+
+      const sides = new Set(predictions.map((p) => p.side));
+      expect(sides).toContain('over');
+      expect(sides).toContain('under');
+    });
+  });
+
+  describe('parse (Corners page)', () => {
+    it('should parse corner predictions with line values', () => {
+      const html = loadFixture('onemillionpredictions', 'corners.html');
+      const predictions = adapter.parse(html, 'football', new Date('2026-02-16'));
+
+      expect(predictions).toBeInstanceOf(Array);
+      expect(predictions.length).toBeGreaterThan(0);
+
+      predictions.forEach((p) => {
+        expect(p.pickType).toBe('prop');
+        expect(['over', 'under']).toContain(p.side);
+      });
+
+      // Corner lines should be in the 5.5-15.5 range, not decimal odds
+      const withLine = predictions.filter((p) => p.value !== null);
+      expect(withLine.length).toBeGreaterThan(0);
+      withLine.forEach((p) => {
+        expect(p.value).toBeGreaterThanOrEqual(5);
+        expect(p.value).toBeLessThanOrEqual(20);
+      });
+    });
+  });
+
   describe('discoverUrls', () => {
     it('should discover sub-page URLs from navigation table', () => {
       const html = loadFixture('onemillionpredictions', 'btts.html');

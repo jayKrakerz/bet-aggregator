@@ -139,8 +139,18 @@ export class OneMillionPredictionsAdapter extends BaseAdapter {
       const oddsCell = oddsSpan.closest('td');
       const oddsValue = parseFloat(oddsSpan.text().trim()) || null;
 
+      // For goals/corners/cards pages, extract the line from the ninja_clmn_nm_1 column
+      // (e.g., "2.5" for Over/Under 2.5 goals, "10.5" for corners)
+      let line: number | null = null;
+      if (pageType === 'goals' || pageType === 'corners' || pageType === 'cards') {
+        const lineCell = $row.find('.ninja_clmn_nm_1');
+        if (lineCell.length) {
+          line = parseFloat(lineCell.text().trim()) || null;
+        }
+      }
+
       // Map column class to side based on page type
-      const result = this.mapPrediction($, oddsCell, pageType, oddsValue);
+      const result = this.mapPrediction($, oddsCell, pageType, oddsValue, line);
       if (!result) return;
 
       predictions.push({
@@ -185,6 +195,8 @@ export class OneMillionPredictionsAdapter extends BaseAdapter {
 
   /**
    * Map a prediction cell to pickType + side based on page type and column class.
+   * For over/under pages (goals, corners, cards), the `line` param carries the
+   * threshold (e.g. 2.5 goals, 10.5 corners) extracted from the ninja_clmn_nm_1 column.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapPrediction(
@@ -192,6 +204,7 @@ export class OneMillionPredictionsAdapter extends BaseAdapter {
     oddsCell: any,
     pageType: string,
     oddsValue: number | null,
+    line: number | null = null,
   ): { pickType: PickType; side: Side; value: number | null } | null {
     const classes = ($(oddsCell).attr('class') || '').toLowerCase();
 
@@ -205,18 +218,18 @@ export class OneMillionPredictionsAdapter extends BaseAdapter {
       }
 
       case 'goals': {
-        // Columns: Over / Under
-        if (classes.includes('ninja_clmn_nm_x') || classes.includes('ninja_clmn_nm_1')) {
-          // Over column varies — detect from header text; generally first odds column = over
-          return { pickType: 'over_under', side: 'over', value: oddsValue };
+        // Columns: Line (ninja_clmn_nm_1) | Over (ninja_clmn_nm_x) | Under (ninja_clmn_nm_2)
+        // Use the line value (e.g. 2.5) instead of odds for the value field
+        if (classes.includes('ninja_clmn_nm_x')) {
+          return { pickType: 'over_under', side: 'over', value: line };
         }
         if (classes.includes('ninja_clmn_nm_2')) {
-          return { pickType: 'over_under', side: 'under', value: oddsValue };
+          return { pickType: 'over_under', side: 'under', value: line };
         }
         // Fall back to column index
         const cellIndex = $(oddsCell).index();
-        if (cellIndex <= 3) return { pickType: 'over_under', side: 'over', value: oddsValue };
-        return { pickType: 'over_under', side: 'under', value: oddsValue };
+        if (cellIndex <= 3) return { pickType: 'over_under', side: 'over', value: line };
+        return { pickType: 'over_under', side: 'under', value: line };
       }
 
       case 'btts': {
@@ -232,16 +245,17 @@ export class OneMillionPredictionsAdapter extends BaseAdapter {
 
       case 'corners':
       case 'cards': {
-        // Over / Under columns (same structure as goals)
-        if (classes.includes('ninja_clmn_nm_x') || classes.includes('ninja_clmn_nm_1')) {
-          return { pickType: 'prop', side: 'over', value: oddsValue };
+        // Columns: Line (ninja_clmn_nm_1) | Over (ninja_clmn_nm_x) | Under (ninja_clmn_nm_2)
+        // Use the line value (e.g. 10.5 corners) instead of odds
+        if (classes.includes('ninja_clmn_nm_x')) {
+          return { pickType: 'prop', side: 'over', value: line };
         }
         if (classes.includes('ninja_clmn_nm_2')) {
-          return { pickType: 'prop', side: 'under', value: oddsValue };
+          return { pickType: 'prop', side: 'under', value: line };
         }
         const idx = $(oddsCell).index();
-        if (idx <= 3) return { pickType: 'prop', side: 'over', value: oddsValue };
-        return { pickType: 'prop', side: 'under', value: oddsValue };
+        if (idx <= 3) return { pickType: 'prop', side: 'over', value: line };
+        return { pickType: 'prop', side: 'under', value: line };
       }
 
       case 'correct-score': {
