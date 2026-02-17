@@ -1,0 +1,11 @@
+/snapshots/
+test/
+dist/
+*.test.ts
+scripts/
+seeds/
+migrations/
+docker-compose.yml
+.env*
+CLAUDE.md
+vitest.config.ts

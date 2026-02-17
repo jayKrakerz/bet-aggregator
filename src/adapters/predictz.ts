@@ -8,13 +8,15 @@ import type { RawPrediction, Side, Confidence } from '../types/prediction.js';
  *
  * Cloudflare-protected site requiring browser rendering.
  *
- * Page structure:
- *   - `.pointed` table rows for each match prediction
- *   - Teams in adjacent cells, home first
- *   - Prediction: "1", "X", or "2" in a highlighted cell
- *   - Odds: decimal odds in three cells (home/draw/away)
- *   - Score prediction: "X-Y" format
- *   - League: section headers
+ * Page structure (div-based, not tables):
+ *   - `.pttable` — prediction table container
+ *   - `.pttrnh.ptttl` — league header row with `.pttd.ptlg > h2 > a`
+ *   - `.pttr.ptcnt` — match prediction row
+ *     - `.pttd.ptmobh` — home team name (mobile)
+ *     - `.pttd.ptmoba` — away team name (mobile)
+ *     - `.pttd.ptgame > a` — "Home v Away" full match link
+ *     - `.pttd.ptprd > .ptpredboxsml` — prediction text ("Home 2-0", "Away 0-1", "Draw 1-1")
+ *     - `.pttd.ptodds > a[data-odds]` — odds with data-home, data-away, data-odds attrs
  */
 export class PredictzAdapter extends BaseAdapter {
   readonly config: SiteAdapterConfig = {
@@ -30,7 +32,7 @@ export class PredictzAdapter extends BaseAdapter {
   };
 
   async browserActions(page: Page): Promise<void> {
-    await page.waitForSelector('table.pointed, .pointed, .pttr', { timeout: 20000 }).catch(() => {});
+    await page.waitForSelector('.pttable, .pttr, .ptcnt', { timeout: 20000 }).catch(() => {});
     await page.waitForTimeout(2000);
   }
 
@@ -39,48 +41,56 @@ export class PredictzAdapter extends BaseAdapter {
     const predictions: RawPrediction[] = [];
     let currentLeague = '';
 
-    // Predictz uses table rows with class "pointed" or similar
-    $('table tr, .pointed tr, .pttr').each((_i, el) => {
-      const $row = $(el);
-      const cells = $row.find('td');
+    // League headers
+    $('.pttrnh.ptttl').each((_i, el) => {
+      const leagueText = $(el).find('.ptlg h2 a').text().trim()
+        || $(el).find('.ptlg h2').text().trim()
+        || $(el).find('.ptlg').text().trim();
+      if (leagueText) currentLeague = leagueText;
+    });
 
-      // League header rows typically have colspan or a single cell
-      if (cells.length === 1 || (cells.length > 0 && cells.first().attr('colspan'))) {
-        const text = cells.first().text().trim();
-        if (text && !text.match(/^\d/)) {
-          currentLeague = text;
-        }
+    // Match rows — each `.pttr.ptcnt` is one match
+    let league = '';
+    $('.pttable').children().each((_i, el) => {
+      const $el = $(el);
+
+      // Update league from header rows
+      if ($el.hasClass('pttrnh') && $el.hasClass('ptttl')) {
+        const leagueText = $el.find('.ptlg h2 a').text().trim()
+          || $el.find('.ptlg h2').text().trim()
+          || $el.find('.ptlg').text().trim();
+        if (leagueText) league = leagueText;
         return;
       }
 
-      // Match rows need enough cells for teams + prediction + odds
-      if (cells.length < 5) return;
+      if (!($el.hasClass('pttr') && $el.hasClass('ptcnt'))) return;
 
-      // Extract teams — look for links or plain text
-      const homeTeamRaw = this.findTeam($, cells, 0);
-      const awayTeamRaw = this.findTeam($, cells, 1);
+      // Extract teams
+      const homeTeamRaw = $el.find('.ptmobh').first().text().trim();
+      const awayTeamRaw = $el.find('.ptmoba').first().text().trim();
       if (!homeTeamRaw || !awayTeamRaw) return;
 
-      // Find the prediction cell (bold or highlighted)
-      const predText = this.findPrediction($, cells);
+      // Extract prediction text: "Home 2-0", "Away 0-1", "Draw 1-1"
+      const predText = $el.find('.ptpredboxsml').first().text().trim();
       if (!predText) return;
 
-      const side = this.mapSide(predText);
+      const { side, scorePred } = this.parsePredText(predText);
       if (!side) return;
 
-      // Extract odds
-      const odds = this.extractOdds($, cells);
+      // Extract odds from data-odds attributes
+      const odds: number[] = [];
+      $el.find('.ptodds a[data-odds]').each((_j, oddsEl) => {
+        const val = parseFloat($(oddsEl).attr('data-odds') || '');
+        if (!isNaN(val) && val > 1) odds.push(val);
+      });
+
+      // Pick the relevant odds value for the predicted side
       let value: number | null = null;
       if (side === 'home' && odds[0]) value = odds[0];
       else if (side === 'draw' && odds[1]) value = odds[1];
       else if (side === 'away' && odds[2]) value = odds[2];
 
-      // Extract score prediction
-      const scorePred = this.findScore($, cells);
-
-      // Extract date/time
-      const timeText = cells.first().text().trim();
-      const timeMatch = timeText.match(/(\d{1,2}:\d{2})/);
+      const reasoning = [league, scorePred ? `Predicted: ${scorePred}` : ''].filter(Boolean).join(' | ') || null;
 
       predictions.push({
         sourceId: this.config.id,
@@ -88,13 +98,13 @@ export class PredictzAdapter extends BaseAdapter {
         homeTeamRaw,
         awayTeamRaw,
         gameDate: fetchedAt.toISOString().split('T')[0]!,
-        gameTime: timeMatch ? timeMatch[1]! : null,
+        gameTime: null,
         pickType: 'moneyline',
         side,
         value,
         pickerName: 'Predictz',
         confidence: this.oddsToConfidence(value),
-        reasoning: [currentLeague, scorePred ? `Predicted: ${scorePred}` : ''].filter(Boolean).join(' | ') || null,
+        reasoning,
         fetchedAt,
       });
     });
@@ -102,76 +112,18 @@ export class PredictzAdapter extends BaseAdapter {
     return predictions;
   }
 
-  private findTeam(
-    $: ReturnType<typeof this.load>,
-    cells: ReturnType<ReturnType<typeof this.load>>,
-    index: number,
-  ): string {
-    // Teams might be in cells with links or direct text
-    for (let i = 0; i < cells.length; i++) {
-      const cell = $(cells[i]);
-      const link = cell.find('a');
-      const text = link.length > 0 ? link.first().text().trim() : cell.text().trim();
-      // Skip cells that look like times, odds, or predictions
-      if (!text || /^\d{1,2}:\d{2}$/.test(text) || /^\d+\.\d+$/.test(text) || /^[12X]$/.test(text)) continue;
-      if (index === 0) return text;
-      index--;
-    }
-    return '';
-  }
+  private parsePredText(text: string): { side: Side | null; scorePred: string } {
+    const lower = text.toLowerCase();
+    let side: Side | null = null;
+    if (lower.startsWith('home')) side = 'home';
+    else if (lower.startsWith('away')) side = 'away';
+    else if (lower.startsWith('draw')) side = 'draw';
 
-  private findPrediction(
-    $: ReturnType<typeof this.load>,
-    cells: ReturnType<ReturnType<typeof this.load>>,
-  ): string {
-    // Look for bold text or highlighted cell with 1, X, or 2
-    for (let i = 0; i < cells.length; i++) {
-      const cell = $(cells[i]);
-      const bold = cell.find('b, strong').text().trim();
-      if (/^[12X]$/i.test(bold)) return bold;
-    }
-    // Fallback: look for cell with specific class
-    for (let i = 0; i < cells.length; i++) {
-      const cell = $(cells[i]);
-      const text = cell.text().trim();
-      if (/^[12X]$/i.test(text) && (cell.hasClass('pointed3') || cell.css('font-weight') === 'bold')) {
-        return text;
-      }
-    }
-    return '';
-  }
+    // Extract score prediction (e.g. "2-0", "0-1", "1-1")
+    const scoreMatch = text.match(/(\d+-\d+)/);
+    const scorePred = scoreMatch ? scoreMatch[1]! : '';
 
-  private extractOdds(
-    $: ReturnType<typeof this.load>,
-    cells: ReturnType<ReturnType<typeof this.load>>,
-  ): number[] {
-    const odds: number[] = [];
-    for (let i = 0; i < cells.length; i++) {
-      const text = $(cells[i]).text().trim();
-      const val = parseFloat(text);
-      if (!isNaN(val) && val > 1.0 && val < 50) {
-        odds.push(val);
-      }
-    }
-    return odds;
-  }
-
-  private findScore(
-    $: ReturnType<typeof this.load>,
-    cells: ReturnType<ReturnType<typeof this.load>>,
-  ): string {
-    for (let i = 0; i < cells.length; i++) {
-      const text = $(cells[i]).text().trim();
-      if (/^\d+-\d+$/.test(text) || /^\d+:\d+$/.test(text)) return text;
-    }
-    return '';
-  }
-
-  private mapSide(pred: string): Side | null {
-    if (pred === '1') return 'home';
-    if (pred.toUpperCase() === 'X') return 'draw';
-    if (pred === '2') return 'away';
-    return null;
+    return { side, scorePred };
   }
 
   private oddsToConfidence(odds: number | null): Confidence | null {

@@ -6,6 +6,7 @@ import { healthRoutes } from './routes/health.js';
 import { predictionsRoutes } from './routes/predictions.js';
 import { sourcesRoutes } from './routes/sources.js';
 import { bullBoardPlugin } from './plugins/bull-board.js';
+import { websocketPlugin } from './plugins/websocket.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +26,7 @@ export async function createServer() {
     prefix: '/',
   });
 
+  await app.register(websocketPlugin);
   await app.register(healthRoutes);
   await app.register(predictionsRoutes, { prefix: '/predictions' });
   await app.register(sourcesRoutes, { prefix: '/sources' });

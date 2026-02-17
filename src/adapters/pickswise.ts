@@ -1,3 +1,4 @@
+import type { Page } from 'playwright';
 import { BaseAdapter } from './base-adapter.js';
 import type { SiteAdapterConfig } from '../types/adapter.js';
 import type { RawPrediction, PickType, Side } from '../types/prediction.js';
@@ -5,31 +6,20 @@ import type { RawPrediction, PickType, Side } from '../types/prediction.js';
 /**
  * Pickswise adapter.
  *
- * Pickswise is a Next.js app. All pick data lives in `__NEXT_DATA__` JSON
- * embedded in the HTML, making DOM parsing unnecessary.
+ * Pickswise is a Next.js app. Pick data is loaded via client-side JS after
+ * hydration, so `__NEXT_DATA__` in the initial HTML is usually empty.
+ * Requires browser rendering, then attempts __NEXT_DATA__ first and
+ * falls back to DOM extraction from rendered pick cards.
  *
- * Data path:
+ * Data path (when populated):
  *   props.pageProps.initialState.sportPredictionsPicks[pagePath] → Prediction[]
- *
- * Each Prediction contains:
- *   - homeTeam / awayTeam (with nickname, name, abbreviation)
- *   - startTimeString (ISO date)
- *   - basePicks[] — individual picks, each with:
- *     - outcome: "Syracuse +19.5" or "Iowa State Win" or "Over 215.5"
- *     - line: numeric line value (null for moneyline)
- *     - oddsAmerican: "-115"
- *     - market: "Point Spread" | "Money Line" | "Total" | etc.
- *     - betTypes[].slug: "point-spread" | "money-line" | "over-under" | "prop-bets"
- *     - confidence: 1-5 (5 = Best Bet)
- *     - tipsters[]: expert info
- *     - reasoning: HTML analysis text
  */
 export class PickswiseAdapter extends BaseAdapter {
   readonly config: SiteAdapterConfig = {
     id: 'pickswise',
     name: 'Pickswise',
     baseUrl: 'https://www.pickswise.com',
-    fetchMethod: 'http',
+    fetchMethod: 'browser',
     paths: { nba: '/nba/picks/' },
     cron: '0 */30 9-23 * * *',
     rateLimitMs: 3000,
@@ -37,19 +27,110 @@ export class PickswiseAdapter extends BaseAdapter {
     backoff: { type: 'exponential', delay: 5000 },
   };
 
+  async browserActions(page: Page): Promise<void> {
+    // Wait for pick cards to render after React hydration
+    await page.waitForSelector('[class*="PickCard"], [class*="pickCard"], [class*="GameCard"], [class*="gameCard"], [class*="card"]', { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+    // Scroll to trigger lazy loading
+    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+    await page.waitForTimeout(2000);
+  }
+
   parse(html: string, sport: string, fetchedAt: Date): RawPrediction[] {
     const $ = this.load(html);
 
-    // Extract __NEXT_DATA__ JSON
+    // Try __NEXT_DATA__ JSON first (may be populated after browser rendering)
     const nextDataScript = $('#__NEXT_DATA__').html();
-    if (!nextDataScript) return [];
-
-    try {
-      const nextData = JSON.parse(nextDataScript) as NextData;
-      return this.extractFromNextData(nextData, sport, fetchedAt);
-    } catch {
-      return [];
+    if (nextDataScript) {
+      try {
+        const nextData = JSON.parse(nextDataScript) as NextData;
+        const results = this.extractFromNextData(nextData, sport, fetchedAt);
+        if (results.length > 0) return results;
+      } catch {
+        // Fall through to DOM parsing
+      }
     }
+
+    // Fallback: extract picks from rendered DOM
+    return this.extractFromDom($, sport, fetchedAt);
+  }
+
+  /**
+   * Extract predictions from the rendered DOM when __NEXT_DATA__ is empty.
+   * Pickswise uses hashed CSS module class names, so we match partial patterns.
+   */
+  private extractFromDom(
+    $: ReturnType<typeof this.load>,
+    sport: string,
+    fetchedAt: Date,
+  ): RawPrediction[] {
+    const predictions: RawPrediction[] = [];
+
+    // Look for elements that contain pick data by searching for common patterns
+    // Pickswise cards typically have team names, outcome text, and odds
+    $('[class*="PickCard"], [class*="pickCard"], [class*="GameCard"], [class*="gameCard"]').each((_i, el) => {
+      const $card = $(el);
+      const text = $card.text();
+
+      // Look for team names in heading-like elements
+      const teams = $card.find('h2, h3, [class*="team"], [class*="Team"]');
+      if (teams.length < 2) return;
+
+      const homeTeamRaw = $(teams[0]).text().trim();
+      const awayTeamRaw = $(teams[1]).text().trim();
+      if (!homeTeamRaw || !awayTeamRaw) return;
+
+      // Extract outcome text
+      const outcome = $card.find('[class*="outcome"], [class*="Outcome"], [class*="pick"], [class*="Pick"]').first().text().trim();
+      if (!outcome) return;
+
+      const pickType = this.inferPickType(outcome);
+      const side = this.resolveSideFromText(outcome, homeTeamRaw, awayTeamRaw);
+      const value = this.resolveValueFromText(outcome, pickType);
+
+      // Extract odds
+      const oddsText = $card.find('[class*="odds"], [class*="Odds"]').first().text().trim();
+      const oddsNum = oddsText ? parseFloat(oddsText.replace(/[^0-9.+-]/g, '')) : null;
+
+      // Extract tipster
+      const tipster = $card.find('[class*="tipster"], [class*="Tipster"], [class*="expert"], [class*="Expert"]').first().text().trim();
+
+      predictions.push({
+        sourceId: this.config.id,
+        sport,
+        homeTeamRaw,
+        awayTeamRaw,
+        gameDate: fetchedAt.toISOString().split('T')[0]!,
+        gameTime: null,
+        pickType,
+        side,
+        value: value ?? (oddsNum && !isNaN(oddsNum) ? oddsNum : null),
+        pickerName: tipster || 'Pickswise Expert',
+        confidence: null,
+        reasoning: null,
+        fetchedAt,
+      });
+    });
+
+    return predictions;
+  }
+
+  private resolveSideFromText(outcome: string, home: string, away: string): Side {
+    const lower = outcome.toLowerCase();
+    if (lower.startsWith('over')) return 'over';
+    if (lower.startsWith('under')) return 'under';
+    if (home && lower.includes(home.toLowerCase().split(' ')[0] || '')) return 'home';
+    if (away && lower.includes(away.toLowerCase().split(' ')[0] || '')) return 'away';
+    return 'home';
+  }
+
+  private resolveValueFromText(outcome: string, pickType: PickType): number | null {
+    const match = outcome.match(/[+-]?\d+\.?\d*/);
+    if (!match) return null;
+    const val = parseFloat(match[0]);
+    if (isNaN(val)) return null;
+    if (pickType === 'spread' || pickType === 'over_under') return val;
+    return null;
   }
 
   private extractFromNextData(

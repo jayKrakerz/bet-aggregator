@@ -1,5 +1,6 @@
 import { sql } from './pool.js';
 import type { NormalizedPrediction } from '../types/prediction.js';
+import type { MatchStatus, Grade } from '../types/result.js';
 
 interface FindOrCreateMatchInput {
   sport: string;
@@ -92,4 +93,150 @@ export async function createTeamWithAlias(name: string, sport: string): Promise<
   `;
 
   return teamId;
+}
+
+// ===== Match Results & Grading =====
+
+export async function insertMatchResult(input: {
+  matchId: number;
+  homeScore: number;
+  awayScore: number;
+  status: MatchStatus;
+  resultSource?: string;
+}): Promise<boolean> {
+  const result = await sql`
+    INSERT INTO match_results (match_id, home_score, away_score, status, result_source)
+    VALUES (${input.matchId}, ${input.homeScore}, ${input.awayScore}, ${input.status}, ${input.resultSource ?? 'espn'})
+    ON CONFLICT (match_id) DO UPDATE SET
+      home_score = EXCLUDED.home_score,
+      away_score = EXCLUDED.away_score,
+      status = EXCLUDED.status,
+      settled_at = NOW()
+  `;
+  return result.count > 0;
+}
+
+export async function getUngradedPredictions(matchId: number) {
+  return sql<{
+    id: number;
+    pick_type: string;
+    side: string;
+    value: number | null;
+  }[]>`
+    SELECT id, pick_type, side, value
+    FROM predictions
+    WHERE match_id = ${matchId} AND grade IS NULL
+  `;
+}
+
+export async function updatePredictionGrade(
+  predictionId: number,
+  grade: Grade,
+): Promise<void> {
+  await sql`
+    UPDATE predictions SET grade = ${grade}, graded_at = NOW()
+    WHERE id = ${predictionId}
+  `;
+}
+
+export async function getAccuracyStats(filters?: {
+  sport?: string;
+  pickType?: string;
+}) {
+  return sql<{
+    sport: string;
+    pick_type: string;
+    grade: string;
+    count: number;
+  }[]>`
+    SELECT sport, pick_type, grade, count(*)::int as count
+    FROM predictions
+    WHERE grade IS NOT NULL
+      ${filters?.sport ? sql`AND sport = ${filters.sport}` : sql``}
+      ${filters?.pickType ? sql`AND pick_type = ${filters.pickType}` : sql``}
+    GROUP BY sport, pick_type, grade
+    ORDER BY sport, pick_type, grade
+  `;
+}
+
+export async function getAccuracyHistory(days: number = 30) {
+  return sql<{
+    date: string;
+    wins: number;
+    losses: number;
+    pushes: number;
+    total: number;
+  }[]>`
+    SELECT
+      to_char(graded_at::date, 'YYYY-MM-DD') as date,
+      count(*) FILTER (WHERE grade = 'win')::int as wins,
+      count(*) FILTER (WHERE grade = 'loss')::int as losses,
+      count(*) FILTER (WHERE grade = 'push')::int as pushes,
+      count(*)::int as total
+    FROM predictions
+    WHERE grade IS NOT NULL AND graded_at >= NOW() - make_interval(days => ${days})
+    GROUP BY graded_at::date
+    ORDER BY graded_at::date DESC
+  `;
+}
+
+export async function getTeamForm(teamId: number, limit: number = 10) {
+  return sql<{
+    match_id: number;
+    is_home: boolean;
+    home_score: number;
+    away_score: number;
+    game_date: string;
+  }[]>`
+    SELECT
+      mr.match_id,
+      (m.home_team_id = ${teamId}) as is_home,
+      mr.home_score,
+      mr.away_score,
+      to_char(m.game_date, 'YYYY-MM-DD') as game_date
+    FROM match_results mr
+    JOIN matches m ON m.id = mr.match_id
+    WHERE mr.status = 'final'
+      AND (m.home_team_id = ${teamId} OR m.away_team_id = ${teamId})
+    ORDER BY m.game_date DESC
+    LIMIT ${limit}
+  `;
+}
+
+export async function getH2HResults(homeTeamId: number, awayTeamId: number, limit: number = 10) {
+  return sql<{
+    home_score: number;
+    away_score: number;
+    game_date: string;
+  }[]>`
+    SELECT mr.home_score, mr.away_score, to_char(m.game_date, 'YYYY-MM-DD') as game_date
+    FROM match_results mr
+    JOIN matches m ON m.id = mr.match_id
+    WHERE mr.status = 'final'
+      AND m.home_team_id = ${homeTeamId} AND m.away_team_id = ${awayTeamId}
+    ORDER BY m.game_date DESC
+    LIMIT ${limit}
+  `;
+}
+
+export async function getHomeSplit(teamId: number) {
+  return sql<{ wins: number; total: number }[]>`
+    SELECT
+      count(*) FILTER (WHERE mr.home_score > mr.away_score)::int as wins,
+      count(*)::int as total
+    FROM match_results mr
+    JOIN matches m ON m.id = mr.match_id
+    WHERE mr.status = 'final' AND m.home_team_id = ${teamId}
+  `;
+}
+
+export async function getAwaySplit(teamId: number) {
+  return sql<{ wins: number; total: number }[]>`
+    SELECT
+      count(*) FILTER (WHERE mr.away_score > mr.home_score)::int as wins,
+      count(*)::int as total
+    FROM match_results mr
+    JOIN matches m ON m.id = mr.match_id
+    WHERE mr.status = 'final' AND m.away_team_id = ${teamId}
+  `;
 }

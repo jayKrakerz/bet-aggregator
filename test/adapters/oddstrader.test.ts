@@ -7,7 +7,7 @@ describe('OddsTraderAdapter', () => {
 
   it('should have correct config', () => {
     expect(adapter.config.id).toBe('oddstrader');
-    expect(adapter.config.fetchMethod).toBe('http');
+    expect(adapter.config.fetchMethod).toBe('browser');
     expect(adapter.config.baseUrl).toBe('https://www.oddstrader.com');
     expect(adapter.config.paths.nba).toBe('/nba/picks/');
     expect(adapter.config.paths.nfl).toBe('/nfl/picks/');

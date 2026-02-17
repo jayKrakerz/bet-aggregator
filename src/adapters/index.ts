@@ -12,12 +12,13 @@ import { BettingProsAdapter } from './bettingpros.js';
 import { DimersAdapter } from './dimers.js';
 import { VitibetAdapter } from './vitibet.js';
 import { FootballPredictionsAdapter } from './footballpredictions.js';
-import { TopBetPredictAdapter } from './topbetpredict.js';
+// TopBetPredict removed — site is blog-only, no structured predictions
 import { PredictzAdapter } from './predictz.js';
 import { StatAreaAdapter } from './statarea.js';
 import { EaglePredictAdapter } from './eaglepredict.js';
 import { WinDrawWinAdapter } from './windrawwin.js';
-import { BetMinesAdapter } from './betmines.js';
+// BetMines disabled — Cloudflare blocks even Playwright; revisit with stealth plugin
+// import { BetMinesAdapter } from './betmines.js';
 
 const adapters: Map<string, SiteAdapter> = new Map();
 
@@ -38,12 +39,12 @@ register(new BettingProsAdapter());
 register(new DimersAdapter());
 register(new VitibetAdapter());
 register(new FootballPredictionsAdapter());
-register(new TopBetPredictAdapter());
+// TopBetPredict removed — site no longer has predictions
 register(new PredictzAdapter());
 register(new StatAreaAdapter());
 register(new EaglePredictAdapter());
 register(new WinDrawWinAdapter());
-register(new BetMinesAdapter());
+// register(new BetMinesAdapter()); // Cloudflare blocks even Playwright
 
 export function getAdapter(id: string): SiteAdapter {
   const adapter = adapters.get(id);

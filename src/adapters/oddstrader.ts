@@ -1,3 +1,4 @@
+import type { Page } from 'playwright';
 import { BaseAdapter } from './base-adapter.js';
 import type { SiteAdapterConfig } from '../types/adapter.js';
 import type { RawPrediction, Side, Confidence } from '../types/prediction.js';
@@ -5,8 +6,9 @@ import type { RawPrediction, Side, Confidence } from '../types/prediction.js';
 /**
  * OddsTrader adapter.
  *
- * OddsTrader is a React SSR app that embeds all pick data in
- * `window.__INITIAL_STATE__` JSON. No browser rendering needed.
+ * OddsTrader is a React SSR app that embeds event metadata in
+ * `window.__INITIAL_STATE__` JSON but loads picks via JS hydration.
+ * Requires browser rendering to populate the picks data.
  *
  * Data path:
  *   state.picks.events[lid]  → event metadata (teams, date, venue)
@@ -23,7 +25,7 @@ export class OddsTraderAdapter extends BaseAdapter {
     id: 'oddstrader',
     name: 'OddsTrader',
     baseUrl: 'https://www.oddstrader.com',
-    fetchMethod: 'http',
+    fetchMethod: 'browser',
     paths: {
       nba: '/nba/picks/',
       nfl: '/nfl/picks/',
@@ -35,6 +37,24 @@ export class OddsTraderAdapter extends BaseAdapter {
     maxRetries: 3,
     backoff: { type: 'exponential', delay: 5000 },
   };
+
+  async browserActions(page: Page): Promise<void> {
+    // Wait for React to hydrate and picks data to load into __INITIAL_STATE__
+    await page.waitForFunction(
+      () => {
+        const w = globalThis as Record<string, unknown>;
+        const state = w.__INITIAL_STATE__ as Record<string, unknown> | undefined;
+        if (!state?.picks) return false;
+        const picks = state.picks as Record<string, unknown>;
+        const picksMap = picks.picks as Record<string, { picks?: unknown[] }> | undefined;
+        if (!picksMap) return false;
+        return Object.values(picksMap).some((c) => c.picks && c.picks.length > 0);
+      },
+      { timeout: 15000 },
+    ).catch(() => {});
+    // Extra buffer for any remaining async updates
+    await page.waitForTimeout(2000);
+  }
 
   private static readonly SPORT_TO_LID: Record<string, string[]> = {
     nba: ['5'],

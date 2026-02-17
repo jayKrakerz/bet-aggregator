@@ -4,6 +4,8 @@ import { config } from '../config.js';
 import { QUEUE_NAMES } from '../scheduler/constants.js';
 import { getAdapter } from '../adapters/index.js';
 import { normalizeAndInsert } from '../pipeline/normalizer.js';
+import { invalidateCache } from '../api/cache.js';
+import { broadcast } from '../api/ws-hub.js';
 import { logger } from '../utils/logger.js';
 
 interface ParseJobData {
@@ -35,6 +37,12 @@ export function createParseWorker() {
 
       const inserted = await normalizeAndInsert(rawPredictions);
       log.info({ inserted }, 'Predictions normalized and inserted');
+
+      if (inserted > 0) {
+        const today = new Date().toISOString().split('T')[0]!;
+        await invalidateCache(sport, today);
+        broadcast('predictions:updated', { sport, count: inserted });
+      }
     },
     {
       connection,

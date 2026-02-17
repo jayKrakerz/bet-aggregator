@@ -54,8 +54,8 @@ export class CoversComAdapter extends BaseAdapter {
    * - Odds tables: `table.Covers-CoversArticles-AdminArticleTable`
    *   - Headers: [TeamA, "", TeamB] → 3-col matchup table
    *   - Rows: [odds/spread, "Moneyline"/"Spread"/"Total", odds/spread]
-   * - Best bets: `<strong>My best bet</strong>` followed by pick text
-   *   - Pattern: "TeamOrSide (odds at sportsbook)"
+   * - Best bets: `<strong>Best bet:</strong>` or `<strong>My best bet</strong>` followed by pick text
+   *   - Pattern: "TeamOrSide to win (odds at sportsbook)"
    * - Author: `[class*="authorName"]`
    */
   parse(html: string, sport: string, fetchedAt: Date): RawPrediction[] {
@@ -66,29 +66,29 @@ export class CoversComAdapter extends BaseAdapter {
       $('[class*="authorName"]').first().text().trim().split('\n')[0]?.trim() ||
       'Covers Expert';
 
-    // Extract "My best bet" callouts from article body
-    const articleText = $('.covers-CoversArticles-articleText');
-
-    // Find all <strong>My best bet</strong> followed by the pick text
-    articleText.find('strong, b').each((_i, el) => {
+    // Extract best bet callouts from article body
+    // Handles both <strong>Best bet:</strong> and <strong>My best bet</strong> formats
+    $('strong, b').each((_i, el) => {
       const strongText = $(el).text().trim().toLowerCase();
-      if (!strongText.includes('my best bet') && !strongText.includes('best bet'))
-        return;
+      if (!strongText.includes('best bet')) return;
 
-      // The pick text is immediately after the strong tag, in the same parent <p>
+      // The pick text is in the same parent <p>
       const parent = $(el).parent();
       const fullText = parent.text().trim();
 
-      // Remove the "My best bet" prefix
+      // Remove the "Best bet:" / "My best bet" prefix
       const pickText = fullText
-        .replace(/my best bet/i, '')
+        .replace(/my best bet:?\s*/i, '')
         .replace(/best bet:?\s*/i, '')
         .trim();
 
       if (!pickText) return;
 
-      // Parse the pick: "World (+165 at bet365)" or "Under 81.5 (-110 at bet365)"
-      const parsed = this.parseBestBetText(pickText);
+      // Also extract linked odds text (e.g. "+320 at bet365")
+      const linkedOdds = parent.find('a').text().trim();
+
+      // Parse the pick — handles both inline and linked odds
+      const parsed = this.parseBestBetText(pickText, linkedOdds);
       if (!parsed) return;
 
       // Try to find the matchup from nearby tables
@@ -115,24 +115,43 @@ export class CoversComAdapter extends BaseAdapter {
   }
 
   /**
-   * Parse "World (+165 at bet365)" or "Under 81.5 (-110 at bet365)"
-   * or "Luka Doncic 2+ threes (+145 at bet365)"
-   * or "Stripes -2.5 (-105 at bet365)"
+   * Parse best bet text in several formats:
+   * - "World (+165 at bet365)" — inline odds
+   * - "Keshad Johnson to win (+320 at bet365)" — "to win" format with linked odds
+   * - "Under 81.5 (-110 at bet365)"
+   * - "Stripes -2.5 (-105 at bet365)"
+   * - "Luka Doncic 2+ threes (+145 at bet365)"
    */
-  private parseBestBetText(text: string): {
+  private parseBestBetText(text: string, linkedOdds?: string): {
     team: string;
     pickType: PickType;
     side: Side;
     value: number | null;
   } | null {
-    // Match pattern: "Something (odds at book)" or "Something odds"
-    const match = text.match(
+    // Try to match "Something (odds at book)"
+    let match = text.match(
       /^(.+?)\s*\(([+-]?\d+\.?\d*)\s*(?:at\s+.+?)?\)/,
     );
-    if (!match) return null;
 
-    const pickPart = match[1]!.trim();
-    const oddsStr = match[2]!;
+    // If no inline odds, try extracting odds from the linked text
+    let pickPart: string;
+    let oddsStr: string;
+
+    if (match) {
+      pickPart = match[1]!.trim().replace(/\s+to\s+win\s*$/i, '').trim();
+      oddsStr = match[2]!;
+    } else {
+      // Fallback: "TeamName to win" with odds from linked <a> text
+      const oddsMatch = (linkedOdds || '').match(/([+-]?\d+\.?\d*)\s*(?:at\s+.+)?/);
+      if (!oddsMatch) return null;
+      oddsStr = oddsMatch[1]!;
+      // Remove the linked text from the pick text
+      pickPart = text.replace(/\(.*\)/, '').replace(linkedOdds || '', '').trim();
+      // Clean trailing "to win" etc
+      pickPart = pickPart.replace(/\s+to\s+win\s*$/i, '').trim();
+    }
+
+    if (!pickPart) return null;
 
     // Detect pick type from the text
     const lower = pickPart.toLowerCase();

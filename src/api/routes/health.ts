@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { sql } from '../../db/pool.js';
+import { getClientCount } from '../ws-hub.js';
 
 export const healthRoutes: FastifyPluginAsync = async (app) => {
   app.get('/health', async () => {
@@ -7,6 +8,7 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
     return {
       status: dbCheck ? 'healthy' : 'degraded',
       timestamp: new Date().toISOString(),
+      wsClients: getClientCount(),
       services: {
         database: dbCheck ? 'up' : 'down',
       },

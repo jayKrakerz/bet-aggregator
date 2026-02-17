@@ -1,0 +1,13 @@
+{
+  "installCommand": "pnpm install",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/health", "destination": "/api" },
+    { "source": "/predictions/:path*", "destination": "/api" },
+    { "source": "/sources/:path*", "destination": "/api" }
+  ]
+}

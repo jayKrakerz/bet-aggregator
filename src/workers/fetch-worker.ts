@@ -22,18 +22,34 @@ interface FetchJobData {
 
 const connection = { host: config.REDIS_HOST, port: config.REDIS_PORT };
 
+function looksLikeBadResponse(body: string): boolean {
+  if (body.length < 1024) return true;
+  const snippet = body.slice(0, 500).toLowerCase();
+  return /403|404|forbidden|not found|server error|cloudflare|access denied/.test(snippet);
+}
+
 async function doFetch(
   url: string,
   adapter: ReturnType<typeof getAdapter>,
-): Promise<{ html: string; httpStatus: number | null }> {
+): Promise<{ html: string; httpStatus: number | null; usedBrowserFallback: boolean }> {
   if (adapter.config.fetchMethod === 'browser') {
     return {
       html: await fetchBrowser(url, adapter.browserActions?.bind(adapter)),
       httpStatus: null,
+      usedBrowserFallback: false,
     };
   }
   const result = await fetchHttp(url);
-  return { html: result.body, httpStatus: result.status };
+  if (looksLikeBadResponse(result.body)) {
+    logger.info({ url }, 'HTTP response looks bad, retrying with browser fallback');
+    try {
+      const html = await fetchBrowser(url, adapter.browserActions?.bind(adapter));
+      return { html, httpStatus: null, usedBrowserFallback: true };
+    } catch (err) {
+      logger.warn({ url, err }, 'Browser fallback failed, using original HTTP response');
+    }
+  }
+  return { html: result.body, httpStatus: result.status, usedBrowserFallback: false };
 }
 
 export function createFetchWorker() {
@@ -56,7 +72,7 @@ export function createFetchWorker() {
       await acquireRateLimit(adapterId, adapter.config.rateLimitMs);
 
       const startMs = Date.now();
-      const { html, httpStatus } = await doFetch(url, adapter);
+      const { html, httpStatus, usedBrowserFallback } = await doFetch(url, adapter);
       const durationMs = Date.now() - startMs;
       const fetchedAt = new Date();
 
@@ -65,7 +81,7 @@ export function createFetchWorker() {
         sourceId: adapterId,
         sport,
         url,
-        fetchMethod: adapter.config.fetchMethod,
+        fetchMethod: usedBrowserFallback ? 'browser' : adapter.config.fetchMethod,
         httpStatus,
         durationMs,
         sizeBytes: Buffer.byteLength(html, 'utf-8'),

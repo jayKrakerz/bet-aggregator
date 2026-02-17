@@ -2,8 +2,11 @@ import { createServer } from './api/server.js';
 import { startScheduler } from './scheduler/index.js';
 import { createFetchWorker } from './workers/fetch-worker.js';
 import { createParseWorker } from './workers/parse-worker.js';
+import { createResultsWorker } from './workers/results-worker.js';
+import { createAlertWorker } from './workers/alert-worker.js';
 import { loadTeamAliases } from './pipeline/team-resolver.js';
 import { closeBrowser } from './workers/browser-pool.js';
+import { redis } from './db/redis.js';
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
 
@@ -19,7 +22,9 @@ async function main(): Promise<void> {
   // Start workers
   const fetchWorker = createFetchWorker();
   const parseWorker = createParseWorker();
-  logger.info('Workers started: fetch-worker, parse-worker');
+  const resultsWorker = createResultsWorker();
+  const alertWorker = createAlertWorker();
+  logger.info('Workers started: fetch-worker, parse-worker, results-worker, alert-worker');
 
   // Start API server
   const server = await createServer();
@@ -31,7 +36,10 @@ async function main(): Promise<void> {
     await server.close();
     await fetchWorker.close();
     await parseWorker.close();
+    await resultsWorker.close();
+    await alertWorker.close();
     await closeBrowser();
+    await redis.quit();
     process.exit(0);
   };
 

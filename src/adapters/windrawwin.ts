@@ -9,13 +9,17 @@ import type { RawPrediction, Side, Confidence } from '../types/prediction.js';
  * Cloudflare-protected site with football predictions and statistical analysis.
  * Requires Playwright for browser rendering.
  *
- * Page structure:
- *   - Match rows in prediction tables
- *   - Teams as links within cells
- *   - Prediction: "W" (home win), "D" (draw), "L" (away win) or "1", "X", "2"
- *   - Probability percentages for each outcome
- *   - League groupings via header rows
- *   - Over/Under predictions on separate columns
+ * Page structure (div-based):
+ *   - `.ptleag` — league header with text like "ENGLAND CHAMPIONSHIP"
+ *   - `.wdwtablest` — prediction table container
+ *   - `.wttr` — match prediction row
+ *     - `.wtteam > .wtmoblnk` — home/away team names (first = home, second = away)
+ *     - `.wttd.wtprd` — prediction text ("Away Win", "Home Win", "Draw")
+ *     - `.wttd.wtstk` — stake level ("Large", "Medium", "Small")
+ *     - `.wttd.wtsc` — score prediction ("0-1")
+ *     - `.wtfullpred > .predstake` — full text ("Large Stake On Away Win")
+ *     - `.wtfullpred > .predscore` — score ("0-1")
+ *     - `.wtocell a[data-odds]` — odds with data-home, data-away, data-odds attrs
  */
 export class WinDrawWinAdapter extends BaseAdapter {
   readonly config: SiteAdapterConfig = {
@@ -31,7 +35,7 @@ export class WinDrawWinAdapter extends BaseAdapter {
   };
 
   async browserActions(page: Page): Promise<void> {
-    await page.waitForSelector('table, .pointed, .prediction', { timeout: 20000 }).catch(() => {});
+    await page.waitForSelector('.wdwtablest, .wttr, .wtprd', { timeout: 20000 }).catch(() => {});
     await page.waitForTimeout(2000);
   }
 
@@ -40,122 +44,108 @@ export class WinDrawWinAdapter extends BaseAdapter {
     const predictions: RawPrediction[] = [];
     let currentLeague = '';
 
-    // WinDrawWin uses table rows for predictions
-    $('table tr, .pointed, .prediction-row').each((_i, el) => {
-      const $row = $(el);
-      const cells = $row.find('td');
+    // Walk all children of the content area to track league context
+    // League headers are in `.ptleag` elements preceding `.wdwtablest` tables
+    $('.ptleag, .wdwtablest').each((_i, el) => {
+      const $el = $(el);
 
-      // League header
-      if (cells.length <= 2) {
-        const text = $row.text().trim();
-        if (text && !text.match(/^\d/) && text.length > 2 && text.length < 100) {
-          currentLeague = text;
-        }
+      // League header — use the link text or strip "Tips" suffix
+      if ($el.hasClass('ptleag')) {
+        const linkText = $el.find('a').first().text().trim();
+        currentLeague = (linkText || $el.text().trim())
+          .replace(/\s*Tips$/i, '')
+          .trim();
         return;
       }
 
-      if (cells.length < 4) return;
+      // Prediction table — process all match rows within
+      $el.find('.wttr').each((_j, rowEl) => {
+        const $row = $(rowEl);
 
-      // Extract teams from links or text
-      const teamLinks = $row.find('a');
-      let homeTeamRaw = '';
-      let awayTeamRaw = '';
-      let teamIdx = 0;
+        // Extract teams from .wtteam > .wtmoblnk
+        const teamEls = $row.find('.wtteam .wtmoblnk');
+        if (teamEls.length < 2) return;
 
-      teamLinks.each((_j, link) => {
-        const text = $(link).text().trim();
-        if (!text || /^\d/.test(text)) return;
-        if (teamIdx === 0) { homeTeamRaw = text; teamIdx++; }
-        else if (teamIdx === 1) { awayTeamRaw = text; teamIdx++; }
-      });
+        const homeTeamRaw = $(teamEls[0]).text().trim();
+        const awayTeamRaw = $(teamEls[1]).text().trim();
+        if (!homeTeamRaw || !awayTeamRaw) return;
 
-      if (!homeTeamRaw || !awayTeamRaw) {
-        // Fallback: try "home v away" or "home vs away" in a cell
-        for (let i = 0; i < cells.length; i++) {
-          const text = $(cells[i]).text().trim();
-          const vsMatch = text.match(/^(.+?)\s+(?:v|vs\.?)\s+(.+)$/i);
-          if (vsMatch) {
-            homeTeamRaw = vsMatch[1]!.trim();
-            awayTeamRaw = vsMatch[2]!.trim();
-            break;
-          }
-        }
-      }
+        // Extract prediction from .wtprd (compact) or .predstake (full)
+        const predText = $row.find('.wtprd').first().text().trim()
+          || $row.find('.predstake').first().text().trim();
+        if (!predText) return;
 
-      if (!homeTeamRaw || !awayTeamRaw) return;
+        const side = this.parsePredSide(predText);
+        if (!side) return;
 
-      // Extract prediction and probabilities
-      const { side, confidence } = this.extractPrediction($, cells);
-      if (!side) return;
+        // Extract stake for confidence
+        const stakeText = $row.find('.wtstk').first().text().trim()
+          || this.extractStakeFromPredstake($row.find('.predstake').first().text().trim());
+        const confidence = this.stakeToConfidence(stakeText);
 
-      // Extract time
-      const timeText = cells.first().text().trim();
-      const timeMatch = timeText.match(/(\d{1,2}:\d{2})/);
+        // Extract score prediction
+        const scorePred = $row.find('.wtsc').first().text().trim()
+          || $row.find('.predscore').first().text().trim();
 
-      predictions.push({
-        sourceId: this.config.id,
-        sport,
-        homeTeamRaw,
-        awayTeamRaw,
-        gameDate: fetchedAt.toISOString().split('T')[0]!,
-        gameTime: timeMatch ? timeMatch[1]! : null,
-        pickType: 'moneyline',
-        side,
-        value: null,
-        pickerName: 'WinDrawWin',
-        confidence,
-        reasoning: currentLeague || null,
-        fetchedAt,
+        // Extract odds from data-odds attributes
+        const odds: number[] = [];
+        $row.find('.wtocell a[data-odds]').each((_k, oddsEl) => {
+          const val = parseFloat($(oddsEl).attr('data-odds') || '');
+          if (!isNaN(val) && val > 1) odds.push(val);
+        });
+
+        // Pick the relevant odds value
+        let value: number | null = null;
+        if (side === 'home' && odds[0]) value = odds[0];
+        else if (side === 'draw' && odds[1]) value = odds[1];
+        else if (side === 'away' && odds[2]) value = odds[2];
+
+        const reasoning = [
+          currentLeague,
+          scorePred ? `Predicted: ${scorePred}` : '',
+          stakeText ? `Stake: ${stakeText}` : '',
+        ].filter(Boolean).join(' | ') || null;
+
+        predictions.push({
+          sourceId: this.config.id,
+          sport,
+          homeTeamRaw,
+          awayTeamRaw,
+          gameDate: fetchedAt.toISOString().split('T')[0]!,
+          gameTime: null,
+          pickType: 'moneyline',
+          side,
+          value,
+          pickerName: 'WinDrawWin',
+          confidence,
+          reasoning,
+          fetchedAt,
+        });
       });
     });
 
     return predictions;
   }
 
-  private extractPrediction(
-    $: ReturnType<typeof this.load>,
-    cells: ReturnType<ReturnType<typeof this.load>>,
-  ): { side: Side | null; confidence: Confidence | null } {
-    // Look for percentages — three consecutive cells with XX% pattern
-    const probs: Array<{ index: number; value: number }> = [];
-    cells.each((i, cell) => {
-      const text = $(cell).text().trim();
-      const match = text.match(/^(\d{1,3})%?$/);
-      if (match) {
-        probs.push({ index: i, value: parseInt(match[1]!, 10) });
-      }
-    });
-
-    if (probs.length >= 3) {
-      const [home, draw, away] = [probs[0]!, probs[1]!, probs[2]!];
-      const maxProb = Math.max(home.value, draw.value, away.value);
-      let side: Side;
-      if (maxProb === home.value) side = 'home';
-      else if (maxProb === draw.value) side = 'draw';
-      else side = 'away';
-      return { side, confidence: this.probToConfidence(maxProb) };
-    }
-
-    // Look for W/D/L or 1/X/2 prediction markers
-    for (let i = 0; i < cells.length; i++) {
-      const cell = $(cells[i]);
-      const text = cell.text().trim().toUpperCase();
-      const bold = cell.find('b, strong').text().trim().toUpperCase();
-      const marker = bold || text;
-
-      if (marker === 'W' || marker === '1') return { side: 'home', confidence: null };
-      if (marker === 'D' || marker === 'X') return { side: 'draw', confidence: null };
-      if (marker === 'L' || marker === '2') return { side: 'away', confidence: null };
-    }
-
-    return { side: null, confidence: null };
+  private parsePredSide(text: string): Side | null {
+    const lower = text.toLowerCase();
+    if (lower.includes('home win') || lower === 'home' || lower === '1') return 'home';
+    if (lower.includes('away win') || lower === 'away' || lower === '2') return 'away';
+    if (lower.includes('draw') || lower === 'x') return 'draw';
+    return null;
   }
 
-  private probToConfidence(prob: number): Confidence | null {
-    if (isNaN(prob)) return null;
-    if (prob >= 75) return 'best_bet';
-    if (prob >= 60) return 'high';
-    if (prob >= 45) return 'medium';
-    return 'low';
+  private extractStakeFromPredstake(text: string): string {
+    // "Large Stake On Away Win" → "Large"
+    const match = text.match(/^(Large|Medium|Small)\s+Stake/i);
+    return match ? match[1]! : '';
+  }
+
+  private stakeToConfidence(stake: string): Confidence | null {
+    const lower = stake.toLowerCase();
+    if (lower === 'large') return 'best_bet';
+    if (lower === 'medium') return 'medium';
+    if (lower === 'small') return 'low';
+    return null;
   }
 }
