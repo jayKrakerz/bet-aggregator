@@ -85,5 +85,21 @@ export async function startScheduler(): Promise<void> {
     logger.info('Registered Telegram alert scheduler');
   }
 
+  // Clean up stale schedulers for adapters that have been removed
+  const activeSchedulerIds = new Set<string>();
+  for (const adapter of adapters) {
+    for (const sport of Object.keys(adapter.config.paths)) {
+      activeSchedulerIds.add(`${adapter.config.id}:${sport}`);
+    }
+  }
+
+  const existingSchedulers = await fetchQueue.getJobSchedulers();
+  for (const scheduler of existingSchedulers) {
+    if (scheduler.id && !activeSchedulerIds.has(scheduler.id)) {
+      await fetchQueue.removeJobScheduler(scheduler.id);
+      logger.info({ schedulerId: scheduler.id }, 'Removed stale job scheduler');
+    }
+  }
+
   logger.info(`Scheduler initialized with ${adapters.length} adapters`);
 }
