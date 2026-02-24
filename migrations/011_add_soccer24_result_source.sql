@@ -34,7 +34,7 @@ SELECT add_team_alias_if_exists('West Ham United', 'west ham utd');
 SELECT add_team_alias_if_exists('West Ham United', 'west ham');
 SELECT add_team_alias_if_exists('Wolverhampton Wanderers', 'wolverhampton');
 SELECT add_team_alias_if_exists('Wolverhampton Wanderers', 'wolves');
-SELECT add_team_alias_if_exists('Nottingham Forest', 'nott\'m forest');
+SELECT add_team_alias_if_exists('Nottingham Forest', 'nott''m forest');
 SELECT add_team_alias_if_exists('Nottingham Forest', 'nottingham');
 SELECT add_team_alias_if_exists('Leicester City', 'leicester');
 SELECT add_team_alias_if_exists('Brighton & Hove Albion', 'brighton');
