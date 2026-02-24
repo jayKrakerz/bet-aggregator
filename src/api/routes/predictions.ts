@@ -320,6 +320,147 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     return result;
   });
 
+  // GET /predictions/over-under — over/under predictions grouped by match
+  app.get('/over-under', async (request, reply) => {
+    const { sport, date } = request.query as { sport?: string; date?: string };
+    const cacheKey = [sport || 'all', date || 'upcoming', 'over-under'];
+
+    const cached = await getCached<{ data: unknown }>(cacheKey);
+    if (cached) {
+      const etag = computeETag(cached);
+      if (request.headers['if-none-match'] === etag) {
+        return reply.status(304).send();
+      }
+      void reply.header('Cache-Control', 'public, max-age=300');
+      void reply.header('ETag', etag);
+      return cached;
+    }
+
+    const rows = await sql<{
+      match_id: number;
+      game_date: string;
+      game_time: string | null;
+      sport: string;
+      home_team: string;
+      away_team: string;
+      side: string;
+      value: number | null;
+      source_name: string;
+      confidence: string | null;
+    }[]>`
+      SELECT
+        m.id as match_id,
+        to_char(m.game_date, 'YYYY-MM-DD') as game_date,
+        m.game_time,
+        m.sport,
+        ht.name as home_team,
+        att.name as away_team,
+        p.side,
+        p.value,
+        s.name as source_name,
+        p.confidence
+      FROM predictions p
+      JOIN matches m ON m.id = p.match_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams att ON att.id = m.away_team_id
+      JOIN sources s ON s.id = p.source_id
+      WHERE p.pick_type = 'over_under'
+        ${date ? sql`AND m.game_date = ${date}` : sql`AND m.game_date >= CURRENT_DATE`}
+        ${sport ? sql`AND m.sport = ${sport}` : sql``}
+      ORDER BY m.game_date, m.id
+    `;
+
+    // Group by match
+    const matchMap = new Map<number, {
+      matchId: number;
+      date: string;
+      gameTime: string | null;
+      sport: string;
+      homeTeam: string;
+      awayTeam: string;
+      predictions: { side: string; value: number | null; source: string; confidence: string | null }[];
+    }>();
+
+    for (const r of rows) {
+      if (!matchMap.has(r.match_id)) {
+        matchMap.set(r.match_id, {
+          matchId: r.match_id,
+          date: r.game_date.toString().includes('T') ? r.game_date.toString().split('T')[0]! : r.game_date.toString(),
+          gameTime: r.game_time,
+          sport: r.sport,
+          homeTeam: r.home_team,
+          awayTeam: r.away_team,
+          predictions: [],
+        });
+      }
+      matchMap.get(r.match_id)!.predictions.push({
+        side: r.side,
+        value: r.value,
+        source: r.source_name,
+        confidence: r.confidence,
+      });
+    }
+
+    // Build response with consensus
+    const data = [...matchMap.values()].map((m) => {
+      const overPreds = m.predictions.filter((p) => p.side === 'over');
+      const underPreds = m.predictions.filter((p) => p.side === 'under');
+      const total = overPreds.length + underPreds.length;
+      const consensus = overPreds.length > underPreds.length ? 'over'
+        : underPreds.length > overPreds.length ? 'under'
+        : 'split';
+      const consensusCount = consensus === 'over' ? overPreds.length
+        : consensus === 'under' ? underPreds.length
+        : Math.max(overPreds.length, underPreds.length);
+
+      // Most common line value
+      const allValues = m.predictions.filter((p) => p.value != null).map((p) => p.value!);
+      const valueCounts = new Map<number, number>();
+      for (const v of allValues) {
+        valueCounts.set(v, (valueCounts.get(v) || 0) + 1);
+      }
+      let line: number | null = null;
+      let maxCount = 0;
+      for (const [v, c] of valueCounts) {
+        if (c > maxCount) { line = v; maxCount = c; }
+      }
+
+      return {
+        matchId: m.matchId,
+        match: `${m.homeTeam} vs ${m.awayTeam}`,
+        date: m.date,
+        gameTime: m.gameTime,
+        sport: m.sport,
+        consensus,
+        consensusCount,
+        total,
+        overCount: overPreds.length,
+        underCount: underPreds.length,
+        line,
+        sources: m.predictions.map((p) => ({
+          source: p.source,
+          side: p.side,
+          value: p.value,
+          confidence: p.confidence,
+        })),
+      };
+    });
+
+    // Sort: consensus picks first (non-split), then by source count
+    data.sort((a, b) => {
+      if (a.consensus === 'split' && b.consensus !== 'split') return 1;
+      if (a.consensus !== 'split' && b.consensus === 'split') return -1;
+      return b.total - a.total;
+    });
+
+    const result = { data, generatedAt: new Date().toISOString() };
+    await setCached(cacheKey, result);
+    const etag = computeETag(result);
+    void reply.header('Cache-Control', 'public, max-age=300');
+    void reply.header('ETag', etag);
+    return result;
+  });
+
   // GET /predictions/accuracy — win/loss stats by sport/pickType
   app.get('/accuracy', async (request) => {
     const { sport, pickType } = request.query as { sport?: string; pickType?: string };
