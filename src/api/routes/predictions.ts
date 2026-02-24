@@ -197,12 +197,19 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         date: s.date,
         pick: s.recommendation,
         analysis: s.analysis,
+        value: {
+          estimatedProb: s.estimatedProb,
+          marketImpliedProb: s.impliedProb,
+          edge: s.edge,
+          expectedValue: s.expectedValue,
+          bestOdds: s.bestOdds,
+        },
         breakdown: {
           confidence: s.confidenceScore,
           margin: s.marginScore,
           sourceAgreement: s.sourceAgreement,
           sourceAccuracy: s.sourceAccuracy,
-          odds: s.oddsValue,
+          value: s.valueScore,
           alignment: s.alignmentScore,
           form: s.formScore,
           h2h: s.h2hScore,
@@ -212,6 +219,65 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       generatedAt: new Date().toISOString(),
     };
   }
+
+  // GET /predictions/value-bets — picks with positive expected value
+  app.get('/value-bets', async (request, reply) => {
+    const { sport, date, limit: limitStr } = request.query as {
+      sport?: string;
+      date?: string;
+      limit?: string;
+    };
+
+    const limit = Math.min(Math.max(parseInt(limitStr || '10', 10) || 10, 1), 25);
+    const cacheKey = [sport || 'all', date || 'upcoming', 'value-bets', String(limit)];
+
+    const cached = await getCached<{ data: unknown }>(cacheKey);
+    if (cached) {
+      const etag = computeETag(cached);
+      if (request.headers['if-none-match'] === etag) {
+        return reply.status(304).send();
+      }
+      void reply.header('Cache-Control', 'public, max-age=300');
+      void reply.header('ETag', etag);
+      return cached;
+    }
+
+    const picks = await fetchUpcomingPicks(sport, date);
+    const scored = await scoreAllMatches(picks, 0);
+
+    // Filter to only positive EV picks that have odds data
+    const valueBets = scored
+      .filter((s) => s.expectedValue !== null && s.expectedValue > 0)
+      .sort((a, b) => (b.expectedValue ?? 0) - (a.expectedValue ?? 0))
+      .slice(0, limit);
+
+    const result = {
+      data: valueBets.map((s, i) => ({
+        rank: i + 1,
+        match: `${s.homeTeam} vs ${s.awayTeam}`,
+        sport: s.sport,
+        date: s.date,
+        gameTime: s.gameTime,
+        pick: s.recommendation,
+        pickType: s.pickType,
+        estimatedProb: s.estimatedProb,
+        marketImpliedProb: s.impliedProb,
+        edge: s.edge,
+        expectedValue: s.expectedValue,
+        bestOdds: s.bestOdds,
+        score: s.score,
+        analysis: s.analysis,
+        sources: s.sources,
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+
+    await setCached(cacheKey, result);
+    const etag = computeETag(result);
+    void reply.header('Cache-Control', 'public, max-age=300');
+    void reply.header('ETag', etag);
+    return result;
+  });
 
   // GET /predictions/best-multis — intelligent best picks with scoring engine
   app.get('/best-multis', async (request, reply) => {

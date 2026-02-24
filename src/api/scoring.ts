@@ -1,9 +1,9 @@
 /**
  * Shared scoring engine for ranking match predictions.
  *
- * Weights: confidence 30, margin 25, source agreement 20, odds value 15,
+ * Weights: confidence 30, margin 25, source agreement 20, value/EV 20,
  *          source accuracy 15, alignment 10, form 10, h2h 5, home advantage 5
- * Raw max: 135, normalized to 0-100
+ * Raw max: 140, normalized to 0-100
  */
 
 import { getTeamForm, getH2HResults, getHomeSplit, getAwaySplit, getSourceAccuracy } from '../db/queries.js';
@@ -40,7 +40,7 @@ export interface ScoredMatch {
   sourceAgreement: number;
   confidenceScore: number;
   marginScore: number;
-  oddsValue: number;
+  valueScore: number;
   sourceAccuracy: number;
   alignmentScore: number;
   formScore: number;
@@ -50,9 +50,12 @@ export interface ScoredMatch {
   sources: { name: string; side: string; confidence: string | null; detail: string; winRate: number | null }[];
   bestOdds: number | null;
   impliedProb: number | null;
+  estimatedProb: number;
+  expectedValue: number | null;
+  edge: number | null;
 }
 
-const RAW_MAX = 135;
+const RAW_MAX = 140;
 
 interface SourceAgreementResult {
   score: number;
@@ -174,36 +177,114 @@ function toDecimalOdds(value: number | null, sport: string): number | null {
   return 1 + value / 100;
 }
 
-export function scoreOddsValue(
+/**
+ * Extract the best available decimal odds for the favored side.
+ * Only uses moneyline picks to avoid confusing spread values with odds.
+ */
+export function extractBestOdds(
   matchPicks: MatchPick[],
   favSide: string,
   sport: string,
-): { score: number; bestOdds: number | null; impliedProb: number | null } {
-  const sidePicks = matchPicks.filter((p) => p.side === favSide && p.value != null);
-  if (!sidePicks.length) return { score: 3, bestOdds: null, impliedProb: null };
+): { bestOdds: number | null; impliedProb: number | null } {
+  const mlPicks = matchPicks.filter(
+    (p) => p.pick_type === 'moneyline' && p.side === favSide && p.value != null,
+  );
+  if (!mlPicks.length) return { bestOdds: null, impliedProb: null };
 
-  const decOddsList = sidePicks
+  const decOddsList = mlPicks
     .map((p) => toDecimalOdds(p.value, sport))
-    .filter((d): d is number => d !== null);
+    .filter((d): d is number => d !== null && d > 1.01 && d < 50);
 
-  if (!decOddsList.length) return { score: 3, bestOdds: null, impliedProb: null };
+  if (!decOddsList.length) return { bestOdds: null, impliedProb: null };
 
-  const bestOdds = Math.min(...decOddsList);
+  // Best odds = highest payout available
+  const bestOdds = Math.max(...decOddsList);
   const impliedProb = Math.round((1 / bestOdds) * 1000) / 10;
 
-  let score: number;
-  if (sport === 'football') {
-    if (bestOdds >= 1.2 && bestOdds <= 1.7) score = 15;
-    else if (bestOdds > 1.7 && bestOdds <= 2.2) score = 12;
-    else if (bestOdds > 2.2) score = 8;
-    else score = 5;
-  } else {
-    if (bestOdds >= 1.33 && bestOdds <= 2.0) score = 15;
-    else if (bestOdds < 1.33) score = 5;
-    else score = 8;
+  return {
+    bestOdds: Math.round(bestOdds * 100) / 100,
+    impliedProb,
+  };
+}
+
+/**
+ * Estimate the win probability for a pick based on source consensus and accuracy.
+ *
+ * Model: blend source accuracy (quality) with agreement ratio (quantity).
+ * When sources strongly agree AND have good track records → high probability.
+ * When sources are split or unproven → regress toward 50%.
+ */
+export function estimateWinProbability(params: {
+  backingCount: number;
+  totalCount: number;
+  avgAccuracy: number | null; // 0-100 scale, null if no data
+  bestConfidence: string | null;
+}): number {
+  const { backingCount, totalCount, avgAccuracy, bestConfidence } = params;
+
+  if (backingCount === 0 || totalCount === 0) return 50;
+
+  // Source accuracy as base signal (default 52% if no grading data yet)
+  const baseProb = avgAccuracy !== null ? avgAccuracy : 52;
+
+  // Agreement weight: how much to trust the source accuracy vs regress to 50%
+  // Full agreement → weight 1.0, split → weight approaches 0
+  const agreementRatio = backingCount / totalCount;
+  const agreementWeight = Math.min(1, agreementRatio * 1.2);
+
+  // Blend: trust accuracy proportional to agreement strength
+  let prob = (baseProb / 100) * agreementWeight + 0.5 * (1 - agreementWeight);
+
+  // Multi-source confirmation boost (diminishing returns)
+  // Independent signals agreeing is stronger than one source alone
+  if (backingCount >= 5) prob += 0.05;
+  else if (backingCount >= 4) prob += 0.04;
+  else if (backingCount >= 3) prob += 0.03;
+  else if (backingCount >= 2) prob += 0.02;
+
+  // Confidence boost from source-assigned ratings
+  const confBoost: Record<string, number> = { best_bet: 0.04, high: 0.02, medium: 0.01 };
+  prob += confBoost[bestConfidence ?? ''] ?? 0;
+
+  // Clamp to reasonable bounds
+  return Math.round(Math.min(92, Math.max(15, prob * 100)) * 10) / 10;
+}
+
+/**
+ * Score based on expected value (0-20 pts).
+ * Replaces the old odds "sweet spot" scoring with actual EV calculation.
+ *
+ * EV% = (estimatedProb × decimalOdds) - 1
+ * Positive EV = the bet is profitable long-term.
+ */
+export function scoreValue(
+  estimatedProb: number, // 0-100 scale
+  bestOdds: number | null,
+): { score: number; ev: number | null; edge: number | null } {
+  if (bestOdds === null) {
+    // No odds data — can't calculate EV. Give a neutral score.
+    return { score: 7, ev: null, edge: null };
   }
 
-  return { score, bestOdds: Math.round(bestOdds * 100) / 100, impliedProb };
+  const prob = estimatedProb / 100;
+  const marketProb = 1 / bestOdds;
+  const ev = (prob * bestOdds - 1) * 100; // EV as percentage
+  const edge = (prob - marketProb) * 100;  // Edge in percentage points
+
+  let score: number;
+  if (ev >= 20) score = 20;       // exceptional value
+  else if (ev >= 12) score = 17;  // strong value
+  else if (ev >= 6) score = 14;   // good value
+  else if (ev >= 2) score = 10;   // marginal value
+  else if (ev >= 0) score = 6;    // fair value
+  else if (ev >= -5) score = 3;   // slight negative
+  else score = 0;                 // clear negative — avoid
+
+  return {
+    score,
+    ev: Math.round(ev * 10) / 10,
+    edge: Math.round(edge * 10) / 10,
+  };
 }
 
 export function scoreAlignment(
@@ -464,6 +545,7 @@ export function generateAnalysis(
   compositeScore: number,
   avgGoals: number | null,
   accuracyInfo?: { avgWinRate: number; trackedCount: number },
+  valueInfo?: { ev: number | null; edge: number | null; bestOdds: number | null },
 ): string {
   const parts: string[] = [];
   const teamName = favSide === 'home' ? info.home_team : favSide === 'away' ? info.away_team : 'Draw';
@@ -487,6 +569,17 @@ export function generateAnalysis(
       : accuracyInfo.avgWinRate >= 48 ? 'mixed'
       : 'weak';
     parts.push(`Sources have ${label} track record (${accuracyInfo.avgWinRate}% avg win rate).`);
+  }
+
+  // Expected value insight
+  if (valueInfo?.ev !== null && valueInfo?.ev !== undefined && valueInfo.bestOdds) {
+    if (valueInfo.ev >= 10) {
+      parts.push(`Strong value: +${valueInfo.ev}% EV at ${valueInfo.bestOdds} odds.`);
+    } else if (valueInfo.ev >= 2) {
+      parts.push(`Value bet: +${valueInfo.ev}% EV at ${valueInfo.bestOdds} odds.`);
+    } else if (valueInfo.ev < -5) {
+      parts.push(`Negative value: ${valueInfo.ev}% EV at ${valueInfo.bestOdds} odds — overpriced.`);
+    }
   }
 
   // Strip source names from margin details, just show scores
@@ -578,7 +671,6 @@ export async function scoreMatch(
   const avgGoals = extractAvgGoals(matchPicks);
   const { margin, details: marginDetails, predictedDraw } = extractPredictedMargin(matchPicks, info.sport);
   const mrgScore = scoreMargin(margin, info.sport, predictedDraw);
-  const oddsResult = scoreOddsValue(matchPicks, favSide, info.sport);
   const alignScore = scoreAlignment(matchPicks, favSide, avgGoals);
 
   // Async factors — resolve favored team ID + source accuracy
@@ -590,14 +682,7 @@ export async function scoreMatch(
     scoreSourceAccuracyFactor(matchPicks, favSide, info.sport),
   ]);
 
-  const rawScore = srcResult.score + confScore + mrgScore + oddsResult.score
-    + srcAccResult.score + alignScore + formPts + h2hPts + homePts;
-  const composite = Math.round((rawScore / RAW_MAX) * 100);
-
-  const hasMl = matchPicks.some((p) => p.pick_type === 'moneyline' && p.side === favSide);
-  const pickType = hasMl ? 'moneyline' : 'spread';
-
-  // Compute average win rate of backing sources for analysis text
+  // Compute average win rate of backing sources
   const backingSources = [...new Set(matchPicks.filter((p) => p.side === favSide).map((p) => p.source_name))];
   let accWinRateSum = 0;
   let accTracked = 0;
@@ -605,12 +690,41 @@ export async function scoreMatch(
     const wr = getSourceWinRate(srcAccResult.accuracyMap, src, info.sport);
     if (wr !== null) { accWinRateSum += wr; accTracked++; }
   }
+  const avgAccuracy = accTracked > 0 ? Math.round(accWinRateSum / accTracked * 10) / 10 : null;
+
+  // Best confidence among backing picks
+  const confOrder: Record<string, number> = { best_bet: 4, high: 3, medium: 2, low: 1 };
+  const bestConf = matchPicks
+    .filter((p) => p.side === favSide && p.confidence)
+    .sort((a, b) => (confOrder[b.confidence!] ?? 0) - (confOrder[a.confidence!] ?? 0))[0]?.confidence ?? null;
+
+  // Estimate win probability from our signals
+  const estimatedProb = estimateWinProbability({
+    backingCount: srcResult.sideCount,
+    totalCount: srcResult.totalSources,
+    avgAccuracy,
+    bestConfidence: bestConf,
+  });
+
+  // Extract best odds and compute expected value
+  const { bestOdds, impliedProb } = extractBestOdds(matchPicks, favSide, info.sport);
+  const valResult = scoreValue(estimatedProb, bestOdds);
+
+  const rawScore = srcResult.score + confScore + mrgScore + valResult.score
+    + srcAccResult.score + alignScore + formPts + h2hPts + homePts;
+  const composite = Math.round((rawScore / RAW_MAX) * 100);
+
+  const hasMl = matchPicks.some((p) => p.pick_type === 'moneyline' && p.side === favSide);
+  const pickType = hasMl ? 'moneyline' : 'spread';
+
   const accuracyInfo = accTracked > 0
-    ? { avgWinRate: Math.round(accWinRateSum / accTracked * 10) / 10, trackedCount: accTracked }
+    ? { avgWinRate: avgAccuracy!, trackedCount: accTracked }
     : undefined;
 
+  const valueInfo = { ev: valResult.ev, edge: valResult.edge, bestOdds };
+
   const analysis = generateAnalysis(
-    info, favSide, srcResult, marginDetails, matchPicks, composite, avgGoals, accuracyInfo,
+    info, favSide, srcResult, marginDetails, matchPicks, composite, avgGoals, accuracyInfo, valueInfo,
   );
   const sources = buildSourcesList(matchPicks, favSide, info.sport, srcAccResult.accuracyMap);
 
@@ -630,7 +744,7 @@ export async function scoreMatch(
     sourceAgreement: srcResult.score,
     confidenceScore: confScore,
     marginScore: mrgScore,
-    oddsValue: oddsResult.score,
+    valueScore: valResult.score,
     sourceAccuracy: srcAccResult.score,
     alignmentScore: alignScore,
     formScore: formPts,
@@ -638,8 +752,11 @@ export async function scoreMatch(
     homeAdvantage: homePts,
     analysis,
     sources,
-    bestOdds: oddsResult.bestOdds,
-    impliedProb: oddsResult.impliedProb,
+    bestOdds,
+    impliedProb,
+    estimatedProb,
+    expectedValue: valResult.ev,
+    edge: valResult.edge,
   };
 }
 
