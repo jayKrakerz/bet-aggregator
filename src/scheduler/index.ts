@@ -4,7 +4,7 @@ import { JOB_NAMES } from './constants.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
-const RESULTS_SPORTS = ['nba', 'nfl', 'nhl', 'mlb'];
+const RESULTS_SPORTS = ['nba', 'nfl', 'nhl', 'mlb', 'football'];
 
 /**
  * Sets up BullMQ repeatable job schedulers for each adapter + sport combo.
@@ -93,11 +93,11 @@ export async function startScheduler(): Promise<void> {
     }
   }
 
-  const existingSchedulers = await fetchQueue.getJobSchedulers();
+  const existingSchedulers = await fetchQueue.getJobSchedulers(0, -1);
   for (const scheduler of existingSchedulers) {
-    if (scheduler.id && !activeSchedulerIds.has(scheduler.id)) {
-      await fetchQueue.removeJobScheduler(scheduler.id);
-      logger.info({ schedulerId: scheduler.id }, 'Removed stale job scheduler');
+    if (scheduler.key && !activeSchedulerIds.has(scheduler.key)) {
+      await fetchQueue.removeJobScheduler(scheduler.key);
+      logger.info({ schedulerId: scheduler.key }, 'Removed stale job scheduler');
     }
   }
 

@@ -1,12 +1,13 @@
 /**
  * Shared scoring engine for ranking match predictions.
  *
- * Original weights: confidence 30, margin 25, source agreement 20, odds value 15, alignment 10
- * New factors: form 10, h2h 5, home advantage 5
- * Raw max: 120, normalized to 0-100
+ * Weights: confidence 30, margin 25, source agreement 20, odds value 15,
+ *          source accuracy 15, alignment 10, form 10, h2h 5, home advantage 5
+ * Raw max: 135, normalized to 0-100
  */
 
-import { getTeamForm, getH2HResults, getHomeSplit, getAwaySplit } from '../db/queries.js';
+import { getTeamForm, getH2HResults, getHomeSplit, getAwaySplit, getSourceAccuracy } from '../db/queries.js';
+import { logger } from '../utils/logger.js';
 
 export interface MatchPick {
   match_id: number;
@@ -40,17 +41,18 @@ export interface ScoredMatch {
   confidenceScore: number;
   marginScore: number;
   oddsValue: number;
+  sourceAccuracy: number;
   alignmentScore: number;
   formScore: number;
   h2hScore: number;
   homeAdvantage: number;
   analysis: string;
-  sources: { name: string; side: string; confidence: string | null; detail: string }[];
+  sources: { name: string; side: string; confidence: string | null; detail: string; winRate: number | null }[];
   bestOdds: number | null;
   impliedProb: number | null;
 }
 
-const RAW_MAX = 120;
+const RAW_MAX = 135;
 
 interface SourceAgreementResult {
   score: number;
@@ -331,6 +333,128 @@ export async function scoreHomeAdvantage(
   }
 }
 
+// ===== Source accuracy scoring =====
+
+interface SourceStats {
+  slug: string;
+  name: string;
+  winRate: number;
+  decided: number;
+}
+
+// In-memory cache: "sourceName:sport" -> stats
+let accuracyCache: Map<string, SourceStats> | null = null;
+let accuracyCacheTime = 0;
+const ACCURACY_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Load source accuracy from DB with in-memory caching.
+ * Key: "sourceName:sport", falls back to "sourceName:*" for cross-sport average.
+ */
+async function getSourceAccuracyMap(): Promise<Map<string, SourceStats>> {
+  if (accuracyCache && Date.now() - accuracyCacheTime < ACCURACY_CACHE_TTL) {
+    return accuracyCache;
+  }
+
+  try {
+    const rows = await getSourceAccuracy();
+    const map = new Map<string, SourceStats>();
+
+    // Per-sport accuracy
+    for (const r of rows) {
+      const winRate = r.decided > 0 ? Math.round((r.wins / r.decided) * 1000) / 10 : 0;
+      map.set(`${r.name}:${r.sport}`, { slug: r.slug, name: r.name, winRate, decided: r.decided });
+    }
+
+    // Cross-sport aggregates (for sources without sport-specific data)
+    const bySource = new Map<string, { wins: number; decided: number; slug: string; name: string }>();
+    for (const r of rows) {
+      const existing = bySource.get(r.name) ?? { wins: 0, decided: 0, slug: r.slug, name: r.name };
+      existing.wins += r.wins;
+      existing.decided += r.decided;
+      bySource.set(r.name, existing);
+    }
+    for (const [name, agg] of bySource) {
+      if (!map.has(`${name}:*`)) {
+        const winRate = agg.decided > 0 ? Math.round((agg.wins / agg.decided) * 1000) / 10 : 0;
+        map.set(`${name}:*`, { slug: agg.slug, name: agg.name, winRate, decided: agg.decided });
+      }
+    }
+
+    accuracyCache = map;
+    accuracyCacheTime = Date.now();
+    logger.debug({ entries: map.size }, 'Source accuracy cache refreshed');
+    return map;
+  } catch (err) {
+    logger.warn({ err }, 'Failed to load source accuracy');
+    return accuracyCache ?? new Map();
+  }
+}
+
+/**
+ * Look up a source's win rate for a given sport.
+ * Falls back to cross-sport average if sport-specific data is insufficient.
+ */
+function getSourceWinRate(
+  accuracyMap: Map<string, SourceStats>,
+  sourceName: string,
+  sport: string,
+): number | null {
+  const sportKey = `${sourceName}:${sport}`;
+  const sportStats = accuracyMap.get(sportKey);
+  if (sportStats && sportStats.decided >= 10) return sportStats.winRate;
+
+  const globalKey = `${sourceName}:*`;
+  const globalStats = accuracyMap.get(globalKey);
+  if (globalStats && globalStats.decided >= 10) return globalStats.winRate;
+
+  return null;
+}
+
+/**
+ * Score based on the proven accuracy of sources backing this pick (0-15 pts).
+ * Rewards picks backed by historically accurate sources.
+ */
+export async function scoreSourceAccuracyFactor(
+  matchPicks: MatchPick[],
+  favSide: string,
+  sport: string,
+): Promise<{ score: number; accuracyMap: Map<string, SourceStats> }> {
+  const accuracyMap = await getSourceAccuracyMap();
+
+  // Find unique sources backing the favored side
+  const backingSources = [
+    ...new Set(matchPicks.filter((p) => p.side === favSide).map((p) => p.source_name)),
+  ];
+
+  if (!backingSources.length) return { score: 3, accuracyMap };
+
+  let totalWinRate = 0;
+  let count = 0;
+
+  for (const source of backingSources) {
+    const winRate = getSourceWinRate(accuracyMap, source, sport);
+    if (winRate !== null) {
+      totalWinRate += winRate;
+      count++;
+    }
+  }
+
+  // No accuracy data yet — neutral score
+  if (count === 0) return { score: 5, accuracyMap };
+
+  const avgWinRate = totalWinRate / count;
+
+  let score: number;
+  if (avgWinRate >= 65) score = 15;
+  else if (avgWinRate >= 58) score = 12;
+  else if (avgWinRate >= 52) score = 9;
+  else if (avgWinRate >= 48) score = 6;
+  else score = 3;
+
+  return { score, accuracyMap };
+}
+
 export function generateAnalysis(
   info: MatchPick,
   favSide: string,
@@ -339,6 +463,7 @@ export function generateAnalysis(
   matchPicks: MatchPick[],
   compositeScore: number,
   avgGoals: number | null,
+  accuracyInfo?: { avgWinRate: number; trackedCount: number },
 ): string {
   const parts: string[] = [];
   const teamName = favSide === 'home' ? info.home_team : favSide === 'away' ? info.away_team : 'Draw';
@@ -353,6 +478,15 @@ export function generateAnalysis(
     );
   } else if (srcAgreement.totalSources > 0) {
     parts.push(`Backed by 1 prediction.`);
+  }
+
+  // Source accuracy insight
+  if (accuracyInfo && accuracyInfo.trackedCount > 0) {
+    const label = accuracyInfo.avgWinRate >= 58 ? 'strong'
+      : accuracyInfo.avgWinRate >= 52 ? 'solid'
+      : accuracyInfo.avgWinRate >= 48 ? 'mixed'
+      : 'weak';
+    parts.push(`Sources have ${label} track record (${accuracyInfo.avgWinRate}% avg win rate).`);
   }
 
   // Strip source names from margin details, just show scores
@@ -391,11 +525,12 @@ export function generateAnalysis(
   return parts.join(' ');
 }
 
-/** Build the deduped sources list for a scored match */
+/** Build the deduped sources list for a scored match, with per-source win rates */
 export function buildSourcesList(
   matchPicks: MatchPick[],
   favSide: string,
-  _sport: string,
+  sport: string,
+  accuracyMap?: Map<string, SourceStats>,
 ): ScoredMatch['sources'] {
   return matchPicks
     .filter((p) => p.side === favSide || p.pick_type === 'over_under')
@@ -413,17 +548,23 @@ export function buildSourcesList(
         const predMatch = p.reasoning.match(/Predicted:\s*[\d]+-[\d]+/i);
         if (predMatch) detail += detail ? ` | ${predMatch[0]}` : predMatch[0];
       }
+
+      const winRate = accuracyMap
+        ? getSourceWinRate(accuracyMap, p.source_name, sport)
+        : null;
+
       acc.push({
         name: p.source_name,
         side: p.side,
         confidence: p.confidence,
         detail,
+        winRate,
       });
       return acc;
     }, []);
 }
 
-/** Score a single match — now async for form/H2H/home advantage lookups */
+/** Score a single match — async for form/H2H/home advantage/source accuracy lookups */
 export async function scoreMatch(
   matchId: number,
   info: MatchPick,
@@ -440,22 +581,38 @@ export async function scoreMatch(
   const oddsResult = scoreOddsValue(matchPicks, favSide, info.sport);
   const alignScore = scoreAlignment(matchPicks, favSide, avgGoals);
 
-  // New async factors — resolve favored team ID
+  // Async factors — resolve favored team ID + source accuracy
   const favTeamId = favSide === 'home' ? info.home_team_id : info.away_team_id;
-  const [formPts, h2hPts, homePts] = await Promise.all([
+  const [formPts, h2hPts, homePts, srcAccResult] = await Promise.all([
     scoreForm(favTeamId, favSide),
     scoreH2H(info.home_team_id, info.away_team_id, favSide),
     scoreHomeAdvantage(favTeamId, favSide),
+    scoreSourceAccuracyFactor(matchPicks, favSide, info.sport),
   ]);
 
-  const rawScore = srcResult.score + confScore + mrgScore + oddsResult.score + alignScore + formPts + h2hPts + homePts;
+  const rawScore = srcResult.score + confScore + mrgScore + oddsResult.score
+    + srcAccResult.score + alignScore + formPts + h2hPts + homePts;
   const composite = Math.round((rawScore / RAW_MAX) * 100);
 
   const hasMl = matchPicks.some((p) => p.pick_type === 'moneyline' && p.side === favSide);
   const pickType = hasMl ? 'moneyline' : 'spread';
 
-  const analysis = generateAnalysis(info, favSide, srcResult, marginDetails, matchPicks, composite, avgGoals);
-  const sources = buildSourcesList(matchPicks, favSide, info.sport);
+  // Compute average win rate of backing sources for analysis text
+  const backingSources = [...new Set(matchPicks.filter((p) => p.side === favSide).map((p) => p.source_name))];
+  let accWinRateSum = 0;
+  let accTracked = 0;
+  for (const src of backingSources) {
+    const wr = getSourceWinRate(srcAccResult.accuracyMap, src, info.sport);
+    if (wr !== null) { accWinRateSum += wr; accTracked++; }
+  }
+  const accuracyInfo = accTracked > 0
+    ? { avgWinRate: Math.round(accWinRateSum / accTracked * 10) / 10, trackedCount: accTracked }
+    : undefined;
+
+  const analysis = generateAnalysis(
+    info, favSide, srcResult, marginDetails, matchPicks, composite, avgGoals, accuracyInfo,
+  );
+  const sources = buildSourcesList(matchPicks, favSide, info.sport, srcAccResult.accuracyMap);
 
   const dateStr = info.game_date.toString();
   const date = dateStr.includes('T') ? dateStr.split('T')[0]! : dateStr;
@@ -474,6 +631,7 @@ export async function scoreMatch(
     confidenceScore: confScore,
     marginScore: mrgScore,
     oddsValue: oddsResult.score,
+    sourceAccuracy: srcAccResult.score,
     alignmentScore: alignScore,
     formScore: formPts,
     h2hScore: h2hPts,

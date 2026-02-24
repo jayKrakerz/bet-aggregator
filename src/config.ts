@@ -8,6 +8,8 @@ const envSchema = z.object({
   REDIS_PORT: z.coerce.number().default(6380),
   SNAPSHOT_DIR: z.string().default('./snapshots'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
+  OLLAMA_BASE_URL: z.string().default('http://127.0.0.1:11434'),
+  OLLAMA_MODEL: z.string().default('llama3.1'),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_CHAT_ID: z.string().optional(),
   TELEGRAM_SCORE_THRESHOLD: z.coerce.number().default(65),

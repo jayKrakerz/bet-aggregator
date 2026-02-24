@@ -8,6 +8,7 @@
   "rewrites": [
     { "source": "/health", "destination": "/api" },
     { "source": "/predictions/:path*", "destination": "/api" },
-    { "source": "/sources/:path*", "destination": "/api" }
+    { "source": "/sources/:path*", "destination": "/api" },
+    { "source": "/analyst/:path*", "destination": "/api" }
   ]
 }

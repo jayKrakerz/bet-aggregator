@@ -17,6 +17,7 @@ import { PredictzAdapter } from './predictz.js';
 import { StatAreaAdapter } from './statarea.js';
 import { EaglePredictAdapter } from './eaglepredict.js';
 import { WinDrawWinAdapter } from './windrawwin.js';
+import { SportsAiAdapter } from './sports-ai.js';
 // BetMines disabled — Cloudflare blocks even Playwright; revisit with stealth plugin
 // import { BetMinesAdapter } from './betmines.js';
 
@@ -44,6 +45,7 @@ register(new PredictzAdapter());
 register(new StatAreaAdapter());
 register(new EaglePredictAdapter());
 register(new WinDrawWinAdapter());
+register(new SportsAiAdapter());
 // register(new BetMinesAdapter()); // Cloudflare blocks even Playwright
 
 export function getAdapter(id: string): SiteAdapter {

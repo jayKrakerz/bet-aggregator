@@ -230,6 +230,34 @@ export async function getHomeSplit(teamId: number) {
   `;
 }
 
+/**
+ * Get win/loss stats per source + sport for accuracy weighting.
+ * Only counts decided predictions (win/loss), not pushes/voids.
+ */
+export async function getSourceAccuracy() {
+  return sql<{
+    slug: string;
+    name: string;
+    sport: string;
+    wins: number;
+    losses: number;
+    decided: number;
+  }[]>`
+    SELECT
+      s.slug,
+      s.name,
+      p.sport,
+      count(*) FILTER (WHERE p.grade = 'win')::int as wins,
+      count(*) FILTER (WHERE p.grade = 'loss')::int as losses,
+      count(*) FILTER (WHERE p.grade IN ('win', 'loss'))::int as decided
+    FROM predictions p
+    JOIN sources s ON s.id = p.source_id
+    WHERE p.grade IS NOT NULL
+    GROUP BY s.slug, s.name, p.sport
+    HAVING count(*) FILTER (WHERE p.grade IN ('win', 'loss')) >= 5
+  `;
+}
+
 export async function getAwaySplit(teamId: number) {
   return sql<{ wins: number; total: number }[]>`
     SELECT

@@ -2,6 +2,7 @@ import { Worker, type Job } from 'bullmq';
 import { config } from '../config.js';
 import { QUEUE_NAMES } from '../scheduler/constants.js';
 import { fetchEspnResults } from '../results/espn-fetcher.js';
+import { fetchSoccer24Results } from '../results/soccer24-fetcher.js';
 import { matchResults } from '../results/matcher.js';
 import { gradePrediction } from '../results/grader.js';
 import {
@@ -18,6 +19,17 @@ interface ResultsJobData {
 
 const connection = { host: config.REDIS_HOST, port: config.REDIS_PORT };
 
+/**
+ * Fetch results from the appropriate source based on sport.
+ * US sports use ESPN; football (soccer) uses Soccer24.
+ */
+async function fetchResultsForSport(sport: string, dateStr: string) {
+  if (sport === 'football') {
+    return fetchSoccer24Results(dateStr);
+  }
+  return fetchEspnResults(sport, dateStr);
+}
+
 export function createResultsWorker() {
   const worker = new Worker<ResultsJobData>(
     QUEUE_NAMES.RESULTS,
@@ -25,10 +37,10 @@ export function createResultsWorker() {
       const { sport, date } = job.data;
       const log = logger.child({ job: job.id, sport, date });
 
-      // 1. Fetch from ESPN
-      const rawResults = await fetchEspnResults(sport, date);
+      // 1. Fetch results (ESPN for US sports, Soccer24 for football)
+      const rawResults = await fetchResultsForSport(sport, date);
       if (!rawResults.length) {
-        log.info('No ESPN results for this sport/date');
+        log.info('No results for this sport/date');
         return;
       }
 
@@ -49,6 +61,7 @@ export function createResultsWorker() {
           homeScore: result.homeScore,
           awayScore: result.awayScore,
           status: result.status,
+          resultSource: sport === 'football' ? 'soccer24' : 'espn',
         });
         resultsInserted++;
 

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { sql } from '../../db/pool.js';
 import { type MatchPick, type ScoredMatch, scoreMatch, groupByMatch } from '../scoring.js';
-import { getAccuracyStats, getAccuracyHistory } from '../../db/queries.js';
+import { getAccuracyStats, getAccuracyHistory, getSourceAccuracy } from '../../db/queries.js';
 import { getCached, setCached, computeETag } from '../cache.js';
 
 export const predictionsRoutes: FastifyPluginAsync = async (app) => {
@@ -201,6 +201,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
           confidence: s.confidenceScore,
           margin: s.marginScore,
           sourceAgreement: s.sourceAgreement,
+          sourceAccuracy: s.sourceAccuracy,
           odds: s.oddsValue,
           alignment: s.alignmentScore,
           form: s.formScore,
@@ -280,6 +281,27 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         winRate: decided > 0 ? Math.round((g.wins / decided) * 1000) / 10 : null,
       };
     });
+
+    return { data };
+  });
+
+  // GET /predictions/accuracy/sources — per-source accuracy leaderboard
+  app.get('/accuracy/sources', async (request) => {
+    const { sport } = request.query as { sport?: string };
+    const rows = await getSourceAccuracy();
+
+    const data = rows
+      .filter((r) => !sport || r.sport === sport)
+      .map((r) => ({
+        source: r.name,
+        slug: r.slug,
+        sport: r.sport,
+        wins: r.wins,
+        losses: r.losses,
+        decided: r.decided,
+        winRate: r.decided > 0 ? Math.round((r.wins / r.decided) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.winRate - a.winRate || b.decided - a.decided);
 
     return { data };
   });
