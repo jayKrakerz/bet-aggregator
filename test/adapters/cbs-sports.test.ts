@@ -14,104 +14,111 @@ describe('CbsSportsAdapter', () => {
   });
 
   describe('parse (NBA expert picks)', () => {
-    it('should parse predictions from expert picks grid', () => {
-      const html = loadFixture('cbs-sports', 'nba-expert-picks.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
+    const html = loadFixture('cbs-sports', 'nba-expert-picks.html');
+    const fetchedAt = new Date('2026-02-16');
+    const predictions = adapter.parse(html, 'nba', fetchedAt);
 
+    it('should produce 8 total predictions (2 games x 2 experts x 2 picks)', () => {
       expect(predictions).toBeInstanceOf(Array);
-      // Game 1: 3 experts × 3 picks = 9, Game 2: 2 experts × 3 picks = 6 → total 15
-      expect(predictions.length).toBe(15);
+      expect(predictions.length).toBe(8);
 
       predictions.forEach((p) => {
         expect(p.sourceId).toBe('cbs-sports');
         expect(p.sport).toBe('nba');
         expect(p.homeTeamRaw).toBeTruthy();
         expect(p.awayTeamRaw).toBeTruthy();
-        expect(['spread', 'moneyline', 'over_under']).toContain(p.pickType);
+        expect(['spread', 'over_under']).toContain(p.pickType);
       });
     });
 
-    it('should use individual expert names as pickerName', () => {
-      const html = loadFixture('cbs-sports', 'nba-expert-picks.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
-
+    it('should have correct expert names', () => {
       const names = new Set(predictions.map((p) => p.pickerName));
+      expect(names.size).toBe(2);
       expect(names).toContain('Brad Botkin');
       expect(names).toContain('Sam Quinn');
-      expect(names).toContain('Jack Maloney');
     });
 
-    it('should resolve team abbreviations to correct sides', () => {
-      const html = loadFixture('cbs-sports', 'nba-expert-picks.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
+    it('should parse spread picks with correct values', () => {
+      const spreads = predictions.filter((p) => p.pickType === 'spread');
+      expect(spreads.length).toBe(4);
 
-      // Brad Botkin picks BOS ATS for game 1 → away
-      const bradAts = predictions.find(
-        (p) => p.pickerName === 'Brad Botkin' &&
-          p.homeTeamRaw === 'Los Angeles Lakers' &&
-          p.pickType === 'spread',
+      // Game 1 (BOS @ LAL): Brad picks LAL +6.5, Sam picks BOS -6.5
+      const bradSpreadG1 = spreads.find(
+        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'LAL',
       );
-      expect(bradAts?.side).toBe('away');
-      expect(bradAts?.value).toBe(-6.5);
+      expect(bradSpreadG1).toBeDefined();
+      expect(bradSpreadG1?.value).toBe(6.5);
+      expect(bradSpreadG1?.side).toBe('home');
 
-      // Sam Quinn picks LAL ATS for game 1 → home
-      const samAts = predictions.find(
-        (p) => p.pickerName === 'Sam Quinn' &&
-          p.homeTeamRaw === 'Los Angeles Lakers' &&
-          p.pickType === 'spread',
+      const samSpreadG1 = spreads.find(
+        (p) => p.pickerName === 'Sam Quinn' && p.homeTeamRaw === 'LAL',
       );
-      expect(samAts?.side).toBe('home');
-      expect(samAts?.value).toBe(6.5);
+      expect(samSpreadG1).toBeDefined();
+      expect(samSpreadG1?.value).toBe(-6.5);
+      expect(samSpreadG1?.side).toBe('away');
+
+      // Game 2 (MIL @ GSW): Brad picks GSW +3, Sam picks MIL -3
+      const bradSpreadG2 = spreads.find(
+        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'GSW',
+      );
+      expect(bradSpreadG2).toBeDefined();
+      expect(bradSpreadG2?.value).toBe(3);
+      expect(bradSpreadG2?.side).toBe('home');
+
+      const samSpreadG2 = spreads.find(
+        (p) => p.pickerName === 'Sam Quinn' && p.homeTeamRaw === 'GSW',
+      );
+      expect(samSpreadG2).toBeDefined();
+      expect(samSpreadG2?.value).toBe(-3);
+      expect(samSpreadG2?.side).toBe('away');
     });
 
-    it('should parse over/under picks correctly', () => {
-      const html = loadFixture('cbs-sports', 'nba-expert-picks.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
-
+    it('should parse over/under picks with correct side and value', () => {
       const ouPicks = predictions.filter((p) => p.pickType === 'over_under');
-      expect(ouPicks.length).toBe(5);
+      expect(ouPicks.length).toBe(4);
 
       ouPicks.forEach((p) => {
         expect(['over', 'under']).toContain(p.side);
         expect(p.value).not.toBeNull();
       });
 
-      // Brad Botkin picks Over 221.5 for game 1
-      const bradOu = ouPicks.find(
-        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'Los Angeles Lakers',
+      // Game 1 (BOS @ LAL): total 233.5 — Brad over, Sam under
+      const bradOuG1 = ouPicks.find(
+        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'LAL',
       );
-      expect(bradOu?.side).toBe('over');
-      expect(bradOu?.value).toBe(221.5);
+      expect(bradOuG1?.side).toBe('over');
+      expect(bradOuG1?.value).toBe(233.5);
+
+      const samOuG1 = ouPicks.find(
+        (p) => p.pickerName === 'Sam Quinn' && p.homeTeamRaw === 'LAL',
+      );
+      expect(samOuG1?.side).toBe('under');
+      expect(samOuG1?.value).toBe(233.5);
+
+      // Game 2 (MIL @ GSW): total 228 — Brad over, Sam under
+      const bradOuG2 = ouPicks.find(
+        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'GSW',
+      );
+      expect(bradOuG2?.side).toBe('over');
+      expect(bradOuG2?.value).toBe(228);
+
+      const samOuG2 = ouPicks.find(
+        (p) => p.pickerName === 'Sam Quinn' && p.homeTeamRaw === 'GSW',
+      );
+      expect(samOuG2?.side).toBe('under');
+      expect(samOuG2?.value).toBe(228);
     });
 
-    it('should map expert records to confidence', () => {
-      const html = loadFixture('cbs-sports', 'nba-expert-picks.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
-
-      // Brad Botkin: 85-62 → 57.8% → medium (52-60% range)
-      const brad = predictions.find((p) => p.pickerName === 'Brad Botkin');
-      expect(brad?.confidence).toBe('medium');
-
-      // Sam Quinn: 79-68 → 53.7% → medium
-      const sam = predictions.find((p) => p.pickerName === 'Sam Quinn');
-      expect(sam?.confidence).toBe('medium');
-    });
-
-    it('should extract game date from page', () => {
-      const html = loadFixture('cbs-sports', 'nba-expert-picks.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
-
+    it('should set gameDate from fetchedAt', () => {
       predictions.forEach((p) => {
         expect(p.gameDate).toBe('2026-02-16');
       });
     });
 
-    it('should include game times', () => {
-      const html = loadFixture('cbs-sports', 'nba-expert-picks.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
-
-      const lalGame = predictions.find((p) => p.homeTeamRaw === 'Los Angeles Lakers');
-      expect(lalGame?.gameTime).toBe('7:30 PM ET');
+    it('should set gameTime to null', () => {
+      predictions.forEach((p) => {
+        expect(p.gameTime).toBeNull();
+      });
     });
   });
 
@@ -120,7 +127,7 @@ describe('CbsSportsAdapter', () => {
     expect(predictions).toEqual([]);
   });
 
-  it('should return empty array for grid with no game cards', () => {
+  it('should return empty array for page with no experts-panel', () => {
     const html = '<html><body><div class="picks-grid"></div></body></html>';
     const predictions = adapter.parse(html, 'nba', new Date());
     expect(predictions).toEqual([]);

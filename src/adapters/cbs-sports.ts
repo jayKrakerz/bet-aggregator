@@ -6,23 +6,19 @@ import type { RawPrediction, Side, Confidence } from '../types/prediction.js';
 /**
  * CBS Sports adapter.
  *
- * CBS Sports publishes expert picks as a dynamically-loaded grid (Next.js).
- * Requires browser rendering to capture the picks table.
+ * CBS Sports publishes expert picks in server-rendered expert panels.
  *
- * Page structure:
- *   - `.picks-grid` — container for all game cards
- *   - `.game-card` — one per game
- *     - `.game-teams` — away-team @ home-team
- *     - `.game-info` — time, spread, total
- *     - `.expert-picks-table` — rows of expert picks
- *       - `.expert-row` — one per expert
- *         - `.expert-name` — e.g. "Brad Botkin"
- *         - `.expert-record` — e.g. "(85-62 ATS)"
- *         - `.pick-ats` — spread pick (team + value)
- *         - `.pick-su` — straight-up/moneyline pick (team)
- *         - `.pick-ou` — over/under pick (side + value)
- *
- * Each expert generates up to 3 RawPredictions per game (spread, ML, O/U).
+ * Actual structure (as of 2026-02):
+ *   - `div.experts-panel` — one per game
+ *     - `div.experts-panel-heading` — game header
+ *       - `div.game-info-team span.team` — team names (away first, home second)
+ *       - `div.game-odds` — spread/total line
+ *     - `div.picks-table` — expert picks table
+ *       - `div.picks-tr` — one per expert
+ *         - `div.expert-name` — expert name
+ *         - `div.picks-spread` — spread pick
+ *         - `div.picks-o-u` — over/under pick
+ *           - `div.pick-over` / `div.pick-under` — O/U direction
  */
 export class CbsSportsAdapter extends BaseAdapter {
   readonly config: SiteAdapterConfig = {
@@ -43,7 +39,7 @@ export class CbsSportsAdapter extends BaseAdapter {
   };
 
   async browserActions(page: Page): Promise<void> {
-    await page.waitForSelector('.picks-grid, .expert-picks-table', { timeout: 20000 }).catch(() => {});
+    await page.waitForSelector('.experts-panel, .picks-table', { timeout: 20000 }).catch(() => {});
     await page.waitForTimeout(2000);
   }
 
@@ -51,35 +47,36 @@ export class CbsSportsAdapter extends BaseAdapter {
     const $ = this.load(html);
     const predictions: RawPrediction[] = [];
 
-    const dateText = $('.picks-date').text().trim();
-    const gameDate = this.parseDateText(dateText, fetchedAt);
+    const gameDate = fetchedAt.toISOString().split('T')[0]!;
 
-    $('.game-card').each((_i, cardEl) => {
-      const card = $(cardEl);
+    $('div.experts-panel').each((_i, panelEl) => {
+      const panel = $(panelEl);
 
-      const awayTeamRaw = card.find('.away-team').text().trim();
-      const homeTeamRaw = card.find('.home-team').text().trim();
-      const gameTime = card.find('.game-time').text().trim() || null;
-      const awayAbbr = card.find('.away-team').attr('data-abbr') || '';
-      const homeAbbr = card.find('.home-team').attr('data-abbr') || '';
+      // Extract team names from heading
+      const heading = panel.find('.experts-panel-heading');
+      const teamEls = heading.find('.game-info-team .team');
+      const awayTeamRaw = teamEls.eq(0).text().trim();
+      const homeTeamRaw = teamEls.eq(1).text().trim();
 
       if (!awayTeamRaw || !homeTeamRaw) return;
 
-      card.find('.expert-row').each((_j, rowEl) => {
+      // Extract game odds line for spread/total values
+      const oddsText = heading.find('.game-odds').text().trim();
+      const totalMatch = oddsText.match(/[oO]([\d.]+)/);
+      const totalValue = totalMatch ? parseFloat(totalMatch[1]!) : null;
+
+      // Iterate expert pick rows
+      panel.find('.picks-tbody .picks-tr').each((_j, rowEl) => {
         const row = $(rowEl);
         const expertName = row.find('.expert-name').text().trim();
-        const recordText = row.find('.expert-record').text().trim();
-        const confidence = this.mapRecordToConfidence(recordText);
-
         if (!expertName) return;
 
-        // ATS (spread) pick
-        const atsCell = row.find('.pick-ats');
-        const atsTeam = atsCell.find('.pick-team').text().trim();
-        const atsValue = this.parseSpreadValue(atsCell.find('.pick-value').text());
-
-        if (atsTeam) {
-          const side: Side = this.resolveTeamSide(atsTeam, homeAbbr, awayAbbr, homeTeamRaw, awayTeamRaw);
+        // Spread pick — text in picks-spread cell indicates team picked
+        const spreadCell = row.find('.picks-spread');
+        const spreadText = spreadCell.text().trim();
+        if (spreadText) {
+          const side: Side = this.resolveTeamSide(spreadText, homeTeamRaw, awayTeamRaw);
+          const spreadVal = this.parseSpreadFromText(spreadText);
 
           predictions.push({
             sourceId: this.config.id,
@@ -87,23 +84,24 @@ export class CbsSportsAdapter extends BaseAdapter {
             homeTeamRaw,
             awayTeamRaw,
             gameDate,
-            gameTime,
+            gameTime: null,
             pickType: 'spread',
             side,
-            value: atsValue,
+            value: spreadVal,
             pickerName: expertName,
-            confidence,
-            reasoning: recordText || null,
+            confidence: null,
+            reasoning: null,
             fetchedAt,
           });
         }
 
-        // SU (moneyline) pick
-        const suCell = row.find('.pick-su');
-        const suTeam = suCell.find('.pick-team').text().trim();
+        // Over/under pick
+        const ouCell = row.find('.picks-o-u');
+        const hasOver = ouCell.find('.pick-over').length > 0;
+        const hasUnder = ouCell.find('.pick-under').length > 0;
 
-        if (suTeam) {
-          const side: Side = this.resolveTeamSide(suTeam, homeAbbr, awayAbbr, homeTeamRaw, awayTeamRaw);
+        if (hasOver || hasUnder) {
+          const side: Side = hasOver ? 'over' : 'under';
 
           predictions.push({
             sourceId: this.config.id,
@@ -111,38 +109,13 @@ export class CbsSportsAdapter extends BaseAdapter {
             homeTeamRaw,
             awayTeamRaw,
             gameDate,
-            gameTime,
-            pickType: 'moneyline',
-            side,
-            value: null,
-            pickerName: expertName,
-            confidence,
-            reasoning: recordText || null,
-            fetchedAt,
-          });
-        }
-
-        // O/U pick
-        const ouCell = row.find('.pick-ou');
-        const ouSideText = ouCell.find('.pick-side').text().trim().toLowerCase();
-        const ouValue = this.parseTotalValue(ouCell.find('.pick-value').text());
-
-        if (ouSideText === 'over' || ouSideText === 'under') {
-          const side: Side = ouSideText as Side;
-
-          predictions.push({
-            sourceId: this.config.id,
-            sport,
-            homeTeamRaw,
-            awayTeamRaw,
-            gameDate,
-            gameTime,
+            gameTime: null,
             pickType: 'over_under',
             side,
-            value: ouValue,
+            value: totalValue,
             pickerName: expertName,
-            confidence,
-            reasoning: recordText || null,
+            confidence: null,
+            reasoning: null,
             fetchedAt,
           });
         }
@@ -152,51 +125,23 @@ export class CbsSportsAdapter extends BaseAdapter {
     return predictions;
   }
 
-  private resolveTeamSide(
-    pickTeam: string,
-    homeAbbr: string,
-    awayAbbr: string,
-    homeTeamRaw: string,
-    awayTeamRaw: string,
-  ): Side {
-    const pick = pickTeam.toUpperCase();
-    if (pick === homeAbbr.toUpperCase() || homeTeamRaw.toUpperCase().includes(pick)) {
-      return 'home';
+  private resolveTeamSide(pickText: string, homeTeam: string, awayTeam: string): Side {
+    const text = pickText.toUpperCase();
+    // Check if the pick text contains the home or away team name/abbreviation
+    const homeWords = homeTeam.toUpperCase().split(/\s+/);
+    const awayWords = awayTeam.toUpperCase().split(/\s+/);
+
+    for (const word of homeWords) {
+      if (word.length >= 3 && text.includes(word)) return 'home';
     }
-    if (pick === awayAbbr.toUpperCase() || awayTeamRaw.toUpperCase().includes(pick)) {
-      return 'away';
+    for (const word of awayWords) {
+      if (word.length >= 3 && text.includes(word)) return 'away';
     }
     return 'home';
   }
 
-  private mapRecordToConfidence(recordText: string): Confidence | null {
-    // Parse "(85-62 ATS)" → win rate
-    const match = recordText.match(/(\d+)-(\d+)/);
-    if (!match) return null;
-    const wins = parseInt(match[1]!, 10);
-    const losses = parseInt(match[2]!, 10);
-    const total = wins + losses;
-    if (total === 0) return null;
-    const pct = wins / total;
-    if (pct >= 0.60) return 'high';
-    if (pct >= 0.52) return 'medium';
-    return 'low';
-  }
-
-  private parseDateText(text: string, fetchedAt: Date): string {
-    const match = text.match(/(\w+)\s+(\d{1,2}),?\s+(\d{4})/);
-    if (match) {
-      const months: Record<string, string> = {
-        january: '01', february: '02', march: '03', april: '04',
-        may: '05', june: '06', july: '07', august: '08',
-        september: '09', october: '10', november: '11', december: '12',
-      };
-      const m = months[match[1]!.toLowerCase()];
-      if (m) {
-        const d = match[2]!.padStart(2, '0');
-        return `${match[3]}-${m}-${d}`;
-      }
-    }
-    return fetchedAt.toISOString().split('T')[0]!;
+  private parseSpreadFromText(text: string): number | null {
+    const match = text.match(/([+-]?\d+\.?\d*)/);
+    return match ? parseFloat(match[1]!) : null;
   }
 }

@@ -9,9 +9,9 @@ describe('DunkelIndexAdapter', () => {
     expect(adapter.config.id).toBe('dunkel-index');
     expect(adapter.config.fetchMethod).toBe('http');
     expect(adapter.config.baseUrl).toBe('https://www.dunkelindex.com');
-    expect(adapter.config.paths.nba).toBe('/picks/nba');
-    expect(adapter.config.paths.nfl).toBe('/picks/nfl');
-    expect(adapter.config.paths.ncaab).toBe('/picks/ncaab');
+    expect(adapter.config.paths.nba).toBe('/picks/get/3');
+    expect(adapter.config.paths.nfl).toBe('/picks/get/1');
+    expect(adapter.config.paths.ncaab).toBe('/picks/get/6');
   });
 
   describe('parse (NBA picks JSON)', () => {
@@ -20,8 +20,9 @@ describe('DunkelIndexAdapter', () => {
       const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
 
       expect(predictions).toBeInstanceOf(Array);
-      // 3 games × 3 pick types (spread, o/u, ML) = 9
-      expect(predictions.length).toBe(9);
+      // 2 scheduled games x 3 pick types (spread, o/u, ML) = 6
+      // (third game has status "Final" and is skipped)
+      expect(predictions.length).toBe(6);
 
       predictions.forEach((p) => {
         expect(p.sourceId).toBe('dunkel-index');
@@ -38,7 +39,7 @@ describe('DunkelIndexAdapter', () => {
       const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
 
       const spreads = predictions.filter((p) => p.pickType === 'spread');
-      expect(spreads.length).toBe(3);
+      expect(spreads.length).toBe(2);
 
       spreads.forEach((p) => {
         expect(p.value).not.toBeNull();
@@ -46,7 +47,7 @@ describe('DunkelIndexAdapter', () => {
         expect(['home', 'away']).toContain(p.side);
       });
 
-      // LAL vs BOS: dunkel_line=-6.5 → away favored
+      // LAL vs BOS: dunkel_pick=BOS, home_team_id=LAL → side=away, dunkel_line=-6.5
       const lalBos = spreads.find((p) => p.homeTeamRaw === 'Los Angeles Lakers');
       expect(lalBos?.side).toBe('away');
       expect(lalBos?.value).toBe(-6.5);
@@ -57,7 +58,7 @@ describe('DunkelIndexAdapter', () => {
       const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
 
       const totals = predictions.filter((p) => p.pickType === 'over_under');
-      expect(totals.length).toBe(3);
+      expect(totals.length).toBe(2);
 
       totals.forEach((p) => {
         expect(p.value).not.toBeNull();
@@ -65,35 +66,61 @@ describe('DunkelIndexAdapter', () => {
         expect(['over', 'under']).toContain(p.side);
       });
 
-      // LAL vs BOS: predicted 107+114=221 vs total 221.5 → under
+      // LAL vs BOS: dunkel_over_under="Under", dunkel_total=221.5
       const lalBos = totals.find((p) => p.homeTeamRaw === 'Los Angeles Lakers');
       expect(lalBos?.side).toBe('under');
       expect(lalBos?.value).toBe(221.5);
+
+      // GSW vs MIL: dunkel_over_under="Over", dunkel_total=233.0
+      const gswMil = totals.find((p) => p.homeTeamRaw === 'Golden State Warriors');
+      expect(gswMil?.side).toBe('over');
+      expect(gswMil?.value).toBe(233.0);
     });
 
-    it('should extract moneyline picks from win percentages', () => {
+    it('should extract moneyline picks from team_recommendation', () => {
       const json = loadFixture('dunkel-index', 'nba-picks.json');
       const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
 
       const mls = predictions.filter((p) => p.pickType === 'moneyline');
-      expect(mls.length).toBe(3);
+      expect(mls.length).toBe(2);
 
       mls.forEach((p) => {
         expect(['home', 'away']).toContain(p.side);
-        expect(p.reasoning).toContain('Win prob:');
       });
 
-      // BOS has 71.7% → away favored
+      // BOS team_recommendation=BOS, home_team_id=LAL → away
       const lalBos = mls.find((p) => p.homeTeamRaw === 'Los Angeles Lakers');
       expect(lalBos?.side).toBe('away');
+      expect(lalBos?.value).toBe(-290);
     });
 
-    it('should include predicted scores in reasoning', () => {
+    it('should include Dunkel ratings in reasoning', () => {
       const json = loadFixture('dunkel-index', 'nba-picks.json');
       const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
 
-      const withPredicted = predictions.filter((p) => p.reasoning?.includes('Predicted:'));
-      expect(withPredicted.length).toBeGreaterThan(0);
+      const withRating = predictions.filter((p) => p.reasoning?.includes('Ratings:'));
+      expect(withRating.length).toBeGreaterThan(0);
+    });
+
+    it('should include dunkel_pick_name in reasoning', () => {
+      const json = loadFixture('dunkel-index', 'nba-picks.json');
+      const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
+
+      const withPickName = predictions.filter((p) => p.reasoning?.includes('Dunkel pick:'));
+      expect(withPickName.length).toBeGreaterThan(0);
+
+      const lalBos = predictions.find(
+        (p) => p.homeTeamRaw === 'Los Angeles Lakers' && p.pickType === 'spread',
+      );
+      expect(lalBos?.reasoning).toContain('Boston Celtics');
+    });
+
+    it('should include vegas_line in reasoning', () => {
+      const json = loadFixture('dunkel-index', 'nba-picks.json');
+      const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
+
+      const withVegas = predictions.filter((p) => p.reasoning?.includes('Vegas line:'));
+      expect(withVegas.length).toBeGreaterThan(0);
     });
 
     it('should map rank differences to confidence', () => {
@@ -108,6 +135,12 @@ describe('DunkelIndexAdapter', () => {
         (p) => p.homeTeamRaw === 'Los Angeles Lakers' && p.pickType === 'spread',
       );
       expect(lalBos?.confidence).toBe('medium');
+
+      // GSW rank 8 vs MIL rank 5 → diff 3 → low (<5)
+      const gswMil = predictions.find(
+        (p) => p.homeTeamRaw === 'Golden State Warriors' && p.pickType === 'spread',
+      );
+      expect(gswMil?.confidence).toBe('low');
     });
 
     it('should extract game dates in YYYY-MM-DD format', () => {
@@ -117,6 +150,25 @@ describe('DunkelIndexAdapter', () => {
       predictions.forEach((p) => {
         expect(p.gameDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       });
+    });
+
+    it('should extract game times from date_of_match', () => {
+      const json = loadFixture('dunkel-index', 'nba-picks.json');
+      const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
+
+      const lalBos = predictions.find(
+        (p) => p.homeTeamRaw === 'Los Angeles Lakers' && p.pickType === 'spread',
+      );
+      expect(lalBos?.gameTime).toBe('19:30');
+    });
+
+    it('should skip games with non-scheduled status', () => {
+      const json = loadFixture('dunkel-index', 'nba-picks.json');
+      const predictions = adapter.parse(json, 'nba', new Date('2026-02-16'));
+
+      // The third game (PHX vs DEN) has status "Final" and should be skipped
+      const phxDen = predictions.find((p) => p.homeTeamRaw === 'Phoenix Suns');
+      expect(phxDen).toBeUndefined();
     });
   });
 
@@ -130,27 +182,31 @@ describe('DunkelIndexAdapter', () => {
     expect(predictions).toEqual([]);
   });
 
-  it('should skip games with non-scheduled status', () => {
+  it('should skip games with non-scheduled status (inline JSON)', () => {
     const json = JSON.stringify({
-      data: [
+      games: [
         {
-          game_id: 1,
-          home_team: 'Team A',
-          away_team: 'Team B',
-          game_date: '2026-02-16',
-          home_rank: 1,
-          away_rank: 2,
-          home_rating: 90,
-          away_rating: 85,
+          id: '99',
+          home_team_full_name: 'Team A',
+          away_team_full_name: 'Team B',
+          date_of_match: '2026-02-16 19:00:00',
+          home_team_id: 'A',
+          away_team_id: 'B',
+          home_team_key: 'A',
+          away_team_key: 'B',
+          home_team_rank: 1,
+          away_team_rank: 2,
+          home_team_dunkel_rating: '90',
+          away_team_dunkel_rating: '85',
+          dunkel_pick: 'A',
+          dunkel_pick_name: 'Team A',
           dunkel_line: -3,
           dunkel_total: 200,
-          dunkel_home_score: 105,
-          dunkel_away_score: 100,
-          home_moneyline: -150,
-          away_moneyline: 130,
-          home_win_pct: 60,
-          away_win_pct: 40,
-          status: 'final',
+          dunkel_over_under: 'Over',
+          team_recommendation: 'A',
+          money_line: '-150',
+          vegas_line: '-3.5',
+          status: 'Final',
         },
       ],
     });

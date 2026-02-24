@@ -14,15 +14,15 @@ describe('DimersAdapter', () => {
   });
 
   describe('parse (NBA schedule)', () => {
-    it('should parse predictions from game cards', () => {
+    it('should parse predictions from game links', () => {
       const html = loadFixture('dimers', 'nba-schedule.html');
       const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
 
       expect(predictions).toBeInstanceOf(Array);
-      // Game 1: 3 edge rows (spread, total, ML) = 3
-      // Game 2: 2 edge rows (spread, ML — total is push/skipped) = 2
-      // Game 3: Final — skipped entirely
-      expect(predictions.length).toBe(5);
+      // Game 1 (BOS@LAL): moneyline + spread = 2
+      // Game 2 (MIL@GSW): moneyline + spread = 2
+      // Game 3 (PHX@DEN): completed — skipped
+      expect(predictions.length).toBe(4);
 
       predictions.forEach((p) => {
         expect(p.sourceId).toBe('dimers');
@@ -30,64 +30,18 @@ describe('DimersAdapter', () => {
         expect(p.homeTeamRaw).toBeTruthy();
         expect(p.awayTeamRaw).toBeTruthy();
         expect(p.pickerName).toBe('Dimers Model');
-        expect(['spread', 'moneyline', 'over_under']).toContain(p.pickType);
+        expect(['spread', 'moneyline']).toContain(p.pickType);
       });
     });
 
-    it('should skip games with Final status', () => {
+    it('should skip games with completed status', () => {
       const html = loadFixture('dimers', 'nba-schedule.html');
       const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
 
-      const phxPicks = predictions.filter((p) =>
-        p.homeTeamRaw === 'Denver Nuggets' || p.awayTeamRaw === 'Phoenix Suns',
+      const phxPicks = predictions.filter(
+        (p) => p.homeTeamRaw === 'DEN' || p.awayTeamRaw === 'PHX',
       );
       expect(phxPicks.length).toBe(0);
-    });
-
-    it('should skip push edge rows (no direction)', () => {
-      const html = loadFixture('dimers', 'nba-schedule.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
-
-      // MIL vs GSW total edge is push → no O/U pick for that game
-      const gswTotals = predictions.filter(
-        (p) => p.homeTeamRaw === 'Golden State Warriors' && p.pickType === 'over_under',
-      );
-      expect(gswTotals.length).toBe(0);
-    });
-
-    it('should extract spread picks with edge-based confidence', () => {
-      const html = loadFixture('dimers', 'nba-schedule.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
-
-      const spreads = predictions.filter((p) => p.pickType === 'spread');
-      expect(spreads.length).toBe(2);
-
-      // BOS @ LAL: edge +1.5 → medium confidence
-      const lalSpread = spreads.find((p) => p.homeTeamRaw === 'Los Angeles Lakers');
-      expect(lalSpread?.side).toBe('away');
-      expect(lalSpread?.value).toBe(-6.5);
-      expect(lalSpread?.confidence).toBe('medium');
-      expect(lalSpread?.reasoning).toContain('Edge: +1.5');
-
-      // MIL @ GSW: edge +1.0 → medium
-      const gswSpread = spreads.find((p) => p.homeTeamRaw === 'Golden State Warriors');
-      expect(gswSpread?.side).toBe('away');
-      expect(gswSpread?.value).toBe(-2.0);
-    });
-
-    it('should extract over/under picks with predicted totals', () => {
-      const html = loadFixture('dimers', 'nba-schedule.html');
-      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
-
-      const totals = predictions.filter((p) => p.pickType === 'over_under');
-      expect(totals.length).toBe(1);
-
-      // BOS @ LAL: Under 221.5, edge -5.5 → best_bet
-      const lalTotal = totals[0]!;
-      expect(lalTotal.side).toBe('under');
-      expect(lalTotal.value).toBe(221.5);
-      expect(lalTotal.confidence).toBe('best_bet');
-      expect(lalTotal.reasoning).toContain('Predicted total: 216');
     });
 
     it('should extract moneyline picks with win probability', () => {
@@ -97,22 +51,84 @@ describe('DimersAdapter', () => {
       const mls = predictions.filter((p) => p.pickType === 'moneyline');
       expect(mls.length).toBe(2);
 
-      // BOS @ LAL: BOS away, win prob 73%
-      const lalMl = mls.find((p) => p.homeTeamRaw === 'Los Angeles Lakers');
+      // BOS @ LAL: BOS away with 73% win prob -> high confidence (>= 65)
+      const lalMl = mls.find((p) => p.homeTeamRaw === 'LAL');
       expect(lalMl?.side).toBe('away');
-      expect(lalMl?.value).toBe(-280);
-      expect(lalMl?.reasoning).toContain('Win prob: 73%');
+      expect(lalMl?.value).toBeNull();
+      expect(lalMl?.confidence).toBe('high');
+      expect(lalMl?.reasoning).toBe('Win prob: BOS 73%, LAL 27%');
+
+      // MIL @ GSW: MIL away with 58% win prob
+      const gswMl = mls.find((p) => p.homeTeamRaw === 'GSW');
+      expect(gswMl?.side).toBe('away');
+      expect(gswMl?.value).toBeNull();
+      expect(gswMl?.confidence).toBe('medium');
+      expect(gswMl?.reasoning).toBe('Win prob: MIL 58%, GSW 42%');
     });
 
-    it('should include predicted scores in reasoning', () => {
+    it('should extract spread picks', () => {
       const html = loadFixture('dimers', 'nba-schedule.html');
       const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
 
-      const lalPick = predictions.find((p) => p.homeTeamRaw === 'Los Angeles Lakers');
-      expect(lalPick?.reasoning).toContain('Predicted: Boston Celtics 112, Los Angeles Lakers 104');
+      const spreads = predictions.filter((p) => p.pickType === 'spread');
+      expect(spreads.length).toBe(2);
+
+      // BOS @ LAL: BOS -6.5
+      const lalSpread = spreads.find((p) => p.homeTeamRaw === 'LAL');
+      expect(lalSpread?.side).toBe('away');
+      expect(lalSpread?.value).toBe(-6.5);
+      expect(lalSpread?.reasoning).toBe('Spread: BOS -6.5, LAL +6.5');
+
+      // MIL @ GSW: MIL -2.0
+      const gswSpread = spreads.find((p) => p.homeTeamRaw === 'GSW');
+      expect(gswSpread?.side).toBe('away');
+      expect(gswSpread?.value).toBe(-2.0);
+      expect(gswSpread?.reasoning).toBe('Spread: MIL -2.0, GSW +2.0');
     });
 
-    it('should extract game dates from date picker', () => {
+    it('should assign confidence based on win probability', () => {
+      const html = loadFixture('dimers', 'nba-schedule.html');
+      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
+
+      // BOS 73% → high (>= 65)
+      const bosPick = predictions.find(
+        (p) => p.homeTeamRaw === 'LAL' && p.pickType === 'moneyline',
+      );
+      expect(bosPick?.confidence).toBe('high');
+
+      // MIL 58% → medium (55-64 range)
+      const milPick = predictions.find(
+        (p) => p.homeTeamRaw === 'GSW' && p.pickType === 'moneyline',
+      );
+      expect(milPick?.confidence).toBe('medium');
+    });
+
+    it('should use team abbreviations from new DOM structure', () => {
+      const html = loadFixture('dimers', 'nba-schedule.html');
+      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
+
+      const teamNames = predictions.flatMap((p) => [p.awayTeamRaw, p.homeTeamRaw]);
+      // All team names should be abbreviations, not full names
+      expect(teamNames).toContain('BOS');
+      expect(teamNames).toContain('LAL');
+      expect(teamNames).toContain('MIL');
+      expect(teamNames).toContain('GSW');
+      expect(teamNames).not.toContain('Boston Celtics');
+      expect(teamNames).not.toContain('Los Angeles Lakers');
+    });
+
+    it('should extract game time from .game-info', () => {
+      const html = loadFixture('dimers', 'nba-schedule.html');
+      const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
+
+      const lalPick = predictions.find((p) => p.homeTeamRaw === 'LAL');
+      expect(lalPick?.gameTime).toBe('7:30 PM, Feb 16');
+
+      const gswPick = predictions.find((p) => p.homeTeamRaw === 'GSW');
+      expect(gswPick?.gameTime).toBe('10:00 PM, Feb 16');
+    });
+
+    it('should extract game dates from fetchedAt', () => {
       const html = loadFixture('dimers', 'nba-schedule.html');
       const predictions = adapter.parse(html, 'nba', new Date('2026-02-16'));
 
@@ -122,33 +138,13 @@ describe('DimersAdapter', () => {
     });
   });
 
-  describe('discoverUrls', () => {
-    it('should extract game detail page links', () => {
-      const html = loadFixture('dimers', 'nba-schedule.html');
-      const urls = adapter.discoverUrls!(html, 'nba');
-
-      expect(urls.length).toBe(2);
-      expect(urls[0]).toContain('/bet-hub/nba/games/bos-lal-20260216');
-      expect(urls[1]).toContain('/bet-hub/nba/games/mil-gsw-20260216');
-    });
-
-    it('should resolve relative URLs to absolute', () => {
-      const html = loadFixture('dimers', 'nba-schedule.html');
-      const urls = adapter.discoverUrls!(html, 'nba');
-
-      urls.forEach((url) => {
-        expect(url).toMatch(/^https:\/\//);
-      });
-    });
-  });
-
   it('should return empty array for empty HTML', () => {
     const predictions = adapter.parse('<html><body></body></html>', 'nba', new Date());
     expect(predictions).toEqual([]);
   });
 
-  it('should return empty array for page with no game cards', () => {
-    const html = '<html><body><app-root><div class="games-container"></div></app-root></body></html>';
+  it('should return empty array for page with no game links', () => {
+    const html = '<html><body><app-root><div class="game-sport-group"></div></app-root></body></html>';
     const predictions = adapter.parse(html, 'nba', new Date());
     expect(predictions).toEqual([]);
   });

@@ -7,10 +7,14 @@ import type { RawPrediction, PickType, Side } from '../types/prediction.js';
  *
  * Covers uses a two-level structure:
  * 1. Landing page (/nba/picks) → lists article links
- * 2. Each article page → has odds tables + "My best bet" callouts
+ * 2. Each article page → has best bet callouts + structured odds
  *
- * The landing page is fetched first; discoverUrls() extracts article links;
- * the fetch worker then fetches each article and feeds it to parse().
+ * Article structure (as of 2026-02):
+ *   - Title: "Jazz vs Rockets Prediction, Picks & Best Bets..."
+ *   - URL: /nba/jazz-vs-rockets-prediction-picks-best-bets-...
+ *   - `<strong>TeamA vs TeamB best bet</strong>: Pick text here (-115)`
+ *   - Odds list `<li><strong>Spread</strong>: Away +13 (-110) | Home -13 (-110)</li>`
+ *   - Author: `[class*="authorName"]`
  */
 export class CoversComAdapter extends BaseAdapter {
   readonly config: SiteAdapterConfig = {
@@ -27,37 +31,42 @@ export class CoversComAdapter extends BaseAdapter {
 
   /**
    * Extract article URLs from the landing page.
-   * Articles are in `article.single-article-LH` elements.
+   * Look for links that match pick/prediction/best-bet URL patterns.
    */
   discoverUrls(html: string, _sport: string): string[] {
     const $ = this.load(html);
     const urls: string[] = [];
+    const seen = new Set<string>();
 
-    $('article.single-article-LH').each((_i, el) => {
-      const href = $(el).find('a[href]').attr('href');
+    // Primary: article elements
+    $('article a[href], .single-article-LH a[href]').each((_i, el) => {
+      const href = $(el).attr('href');
       if (href && /pick|prediction|odds|best-bet/i.test(href)) {
-        // Normalize to absolute URL
-        const url = href.startsWith('http')
-          ? href
-          : `${this.config.baseUrl}${href}`;
-        urls.push(url);
+        const url = href.startsWith('http') ? href : `${this.config.baseUrl}${href}`;
+        if (!seen.has(url)) {
+          seen.add(url);
+          urls.push(url);
+        }
       }
     });
+
+    // Fallback: any link with prediction keywords in the path
+    if (urls.length === 0) {
+      $('a[href]').each((_i, el) => {
+        const href = $(el).attr('href') || '';
+        if (/\/nba\/.*(?:prediction|picks|best-bet)/i.test(href) && !href.includes('/picks/nba')) {
+          const url = href.startsWith('http') ? href : `${this.config.baseUrl}${href}`;
+          if (!seen.has(url)) {
+            seen.add(url);
+            urls.push(url);
+          }
+        }
+      });
+    }
 
     return urls;
   }
 
-  /**
-   * Parse an individual article page for picks.
-   *
-   * Covers articles contain:
-   * - Odds tables: `table.Covers-CoversArticles-AdminArticleTable`
-   *   - Headers: [TeamA, "", TeamB] → 3-col matchup table
-   *   - Rows: [odds/spread, "Moneyline"/"Spread"/"Total", odds/spread]
-   * - Best bets: `<strong>Best bet:</strong>` or `<strong>My best bet</strong>` followed by pick text
-   *   - Pattern: "TeamOrSide to win (odds at sportsbook)"
-   * - Author: `[class*="authorName"]`
-   */
   parse(html: string, sport: string, fetchedAt: Date): RawPrediction[] {
     const $ = this.load(html);
     const predictions: RawPrediction[] = [];
@@ -66,200 +75,240 @@ export class CoversComAdapter extends BaseAdapter {
       $('[class*="authorName"]').first().text().trim().split('\n')[0]?.trim() ||
       'Covers Expert';
 
-    // Extract best bet callouts from article body
-    // Handles both <strong>Best bet:</strong> and <strong>My best bet</strong> formats
+    const gameDate = this.extractDateFromPage($);
+    const matchup = this.extractMatchupFromPage($);
+
+    // Extract best bet callouts
     $('strong, b').each((_i, el) => {
-      const strongText = $(el).text().trim().toLowerCase();
-      if (!strongText.includes('best bet')) return;
+      const strongText = $(el).text().trim();
+      if (!/best bet/i.test(strongText)) return;
 
-      // The pick text is in the same parent <p>
+      // Get text AFTER the strong tag (not the full parent text minus strong)
       const parent = $(el).parent();
-      const fullText = parent.text().trim();
+      const strongOriginal = $(el).text();
+      const parentText = parent.text().trim();
 
-      // Remove the "Best bet:" / "My best bet" prefix
-      const pickText = fullText
-        .replace(/my best bet:?\s*/i, '')
-        .replace(/best bet:?\s*/i, '')
-        .trim();
+      // Extract pick text: everything after the strong element + colon
+      const afterStrong = parentText.substring(
+        parentText.indexOf(strongOriginal) + strongOriginal.length,
+      ).replace(/^:\s*/, '').trim();
 
-      if (!pickText) return;
+      if (!afterStrong) return;
 
-      // Also extract linked odds text (e.g. "+320 at bet365")
-      const linkedOdds = parent.find('a').text().trim();
-
-      // Parse the pick — handles both inline and linked odds
-      const parsed = this.parseBestBetText(pickText, linkedOdds);
+      const parsed = this.parseBestBetText(afterStrong);
       if (!parsed) return;
-
-      // Try to find the matchup from nearby tables
-      const matchup = this.findNearestMatchup($, el);
 
       predictions.push({
         sourceId: this.config.id,
         sport,
-        homeTeamRaw: matchup?.home || parsed.team || '',
+        homeTeamRaw: matchup?.home || '',
         awayTeamRaw: matchup?.away || '',
-        gameDate: this.extractDateFromPage($),
+        gameDate,
         gameTime: null,
         pickType: parsed.pickType,
         side: parsed.side,
         value: parsed.value,
         pickerName: author,
         confidence: 'best_bet',
-        reasoning: pickText.slice(0, 200),
+        reasoning: afterStrong.slice(0, 200),
         fetchedAt,
       });
     });
 
+    // Also extract structured odds from list items
+    // Format: <li><strong>Spread</strong>: Jazz +13 (-110) | Rockets -13 (-110)</li>
+    if (matchup) {
+      $('li').each((_i, el) => {
+        const li = $(el);
+        const strong = li.find('strong').text().trim().toLowerCase();
+        const fullText = li.text().trim();
+
+        if (strong === 'spread') {
+          const spreadPick = this.parseSpreadLine(fullText, matchup);
+          if (spreadPick) {
+            predictions.push({
+              sourceId: this.config.id,
+              sport,
+              homeTeamRaw: matchup.home,
+              awayTeamRaw: matchup.away,
+              gameDate,
+              gameTime: null,
+              pickType: 'spread',
+              side: spreadPick.side,
+              value: spreadPick.value,
+              pickerName: author,
+              confidence: null,
+              reasoning: fullText.slice(0, 200),
+              fetchedAt,
+            });
+          }
+        } else if (strong === 'moneyline') {
+          const mlPick = this.parseMoneylineLine(fullText, matchup);
+          if (mlPick) {
+            predictions.push({
+              sourceId: this.config.id,
+              sport,
+              homeTeamRaw: matchup.home,
+              awayTeamRaw: matchup.away,
+              gameDate,
+              gameTime: null,
+              pickType: 'moneyline',
+              side: mlPick.side,
+              value: mlPick.value,
+              pickerName: author,
+              confidence: null,
+              reasoning: fullText.slice(0, 200),
+              fetchedAt,
+            });
+          }
+        } else if (strong === 'over/under' || strong === 'total') {
+          const ouPick = this.parseOverUnderLine(fullText);
+          if (ouPick) {
+            predictions.push({
+              sourceId: this.config.id,
+              sport,
+              homeTeamRaw: matchup.home,
+              awayTeamRaw: matchup.away,
+              gameDate,
+              gameTime: null,
+              pickType: 'over_under',
+              side: ouPick.side,
+              value: ouPick.value,
+              pickerName: author,
+              confidence: null,
+              reasoning: fullText.slice(0, 200),
+              fetchedAt,
+            });
+          }
+        }
+      });
+    }
+
     return predictions;
   }
 
-  /**
-   * Parse best bet text in several formats:
-   * - "World (+165 at bet365)" — inline odds
-   * - "Keshad Johnson to win (+320 at bet365)" — "to win" format with linked odds
-   * - "Under 81.5 (-110 at bet365)"
-   * - "Stripes -2.5 (-105 at bet365)"
-   * - "Luka Doncic 2+ threes (+145 at bet365)"
-   */
-  private parseBestBetText(text: string, linkedOdds?: string): {
-    team: string;
+  private parseBestBetText(text: string): {
     pickType: PickType;
     side: Side;
     value: number | null;
   } | null {
-    // Try to match "Something (odds at book)"
-    let match = text.match(
-      /^(.+?)\s*\(([+-]?\d+\.?\d*)\s*(?:at\s+.+?)?\)/,
-    );
+    // Extract odds from parentheses: "Rockets team total Under 120.5 (-115)"
+    const oddsMatch = text.match(/\(([+-]?\d+\.?\d*)\s*(?:at\s+.+?)?\)/);
+    const pickText = text.replace(/\s*\([^)]*\)\s*/g, '').trim();
 
-    // If no inline odds, try extracting odds from the linked text
-    let pickPart: string;
-    let oddsStr: string;
+    if (!pickText) return null;
 
-    if (match) {
-      pickPart = match[1]!.trim().replace(/\s+to\s+win\s*$/i, '').trim();
-      oddsStr = match[2]!;
-    } else {
-      // Fallback: "TeamName to win" with odds from linked <a> text
-      const oddsMatch = (linkedOdds || '').match(/([+-]?\d+\.?\d*)\s*(?:at\s+.+)?/);
-      if (!oddsMatch) return null;
-      oddsStr = oddsMatch[1]!;
-      // Remove the linked text from the pick text
-      pickPart = text.replace(/\(.*\)/, '').replace(linkedOdds || '', '').trim();
-      // Clean trailing "to win" etc
-      pickPart = pickPart.replace(/\s+to\s+win\s*$/i, '').trim();
+    const lower = pickText.toLowerCase();
+
+    // Over/under: "Under 120.5" or "Over 228.5"
+    if (/\bunder\b/i.test(lower)) {
+      return { pickType: 'over_under', side: 'under', value: this.parseTotalValue(pickText) };
+    }
+    if (/\bover\b/i.test(lower)) {
+      return { pickType: 'over_under', side: 'over', value: this.parseTotalValue(pickText) };
     }
 
-    if (!pickPart) return null;
-
-    // Detect pick type from the text
-    const lower = pickPart.toLowerCase();
-
-    if (lower.startsWith('over')) {
-      return {
-        team: pickPart,
-        pickType: 'over_under',
-        side: 'over',
-        value: this.parseTotalValue(pickPart),
-      };
-    }
-    if (lower.startsWith('under')) {
-      return {
-        team: pickPart,
-        pickType: 'over_under',
-        side: 'under',
-        value: this.parseTotalValue(pickPart),
-      };
-    }
-
-    // Check for spread: "TeamName -3.5" or "TeamName +2.5"
-    const spreadMatch = pickPart.match(/^(.+?)\s+([+-]\d+\.?\d*)$/);
+    // Spread: "TeamName -3.5"
+    const spreadMatch = pickText.match(/^(.+?)\s+([+-]\d+\.?\d*)$/);
     if (spreadMatch) {
-      return {
-        team: spreadMatch[1]!.trim(),
-        pickType: 'spread',
-        side: 'home', // Will be resolved during normalization
-        value: parseFloat(spreadMatch[2]!),
-      };
+      return { pickType: 'spread', side: 'home', value: parseFloat(spreadMatch[2]!) };
     }
 
-    // Check for props (contains specific player stats)
-    if (/\d\+\s*(three|point|rebound|assist|steal|block)/i.test(pickPart)) {
+    // Props: "Player 2+ threes" etc
+    if (/\d\+\s*(three|point|rebound|assist|steal|block)/i.test(pickText)) {
       return {
-        team: pickPart,
         pickType: 'prop',
         side: 'home',
-        value: parseFloat(oddsStr),
+        value: oddsMatch ? parseFloat(oddsMatch[1]!) : null,
       };
     }
 
-    // Default: moneyline pick
+    // Default: moneyline
     return {
-      team: pickPart,
       pickType: 'moneyline',
       side: 'home',
-      value: parseFloat(oddsStr),
+      value: oddsMatch ? parseFloat(oddsMatch[1]!) : null,
     };
   }
 
   /**
-   * Find the nearest matchup table above the current element.
-   * Matchup tables have 3 columns: [TeamA, "", TeamB] where the middle is empty.
-   * We collect all such tables in document order and pick the last one before
-   * the best-bet element (i.e. the closest matchup above it).
+   * Extract team names from the page title or canonical URL.
+   * URL pattern: /nba/jazz-vs-rockets-prediction-...
+   * Title pattern: "Jazz vs Rockets Prediction, Picks..."
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private findNearestMatchup(
-    $: ReturnType<typeof this.load>,
-    bestBetEl: any,
-  ): { home: string; away: string } | null {
-    const tables = $('table.Covers-CoversArticles-AdminArticleTable');
-    const allMatchups: { home: string; away: string; tableEl: any }[] = [];
-
-    tables.each((_i, tableEl) => {
-      const allHeaders = $(tableEl)
-        .find('thead th')
-        .map((_j, th) => $(th).text().trim())
-        .get();
-
-      // Matchup tables have exactly 3 columns with an empty middle header
-      if (allHeaders.length === 3 && allHeaders[1] === '') {
-        const away = allHeaders[0]!;
-        const home = allHeaders[2]!;
-        if (away && home) {
-          allMatchups.push({ home, away, tableEl });
-        }
-      }
-    });
-
-    if (allMatchups.length === 0) return null;
-
-    // Walk up from the best-bet element to find which matchup table precedes it.
-    // We use a simple heuristic: get the source index of the best-bet element
-    // and each table, then pick the last table whose index is before the bet.
-    const betParent = $(bestBetEl).closest('p, div');
-    const allEls = $('*');
-    const betIndex = allEls.index(betParent.length ? betParent : bestBetEl);
-
-    let closest: { home: string; away: string } | null = null;
-    for (const m of allMatchups) {
-      const tableIndex = allEls.index(m.tableEl);
-      if (tableIndex < betIndex) {
-        closest = { home: m.home, away: m.away };
-      }
+  private extractMatchupFromPage($: ReturnType<typeof this.load>): { home: string; away: string } | null {
+    // Try canonical URL first: more reliable
+    const canonical = $('link[rel="canonical"]').attr('href') || '';
+    const urlMatch = canonical.match(/\/([a-z-]+)-vs-([a-z-]+)-(?:prediction|picks|odds|best-bet)/i);
+    if (urlMatch) {
+      const away = urlMatch[1]!.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      const home = urlMatch[2]!.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      return { away, home };
     }
 
-    // Fallback: if no table is before the bet, return the first matchup
-    return closest || { home: allMatchups[0]!.home, away: allMatchups[0]!.away };
+    // Fallback: page title
+    const title = $('title').text().trim();
+    const titleMatch = title.match(/^(.+?)\s+vs\.?\s+(.+?)\s+(?:prediction|picks|odds)/i);
+    if (titleMatch) {
+      return { away: titleMatch[1]!.trim(), home: titleMatch[2]!.trim() };
+    }
+
+    return null;
+  }
+
+  /**
+   * Parse "Spread: Jazz +13 (-110) | Rockets -13 (-110)"
+   * Returns the favorite's side (team with negative spread).
+   */
+  private parseSpreadLine(text: string, matchup: { home: string; away: string }): { side: Side; value: number } | null {
+    // Find all "TeamName [+-]N.N" patterns
+    const parts = text.split('|');
+    for (const part of parts) {
+      const m = part.match(/([+-]\d+\.?\d*)\s*\(/);
+      if (m) {
+        const val = parseFloat(m[1]!);
+        if (val < 0) {
+          // This is the favorite — check if it's home or away
+          const isHome = part.toLowerCase().includes(matchup.home.toLowerCase().split(' ').pop()!);
+          return { side: isHome ? 'home' : 'away', value: val };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Parse "Moneyline: Jazz +575 | Rockets -850"
+   * Returns the favorite side.
+   */
+  private parseMoneylineLine(text: string, matchup: { home: string; away: string }): { side: Side; value: number } | null {
+    const parts = text.split('|');
+    for (const part of parts) {
+      const m = part.match(/([+-]\d+)/);
+      if (m) {
+        const val = parseInt(m[1]!, 10);
+        if (val < 0) {
+          const isHome = part.toLowerCase().includes(matchup.home.toLowerCase().split(' ').pop()!);
+          return { side: isHome ? 'home' : 'away', value: val };
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Parse "Over/Under: Over 228.5 (-110) | Under 228.5 (-110)"
+   */
+  private parseOverUnderLine(text: string): { side: Side; value: number } | null {
+    const totalMatch = text.match(/([\d.]+)/);
+    if (!totalMatch) return null;
+    return { side: 'over', value: parseFloat(totalMatch[1]!) };
   }
 
   private extractDateFromPage($: ReturnType<typeof this.load>): string {
     // Try to find date from timestamp
     const timestamp = $('[class*="timeStamp"]').text().trim();
-    const dateMatch = timestamp.match(
-      /(\w{3})\s+(\d{1,2}),?\s+(\d{4})/,
-    );
+    const dateMatch = timestamp.match(/(\w{3})\s+(\d{1,2}),?\s+(\d{4})/);
     if (dateMatch) {
       const months: Record<string, string> = {
         Jan: '01', Feb: '02', Mar: '03', Apr: '04',
@@ -270,6 +319,15 @@ export class CoversComAdapter extends BaseAdapter {
       const d = dateMatch[2]!.padStart(2, '0');
       if (m) return `${dateMatch[3]}-${m}-${d}`;
     }
+
+    // Try publication date from schema
+    const pubDate = $('meta[property="article:published_time"]').attr('content')
+      || $('script[type="application/ld+json"]').text().match(/"datePublished":"([^"]+)"/)?.[1];
+    if (pubDate) {
+      const d = new Date(pubDate);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0]!;
+    }
+
     return new Date().toISOString().split('T')[0]!;
   }
 }

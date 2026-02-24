@@ -4,156 +4,72 @@
 <body>
 <div id="app">
   <div class="picks-page">
-    <div class="page-header">
-      <h1>NBA Picks</h1>
-      <div class="picks-date-selector">
-        <span class="current-date" data-date="2026-02-16">February 16, 2026</span>
+    <div class="game-picks-module">
+
+      <!-- Game 1: BOS @ LAL -->
+      <div class="game-picks-card--horizontal">
+        <div class="game-picks-card-horizontal__side--left">
+          <div class="team__name">Boston Celtics</div>
+          <div class="team__percentage">77% of Bets</div>
+          <button class="odds-cell">
+            <span class="odds-cell__line">-6.5</span>
+            <span class="odds-cell__cost">(-110)</span>
+          </button>
+          <button class="odds-cell">
+            <span class="odds-cell__line">-280</span>
+          </button>
+          <button class="odds-cell">
+            <span class="odds-cell__line">221.5</span>
+          </button>
+        </div>
+        <div class="game-picks-card-horizontal__side--right">
+          <div class="team__name">Los Angeles Lakers</div>
+          <div class="team__percentage">23% of Bets</div>
+          <button class="odds-cell">
+            <span class="odds-cell__line">+6.5</span>
+            <span class="odds-cell__cost">(-110)</span>
+          </button>
+          <button class="odds-cell">
+            <span class="odds-cell__line">+230</span>
+          </button>
+          <button class="odds-cell">
+            <span class="odds-cell__line">221.5</span>
+          </button>
+        </div>
       </div>
-    </div>
 
-    <div class="consensus-picks-table">
-      <table class="picks-table">
-        <thead>
-          <tr>
-            <th>Game</th>
-            <th>Time</th>
-            <th>Spread</th>
-            <th>Spread Pick</th>
-            <th>Cover Prob</th>
-            <th>Moneyline</th>
-            <th>ML Pick</th>
-            <th>ML Prob</th>
-            <th>Total</th>
-            <th>O/U Pick</th>
-            <th>O/U Prob</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="picks-row" data-matchup-id="nba-20260216-bos-lal">
-            <td class="game-cell">
-              <div class="matchup">
-                <div class="team away">
-                  <span class="team-name">Boston Celtics</span>
-                  <span class="team-abbr">BOS</span>
-                </div>
-                <div class="team home">
-                  <span class="team-name">Los Angeles Lakers</span>
-                  <span class="team-abbr">LAL</span>
-                </div>
-              </div>
-            </td>
-            <td class="time-cell">
-              <span class="game-time">7:30 PM ET</span>
-            </td>
-            <td class="spread-cell">
-              <div class="line away-line">BOS -6.5 (-110)</div>
-              <div class="line home-line">LAL +6.5 (-110)</div>
-            </td>
-            <td class="pick-cell spread-pick">
-              <div class="consensus-pick">
-                <span class="pick-team">BOS</span>
-                <span class="pick-direction">away</span>
-                <span class="expert-count">112 of 156 experts</span>
-                <span class="consensus-pct">72</span>%
-              </div>
-            </td>
-            <td class="prob-cell spread-prob">
-              <span class="cover-probability">68.4</span>%
-            </td>
-            <td class="ml-cell">
-              <div class="line away-line">BOS -280</div>
-              <div class="line home-line">LAL +230</div>
-            </td>
-            <td class="pick-cell ml-pick">
-              <div class="consensus-pick">
-                <span class="pick-team">BOS</span>
-                <span class="pick-direction">away</span>
-                <span class="expert-count">138 of 156 experts</span>
-                <span class="consensus-pct">88</span>%
-              </div>
-            </td>
-            <td class="prob-cell ml-prob">
-              <span class="win-probability">78.2</span>%
-            </td>
-            <td class="total-cell">
-              <div class="line over-line">O 221.5 (-110)</div>
-              <div class="line under-line">U 221.5 (-110)</div>
-            </td>
-            <td class="pick-cell ou-pick">
-              <div class="consensus-pick">
-                <span class="pick-side">Over</span>
-                <span class="expert-count">89 of 156 experts</span>
-                <span class="consensus-pct">57</span>%
-              </div>
-            </td>
-            <td class="prob-cell ou-prob">
-              <span class="ou-probability">53.1</span>%
-            </td>
-          </tr>
+      <!-- Game 2: MIL @ GSW -->
+      <div class="game-picks-card--horizontal">
+        <div class="game-picks-card-horizontal__side--left">
+          <div class="team__name">Milwaukee Bucks</div>
+          <div class="team__percentage">46% of Bets</div>
+          <button class="odds-cell">
+            <span class="odds-cell__line">-2.0</span>
+            <span class="odds-cell__cost">(-108)</span>
+          </button>
+          <button class="odds-cell">
+            <span class="odds-cell__line">-135</span>
+          </button>
+          <button class="odds-cell">
+            <span class="odds-cell__line">233.0</span>
+          </button>
+        </div>
+        <div class="game-picks-card-horizontal__side--right">
+          <div class="team__name">Golden State Warriors</div>
+          <div class="team__percentage">54% of Bets</div>
+          <button class="odds-cell">
+            <span class="odds-cell__line">+2.0</span>
+            <span class="odds-cell__cost">(-112)</span>
+          </button>
+          <button class="odds-cell">
+            <span class="odds-cell__line">+115</span>
+          </button>
+          <button class="odds-cell">
+            <span class="odds-cell__line">233.0</span>
+          </button>
+        </div>
+      </div>
 
-          <tr class="picks-row" data-matchup-id="nba-20260216-mil-gsw">
-            <td class="game-cell">
-              <div class="matchup">
-                <div class="team away">
-                  <span class="team-name">Milwaukee Bucks</span>
-                  <span class="team-abbr">MIL</span>
-                </div>
-                <div class="team home">
-                  <span class="team-name">Golden State Warriors</span>
-                  <span class="team-abbr">GSW</span>
-                </div>
-              </div>
-            </td>
-            <td class="time-cell">
-              <span class="game-time">10:00 PM ET</span>
-            </td>
-            <td class="spread-cell">
-              <div class="line away-line">MIL -2.0 (-108)</div>
-              <div class="line home-line">GSW +2.0 (-112)</div>
-            </td>
-            <td class="pick-cell spread-pick">
-              <div class="consensus-pick">
-                <span class="pick-team">GSW</span>
-                <span class="pick-direction">home</span>
-                <span class="expert-count">84 of 156 experts</span>
-                <span class="consensus-pct">54</span>%
-              </div>
-            </td>
-            <td class="prob-cell spread-prob">
-              <span class="cover-probability">51.2</span>%
-            </td>
-            <td class="ml-cell">
-              <div class="line away-line">MIL -135</div>
-              <div class="line home-line">GSW +115</div>
-            </td>
-            <td class="pick-cell ml-pick">
-              <div class="consensus-pick">
-                <span class="pick-team">MIL</span>
-                <span class="pick-direction">away</span>
-                <span class="expert-count">91 of 156 experts</span>
-                <span class="consensus-pct">58</span>%
-              </div>
-            </td>
-            <td class="prob-cell ml-prob">
-              <span class="win-probability">55.6</span>%
-            </td>
-            <td class="total-cell">
-              <div class="line over-line">O 233.0 (-110)</div>
-              <div class="line under-line">U 233.0 (-110)</div>
-            </td>
-            <td class="pick-cell ou-pick">
-              <div class="consensus-pick">
-                <span class="pick-side">Under</span>
-                <span class="expert-count">98 of 156 experts</span>
-                <span class="consensus-pct">63</span>%
-              </div>
-            </td>
-            <td class="prob-cell ou-prob">
-              <span class="ou-probability">59.8</span>%
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </div>
   </div>
 </div>
