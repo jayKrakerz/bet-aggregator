@@ -4,73 +4,142 @@
 <body>
 <div id="app">
   <div class="picks-page">
-    <div class="game-picks-module">
 
-      <!-- Game 1: BOS @ LAL -->
-      <div class="game-picks-card--horizontal">
-        <div class="game-picks-card-horizontal__side--left">
-          <div class="team__name">Boston Celtics</div>
-          <div class="team__percentage">77% of Bets</div>
-          <button class="odds-cell">
-            <span class="odds-cell__line">-6.5</span>
-            <span class="odds-cell__cost">(-110)</span>
-          </button>
-          <button class="odds-cell">
-            <span class="odds-cell__line">-280</span>
-          </button>
-          <button class="odds-cell">
-            <span class="odds-cell__line">221.5</span>
-          </button>
-        </div>
-        <div class="game-picks-card-horizontal__side--right">
-          <div class="team__name">Los Angeles Lakers</div>
-          <div class="team__percentage">23% of Bets</div>
-          <button class="odds-cell">
-            <span class="odds-cell__line">+6.5</span>
-            <span class="odds-cell__cost">(-110)</span>
-          </button>
-          <button class="odds-cell">
-            <span class="odds-cell__line">+230</span>
-          </button>
-          <button class="odds-cell">
-            <span class="odds-cell__line">221.5</span>
-          </button>
+    <!-- Game Picks Module: featured game card (only shows 1 game) -->
+    <div class="card-body card-with-heading game-picks-module">
+      <div class="card-with-heading__content">
+        <div class="game-picks-card game-picks-card--horizontal game-picks-module__item">
+          <div class="flex game-picks-card-horizontal">
+            <div class="flex game-picks-card-horizontal__side game-picks-card-horizontal__side--left">
+              <div class="diagonal-event-matchup">
+                <div class="flex team team--left">
+                  <div class="participant-image participant-image--team-logo team__participant team__participant--visitor">
+                    <img class="image-block" src="/assets/images/logos/nba/50x50/BOS.webp" alt="Boston Logo">
+                  </div>
+                </div>
+                <div class="flex team team--right">
+                  <div class="participant-image participant-image--team-logo team__participant team__participant--home">
+                    <img class="image-block" src="/assets/images/logos/nba/50x50/LAL.webp" alt="Los Angeles Logo">
+                  </div>
+                </div>
+              </div>
+              <div class="flex game-picks-card-horizontal__info info">
+                <a href="/nba/matchups/los-angeles-lakers-vs-boston-celtics/" class="link">
+                  <div class="flex event-details-tag">
+                    <span class="typography event-details-tag__text">BOS @ LAL</span>
+                    <span class="typography event-details-tag__text">2/16 7:30pm</span>
+                  </div>
+                </a>
+                <span class="typography info__pick">Celtics -6.5 (-110)</span>
+              </div>
+            </div>
+            <div class="game-picks-card-horizontal__side game-picks-card-horizontal__side--right">
+              <div class="flex split-odds-container">
+                <div class="flex split-fill-bar" style="--4d8ec5d2: 77%; --763cbcf2: 23%;">
+                  <div class="flex split-fill-bar__labels">
+                    <span class="typography">77% Tailing</span>
+                  </div>
+                </div>
+                <button class="odds-cell odds-cell--default">
+                  <span class="typography odds-cell__line">-6.5</span>
+                  <span class="typography odds-cell__cost">(-110)</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      <!-- Game 2: MIL @ GSW -->
-      <div class="game-picks-card--horizontal">
-        <div class="game-picks-card-horizontal__side--left">
-          <div class="team__name">Milwaukee Bucks</div>
-          <div class="team__percentage">46% of Bets</div>
-          <button class="odds-cell">
-            <span class="odds-cell__line">-2.0</span>
-            <span class="odds-cell__cost">(-108)</span>
-          </button>
-          <button class="odds-cell">
-            <span class="odds-cell__line">-135</span>
-          </button>
-          <button class="odds-cell">
-            <span class="odds-cell__line">233.0</span>
-          </button>
-        </div>
-        <div class="game-picks-card-horizontal__side--right">
-          <div class="team__name">Golden State Warriors</div>
-          <div class="team__percentage">54% of Bets</div>
-          <button class="odds-cell">
-            <span class="odds-cell__line">+2.0</span>
-            <span class="odds-cell__cost">(-112)</span>
-          </button>
-          <button class="odds-cell">
-            <span class="odds-cell__line">+115</span>
-          </button>
-          <button class="odds-cell">
-            <span class="odds-cell__line">233.0</span>
-          </button>
-        </div>
-      </div>
-
     </div>
+
+    <!-- Bet Signals Module: carousel with ALL games -->
+    <div class="carousel bet-signals-module__carousel">
+      <div class="carousel__track">
+
+        <!-- Game 1: BOS @ LAL -->
+        <div class="carousel__slide">
+          <div class="bet-signal bet-signals-module__slide">
+            <div class="flex bet-signal__info info">
+              <div class="flex info__team team">
+                <div class="participant-image participant-image--team-logo team__logo">
+                  <img class="image-block" src="/assets/images/logos/nba/100x100/BOS.webp" alt="Boston Logo">
+                </div>
+                <h3 class="typography team__name">Celtics</h3>
+                <h4 class="typography">40-12</h4>
+                <button class="odds-cell odds-cell--default">
+                  <span class="typography odds-cell__line">-6.5</span>
+                  <span class="typography odds-cell__cost">(-110)</span>
+                </button>
+                <div class="team__percentage percentage percentage--bets">
+                  <span class="typography percentage__heading">77% of Bets</span>
+                </div>
+              </div>
+              <span class="typography info__divider">@</span>
+              <div class="flex info__team team">
+                <div class="participant-image participant-image--team-logo team__logo">
+                  <img class="image-block" src="/assets/images/logos/nba/100x100/LAL.webp" alt="Los Angeles Logo">
+                </div>
+                <h3 class="typography team__name">Lakers</h3>
+                <h4 class="typography">28-24</h4>
+                <button class="odds-cell odds-cell--default">
+                  <span class="typography odds-cell__line">+6.5</span>
+                  <span class="typography odds-cell__cost">(-110)</span>
+                </button>
+                <div class="team__percentage percentage percentage--bets">
+                  <span class="typography percentage__heading">23% of Bets</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex bet-signal__bs-card-footer bs-card-footer">
+              <span class="typography">2/16 7:30pm</span>
+              <a href="/nba/matchups/los-angeles-lakers-vs-boston-celtics/" class="link bs-card-footer__matchup-link">Matchup</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Game 2: MIL @ GSW -->
+        <div class="carousel__slide">
+          <div class="bet-signal bet-signals-module__slide">
+            <div class="flex bet-signal__info info">
+              <div class="flex info__team team">
+                <div class="participant-image participant-image--team-logo team__logo">
+                  <img class="image-block" src="/assets/images/logos/nba/100x100/MIL.webp" alt="Milwaukee Logo">
+                </div>
+                <h3 class="typography team__name">Bucks</h3>
+                <h4 class="typography">32-20</h4>
+                <button class="odds-cell odds-cell--default">
+                  <span class="typography odds-cell__line">-2.0</span>
+                  <span class="typography odds-cell__cost">(-108)</span>
+                </button>
+                <div class="team__percentage percentage percentage--bets">
+                  <span class="typography percentage__heading">46% of Bets</span>
+                </div>
+              </div>
+              <span class="typography info__divider">@</span>
+              <div class="flex info__team team">
+                <div class="participant-image participant-image--team-logo team__logo">
+                  <img class="image-block" src="/assets/images/logos/nba/100x100/GSW.webp" alt="Golden State Logo">
+                </div>
+                <h3 class="typography team__name">Warriors</h3>
+                <h4 class="typography">25-27</h4>
+                <button class="odds-cell odds-cell--default">
+                  <span class="typography odds-cell__line">+2.0</span>
+                  <span class="typography odds-cell__cost">(-112)</span>
+                </button>
+                <div class="team__percentage percentage percentage--bets">
+                  <span class="typography percentage__heading">54% of Bets</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex bet-signal__bs-card-footer bs-card-footer">
+              <span class="typography">2/16 10:00pm</span>
+              <a href="/nba/matchups/golden-state-warriors-vs-milwaukee-bucks/" class="link bs-card-footer__matchup-link">Matchup</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 </div>
 </body>

@@ -5,69 +5,167 @@
 <div class="expert-picks-page">
   <h1 class="page-title">NBA Expert Picks</h1>
 
-  <!-- Game 1: BOS @ LAL -->
-  <div class="experts-panel">
-    <div class="experts-panel-heading">
-      <div class="game-info-team">
-        <span class="team">BOS</span>
-      </div>
-      <div class="game-info-team">
-        <span class="team">LAL</span>
-      </div>
-      <div class="game-odds">o233.5</div>
-    </div>
-
-    <div class="picks-table">
-      <div class="picks-tbody">
-        <div class="picks-tr">
-          <div class="expert-name">Brad Botkin</div>
-          <div class="picks-spread">LAL +6.5</div>
-          <div class="picks-o-u">
-            <div class="pick-over">Over</div>
-          </div>
+  <!-- Expert sidebar panel -->
+  <div class="experts-panel single-expert">
+    <div class="experts-panel-info">
+      <h3 class="experts-panel-heading">Our Expert</h3>
+      <div class="expert-list">
+        <div class="expert-item">
+          <span class="expert-name">CBS Sports Staff</span>
         </div>
-
-        <div class="picks-tr">
-          <div class="expert-name">Sam Quinn</div>
-          <div class="picks-spread">BOS -6.5</div>
+      </div>
+      <div class="pick-details">
+        <div class="pick-details-container">
+          <div class="picks-spread">
+            <div class="expert-label">Spread Picks</div>
+            <div class="expert-label-data">424 - 433 - 1 (49%)</div>
+          </div>
           <div class="picks-o-u">
-            <div class="pick-under">Under</div>
+            <div class="expert-label">Over/Under Picks</div>
+            <div class="expert-label-data">402 - 456 - 0 (47%)</div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Game 2: MIL @ GSW -->
-  <div class="experts-panel">
-    <div class="experts-panel-heading">
-      <div class="game-info-team">
-        <span class="team">MIL</span>
+  <!-- Main picks table -->
+  <div class="picks-table">
+    <div class="picks-thead">
+      <div class="picks-tr">
+        <div class="picks-th">Game Info</div>
+        <div class="picks-th">Current Odds</div>
+        <div class="picks-th">Expert Picks</div>
       </div>
-      <div class="game-info-team">
-        <span class="team">GSW</span>
-      </div>
-      <div class="game-odds">o228</div>
     </div>
+    <div class="picks-tbody">
 
-    <div class="picks-table">
-      <div class="picks-tbody">
-        <div class="picks-tr">
-          <div class="expert-name">Brad Botkin</div>
-          <div class="picks-spread">GSW +3</div>
-          <div class="picks-o-u">
-            <div class="pick-over">Over</div>
+      <!-- Game 1: BOS @ LAL -->
+      <div class="picks-tr">
+        <div class="picks-td">
+          <div class="game-info-team">
+            <span class="logo">
+              <div class="TeamLogo TeamLogo--small">
+                <a href="/nba/teams/BOS/boston-celtics/" aria-label="home team page">
+                  <figure class="img"><img class="TeamLogo-image" alt="team logo" src="logo.svg"></figure>
+                </a>
+              </div>
+            </span>
+            <span class="team">
+              <a href="https://www.cbssports.com/nba/teams/BOS/boston-celtics/">Boston</a>
+            </span>
+          </div>
+          <div class="game-info-team">
+            <span class="logo">
+              <div class="TeamLogo TeamLogo--small">
+                <a href="/nba/teams/LAL/los-angeles-lakers/" aria-label="home team page">
+                  <figure class="img"><img class="TeamLogo-image" alt="team logo" src="logo.svg"></figure>
+                </a>
+              </div>
+            </span>
+            <span class="team">
+              <a href="https://www.cbssports.com/nba/teams/LAL/los-angeles-lakers/">LA Lakers</a>
+            </span>
+          </div>
+          <div class="game-info-options">
+            <div class="current-status">
+              <span data-format-datetime="{}"><span class="formatter">7:30<span class="formatter-period">PM</span></span></span>
+            </div>
+            <div class="picks-options">
+              <div class="picks-options-item">
+                <a href="//www.cbssports.com/nba/gametracker/preview/NBA_20260216_BOS@LAL/">Preview</a>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="picks-tr">
-          <div class="expert-name">Sam Quinn</div>
-          <div class="picks-spread">MIL -3</div>
-          <div class="picks-o-u">
-            <div class="pick-under">Under</div>
+        <div class="picks-td">
+          <div class="game-odds over"><span>o233.5</span></div>
+          <div class="game-odds"><span>+6.5</span></div>
+        </div>
+
+        <div class="picks-td">
+          <div class="expert-picks-col">
+            <div class="expert-spread">
+              <div class="expert-logo">
+                <div class="TeamLogo TeamLogo--medium">
+                  <a href="/nba/teams/LAL/los-angeles-lakers/" aria-label="home team page">
+                    <figure class="img"><img class="TeamLogo-image" alt="team logo" src="logo.svg"></figure>
+                  </a>
+                </div>
+              </div>
+              LAL +6.5
+            </div>
+            <div class="expert-ou">
+              <span class="pick-over">O</span>233.5
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- Game 2: MIL @ GSW -->
+      <div class="picks-tr">
+        <div class="picks-td">
+          <div class="game-info-team">
+            <span class="logo">
+              <div class="TeamLogo TeamLogo--small">
+                <a href="/nba/teams/MIL/milwaukee-bucks/" aria-label="home team page">
+                  <figure class="img"><img class="TeamLogo-image" alt="team logo" src="logo.svg"></figure>
+                </a>
+              </div>
+            </span>
+            <span class="team">
+              <a href="https://www.cbssports.com/nba/teams/MIL/milwaukee-bucks/">Milwaukee</a>
+            </span>
+          </div>
+          <div class="game-info-team">
+            <span class="logo">
+              <div class="TeamLogo TeamLogo--small">
+                <a href="/nba/teams/GS/golden-state-warriors/" aria-label="home team page">
+                  <figure class="img"><img class="TeamLogo-image" alt="team logo" src="logo.svg"></figure>
+                </a>
+              </div>
+            </span>
+            <span class="team">
+              <a href="https://www.cbssports.com/nba/teams/GS/golden-state-warriors/">Golden St.</a>
+            </span>
+          </div>
+          <div class="game-info-options">
+            <div class="current-status">
+              <span data-format-datetime="{}"><span class="formatter">10:00<span class="formatter-period">PM</span></span></span>
+            </div>
+            <div class="picks-options">
+              <div class="picks-options-item">
+                <a href="//www.cbssports.com/nba/gametracker/preview/NBA_20260216_MIL@GS/">Preview</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="picks-td">
+          <div class="game-odds over"><span>o228</span></div>
+          <div class="game-odds"><span>-3</span></div>
+        </div>
+
+        <div class="picks-td">
+          <div class="expert-picks-col">
+            <div class="expert-spread">
+              <div class="expert-logo">
+                <div class="TeamLogo TeamLogo--medium">
+                  <a href="/nba/teams/MIL/milwaukee-bucks/" aria-label="home team page">
+                    <figure class="img"><img class="TeamLogo-image" alt="team logo" src="logo.svg"></figure>
+                  </a>
+                </div>
+              </div>
+              MIL -3
+            </div>
+            <div class="expert-ou">
+              <span class="pick-under">U</span>228
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 

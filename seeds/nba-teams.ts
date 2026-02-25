@@ -15,7 +15,7 @@ const NBA_TEAMS = [
   { name: 'Dallas Mavericks', abbr: 'DAL', aliases: ['Mavericks', 'Mavs', 'Dallas'] },
   { name: 'Denver Nuggets', abbr: 'DEN', aliases: ['Nuggets', 'Denver'] },
   { name: 'Detroit Pistons', abbr: 'DET', aliases: ['Pistons', 'Detroit'] },
-  { name: 'Golden State Warriors', abbr: 'GSW', aliases: ['Warriors', 'Golden State', 'GS Warriors'] },
+  { name: 'Golden State Warriors', abbr: 'GSW', aliases: ['Warriors', 'Golden State', 'GS Warriors', 'Golden St.'] },
   { name: 'Houston Rockets', abbr: 'HOU', aliases: ['Rockets', 'Houston'] },
   { name: 'Indiana Pacers', abbr: 'IND', aliases: ['Pacers', 'Indiana'] },
   { name: 'Los Angeles Clippers', abbr: 'LAC', aliases: ['Clippers', 'LA Clippers', 'L.A. Clippers'] },

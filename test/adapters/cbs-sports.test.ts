@@ -18,9 +18,9 @@ describe('CbsSportsAdapter', () => {
     const fetchedAt = new Date('2026-02-16');
     const predictions = adapter.parse(html, 'nba', fetchedAt);
 
-    it('should produce 8 total predictions (2 games x 2 experts x 2 picks)', () => {
+    it('should produce 4 total predictions (2 games x 1 expert x 2 pick types)', () => {
       expect(predictions).toBeInstanceOf(Array);
-      expect(predictions.length).toBe(8);
+      expect(predictions.length).toBe(4);
 
       predictions.forEach((p) => {
         expect(p.sourceId).toBe('cbs-sports');
@@ -31,94 +31,63 @@ describe('CbsSportsAdapter', () => {
       });
     });
 
-    it('should have correct expert names', () => {
+    it('should use the expert name from the sidebar panel', () => {
       const names = new Set(predictions.map((p) => p.pickerName));
-      expect(names.size).toBe(2);
-      expect(names).toContain('Brad Botkin');
-      expect(names).toContain('Sam Quinn');
+      expect(names.size).toBe(1);
+      expect(names).toContain('CBS Sports Staff');
     });
 
-    it('should parse spread picks with correct values', () => {
+    it('should parse spread picks with correct values and sides', () => {
       const spreads = predictions.filter((p) => p.pickType === 'spread');
-      expect(spreads.length).toBe(4);
+      expect(spreads.length).toBe(2);
 
-      // Game 1 (BOS @ LAL): Brad picks LAL +6.5, Sam picks BOS -6.5
-      const bradSpreadG1 = spreads.find(
-        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'LAL',
-      );
-      expect(bradSpreadG1).toBeDefined();
-      expect(bradSpreadG1?.value).toBe(6.5);
-      expect(bradSpreadG1?.side).toBe('home');
+      // Game 1 (BOS @ LAL): expert picks LAL +6.5 — LAL is home
+      const spreadG1 = spreads.find((p) => p.homeTeamRaw === 'LA Lakers');
+      expect(spreadG1).toBeDefined();
+      expect(spreadG1?.value).toBe(6.5);
+      expect(spreadG1?.side).toBe('home');
+      expect(spreadG1?.awayTeamRaw).toBe('Boston');
 
-      const samSpreadG1 = spreads.find(
-        (p) => p.pickerName === 'Sam Quinn' && p.homeTeamRaw === 'LAL',
-      );
-      expect(samSpreadG1).toBeDefined();
-      expect(samSpreadG1?.value).toBe(-6.5);
-      expect(samSpreadG1?.side).toBe('away');
-
-      // Game 2 (MIL @ GSW): Brad picks GSW +3, Sam picks MIL -3
-      const bradSpreadG2 = spreads.find(
-        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'GSW',
-      );
-      expect(bradSpreadG2).toBeDefined();
-      expect(bradSpreadG2?.value).toBe(3);
-      expect(bradSpreadG2?.side).toBe('home');
-
-      const samSpreadG2 = spreads.find(
-        (p) => p.pickerName === 'Sam Quinn' && p.homeTeamRaw === 'GSW',
-      );
-      expect(samSpreadG2).toBeDefined();
-      expect(samSpreadG2?.value).toBe(-3);
-      expect(samSpreadG2?.side).toBe('away');
+      // Game 2 (MIL @ GSW): expert picks MIL -3 — MIL is away
+      const spreadG2 = spreads.find((p) => p.homeTeamRaw === 'Golden St.');
+      expect(spreadG2).toBeDefined();
+      expect(spreadG2?.value).toBe(-3);
+      expect(spreadG2?.side).toBe('away');
+      expect(spreadG2?.awayTeamRaw).toBe('Milwaukee');
     });
 
     it('should parse over/under picks with correct side and value', () => {
       const ouPicks = predictions.filter((p) => p.pickType === 'over_under');
-      expect(ouPicks.length).toBe(4);
+      expect(ouPicks.length).toBe(2);
 
       ouPicks.forEach((p) => {
         expect(['over', 'under']).toContain(p.side);
         expect(p.value).not.toBeNull();
       });
 
-      // Game 1 (BOS @ LAL): total 233.5 — Brad over, Sam under
-      const bradOuG1 = ouPicks.find(
-        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'LAL',
-      );
-      expect(bradOuG1?.side).toBe('over');
-      expect(bradOuG1?.value).toBe(233.5);
+      // Game 1 (BOS @ LAL): total 233.5 — Over
+      const ouG1 = ouPicks.find((p) => p.homeTeamRaw === 'LA Lakers');
+      expect(ouG1?.side).toBe('over');
+      expect(ouG1?.value).toBe(233.5);
 
-      const samOuG1 = ouPicks.find(
-        (p) => p.pickerName === 'Sam Quinn' && p.homeTeamRaw === 'LAL',
-      );
-      expect(samOuG1?.side).toBe('under');
-      expect(samOuG1?.value).toBe(233.5);
-
-      // Game 2 (MIL @ GSW): total 228 — Brad over, Sam under
-      const bradOuG2 = ouPicks.find(
-        (p) => p.pickerName === 'Brad Botkin' && p.homeTeamRaw === 'GSW',
-      );
-      expect(bradOuG2?.side).toBe('over');
-      expect(bradOuG2?.value).toBe(228);
-
-      const samOuG2 = ouPicks.find(
-        (p) => p.pickerName === 'Sam Quinn' && p.homeTeamRaw === 'GSW',
-      );
-      expect(samOuG2?.side).toBe('under');
-      expect(samOuG2?.value).toBe(228);
+      // Game 2 (MIL @ GSW): total 228 — Under
+      const ouG2 = ouPicks.find((p) => p.homeTeamRaw === 'Golden St.');
+      expect(ouG2?.side).toBe('under');
+      expect(ouG2?.value).toBe(228);
     });
 
-    it('should set gameDate from fetchedAt', () => {
+    it('should extract game date from preview link', () => {
       predictions.forEach((p) => {
         expect(p.gameDate).toBe('2026-02-16');
       });
     });
 
-    it('should set gameTime to null', () => {
-      predictions.forEach((p) => {
-        expect(p.gameTime).toBeNull();
-      });
+    it('should extract game time from the formatter element', () => {
+      const g1 = predictions.find((p) => p.homeTeamRaw === 'LA Lakers');
+      expect(g1?.gameTime).toBe('7:30PM');
+
+      const g2 = predictions.find((p) => p.homeTeamRaw === 'Golden St.');
+      expect(g2?.gameTime).toBe('10:00PM');
     });
   });
 
@@ -127,7 +96,7 @@ describe('CbsSportsAdapter', () => {
     expect(predictions).toEqual([]);
   });
 
-  it('should return empty array for page with no experts-panel', () => {
+  it('should return empty array for page with no picks-tbody', () => {
     const html = '<html><body><div class="picks-grid"></div></body></html>';
     const predictions = adapter.parse(html, 'nba', new Date());
     expect(predictions).toEqual([]);
