@@ -155,7 +155,7 @@ Never invent statistics, win-loss records, or injury reports. If you don't have 
           ],
           stream: true,
         }),
-      });
+      }) as unknown as { ok: boolean; status: number; text(): Promise<string>; body: AsyncIterable<Uint8Array> | null };
 
       if (!ollamaRes.ok) {
         const text = await ollamaRes.text();
