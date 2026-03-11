@@ -121,7 +121,7 @@ export function createFetchWorker() {
     },
     {
       connection,
-      concurrency: 3,
+      concurrency: 10,
     },
   );
 

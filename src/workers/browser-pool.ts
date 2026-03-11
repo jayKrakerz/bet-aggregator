@@ -38,6 +38,7 @@ export async function fetchBrowser(
 
     return await page.content();
   } finally {
+    await page.close();
     await context.close();
   }
 }

@@ -57,6 +57,55 @@ export async function insertPrediction(pred: NormalizedPrediction): Promise<bool
   return result.count > 0;
 }
 
+/**
+ * Batch insert predictions in chunks of 50.
+ * Returns the total number of rows actually inserted (skipping dedup conflicts).
+ */
+export async function insertPredictionBatch(preds: NormalizedPrediction[]): Promise<number> {
+  if (!preds.length) return 0;
+
+  // Pre-resolve all source slugs to numeric IDs
+  const uniqueSlugs = [...new Set(preds.map((p) => p.sourceId))];
+  const sourceRows = await sql<{ id: number; slug: string }[]>`
+    SELECT id, slug FROM sources WHERE slug = ANY(${uniqueSlugs})
+  `;
+  const sourceIdMap = new Map(sourceRows.map((r) => [r.slug, r.id]));
+
+  let inserted = 0;
+  const CHUNK = 50;
+
+  for (let i = 0; i < preds.length; i += CHUNK) {
+    const chunk = preds.slice(i, i + CHUNK);
+    const validChunk = chunk.filter((p) => sourceIdMap.has(p.sourceId));
+    if (!validChunk.length) continue;
+
+    const values = validChunk.map((p) => ({
+      source_id: sourceIdMap.get(p.sourceId)!,
+      match_id: p.matchId,
+      sport: p.sport,
+      home_team_id: p.homeTeamId,
+      away_team_id: p.awayTeamId,
+      pick_type: p.pickType,
+      side: p.side,
+      value: p.value,
+      picker_name: p.pickerName,
+      confidence: p.confidence,
+      reasoning: p.reasoning,
+      dedup_key: p.dedupKey,
+      fetched_at: p.fetchedAt,
+    }));
+
+    const result = await sql`
+      INSERT INTO predictions ${sql(values)}
+      ON CONFLICT (dedup_key) DO NOTHING
+    `;
+
+    inserted += result.count;
+  }
+
+  return inserted;
+}
+
 export async function getSourceBySlug(slug: string) {
   const [source] = await sql`
     SELECT id, slug, name, base_url, fetch_method, is_active, last_fetched_at, created_at

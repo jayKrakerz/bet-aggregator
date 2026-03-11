@@ -46,7 +46,7 @@ export function createParseWorker() {
     },
     {
       connection,
-      concurrency: 5,
+      concurrency: 15,
     },
   );
 

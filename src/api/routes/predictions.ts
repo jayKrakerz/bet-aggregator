@@ -21,6 +21,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         count(DISTINCT p.match_id)::int as total_matches,
         count(DISTINCT p.pick_type)::int as pick_types
       FROM predictions p
+      WHERE p.created_at >= CURRENT_DATE
     `;
     const bySport = await sql`
       SELECT sport, count(*)::int as count FROM predictions GROUP BY sport ORDER BY count DESC

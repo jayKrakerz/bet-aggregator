@@ -56,7 +56,7 @@ export const sourcesRoutes: FastifyPluginAsync = async (app) => {
 
   app.post<{ Body: { jobIds: string[] } }>('/fetch-status', async (request) => {
     const { jobIds } = request.body;
-    if (!jobIds || !Array.length) return { completed: 0, failed: 0, pending: 0, total: 0 };
+    if (!jobIds || !jobIds.length) return { completed: 0, failed: 0, pending: 0, total: 0 };
 
     const fetchQueue = new Queue(QUEUE_NAMES.FETCH, {
       connection: { host: config.REDIS_HOST, port: config.REDIS_PORT },

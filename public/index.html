@@ -347,6 +347,48 @@ body{min-height:100vh;overflow-x:hidden}
 .fetch-spinning svg{animation:spin 1s linear infinite}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 
+/* ===== SEARCH BAR ===== */
+.search-bar{position:relative;margin-bottom:16px}
+.search-input{width:100%;padding:10px 16px 10px 40px;font-size:13px;font-family:inherit;border:1px solid rgba(255,255,255,0.08);border-radius:var(--radius);background:var(--surface);color:var(--text);outline:none;transition:all 0.2s}
+.search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search-input::placeholder{color:var(--text-muted)}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none}
+.search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;display:none;font-family:inherit}
+.search-clear:hover{color:var(--text);background:rgba(255,255,255,0.08)}
+.search-bar.has-value .search-clear{display:block}
+
+/* ===== SORT CONTROLS ===== */
+.sort-controls{display:flex;align-items:center;gap:8px}
+.sort-select{padding:5px 10px;font-size:11px;font-family:inherit;border:1px solid rgba(255,255,255,0.08);border-radius:20px;background:rgba(255,255,255,0.04);color:var(--text-dim);cursor:pointer;outline:none;transition:all 0.2s;-webkit-appearance:none;appearance:none;padding-right:24px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6' fill='%238b92a5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.sort-select:hover{border-color:rgba(255,255,255,0.2);color:var(--text)}
+.sort-select:focus{border-color:var(--accent)}
+
+/* ===== TOAST NOTIFICATIONS ===== */
+.toast-container{position:fixed;top:calc(var(--header-h) + 12px);right:20px;z-index:200;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;padding:12px 18px;background:var(--elevated);border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.4);font-size:12px;color:var(--text);pointer-events:auto;animation:toast-in 0.3s ease-out forwards;max-width:340px;backdrop-filter:blur(12px)}
+.toast.hiding{animation:toast-out 0.3s ease-in forwards}
+.toast-icon{font-size:16px;flex-shrink:0}
+.toast-msg{flex:1;line-height:1.5}
+.toast-close{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:2px;flex-shrink:0}
+.toast-close:hover{color:var(--text)}
+@keyframes toast-in{0%{opacity:0;transform:translateX(40px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes toast-out{0%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(40px)}}
+
+/* ===== LAST UPDATED ===== */
+.last-updated{font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.04);white-space:nowrap}
+
+/* ===== MOBILE BOTTOM NAV ===== */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:100;background:rgba(11,15,25,0.95);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-top:1px solid rgba(255,255,255,0.06);padding:6px 8px calc(6px + env(safe-area-inset-bottom));justify-content:space-around}
+.mobile-nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 12px;border:none;background:none;color:var(--text-muted);cursor:pointer;font-family:inherit;font-size:9px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;transition:color 0.2s;-webkit-tap-highlight-color:transparent}
+.mobile-nav-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mobile-nav-btn.active{color:var(--accent)}
+.mobile-nav-btn.active svg{stroke:var(--accent)}
+@media(max-width:768px){
+  .mobile-nav{display:flex}
+  .tabs-header{display:none}
+  body{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+}
+
 /* ===== SOURCES TAB ===== */
 .sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
 .source-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);padding:14px 16px;transition:all 0.2s}
@@ -443,6 +485,10 @@ body{min-height:100vh;overflow-x:hidden}
       <button class="analyst-link" id="fetch-all-btn" title="Fetch all sources now"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg><span>Fetch All</span></button>
       <a href="/analyst" class="analyst-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4 7l-1 4H10l-1-4c-2-1.5-4-4-4-7a7 7 0 0 1 7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg><span>Analyst</span></a>
       <input type="date" class="date-input" id="date-filter" title="Filter by date">
+      <div class="last-updated" id="last-updated" title="Last data refresh">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        <span id="last-updated-text">--</span>
+      </div>
       <div class="health" id="health">
         <div class="health-dot"></div>
         <span>Live</span>
@@ -502,11 +548,26 @@ body{min-height:100vh;overflow-x:hidden}
 
     <!-- TAB: ALL PICKS -->
     <div class="tab-panel active" id="panel-all-picks">
-      <div class="conf-filters" id="conf-filters">
-        <button class="conf-chip active" data-min="0">All</button>
-        <button class="conf-chip" data-min="80">Best Bets 80+</button>
-        <button class="conf-chip" data-min="65">High+ 65+</button>
-        <button class="conf-chip" data-min="50">Medium+ 50+</button>
+      <div class="search-bar" id="search-bar">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" class="search-input" id="search-input" placeholder="Search by team name..." autocomplete="off">
+        <button class="search-clear" id="search-clear">&times;</button>
+      </div>
+      <div class="conf-filters" id="conf-filters" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="conf-chip active" data-min="0">All</button>
+          <button class="conf-chip" data-min="80">Best Bets 80+</button>
+          <button class="conf-chip" data-min="65">High+ 65+</button>
+          <button class="conf-chip" data-min="50">Medium+ 50+</button>
+        </div>
+        <div class="sort-controls">
+          <select class="sort-select" id="sort-picks" title="Sort picks">
+            <option value="score-desc">Score (High-Low)</option>
+            <option value="score-asc">Score (Low-High)</option>
+            <option value="time-asc">Game Time</option>
+            <option value="sources-desc">Most Sources</option>
+          </select>
+        </div>
       </div>
       <div class="section-title">
         <h2>Scored Predictions</h2>
@@ -623,6 +684,33 @@ body{min-height:100vh;overflow-x:hidden}
     </div>
   </div>
 </div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav class="mobile-nav" id="mobile-nav">
+  <button class="mobile-nav-btn active" data-tab="all-picks">
+    <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    Picks
+  </button>
+  <button class="mobile-nav-btn" data-tab="over-under">
+    <svg viewBox="0 0 24 24"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+    O/U
+  </button>
+  <button class="mobile-nav-btn" data-tab="value-bets">
+    <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    Value
+  </button>
+  <button class="mobile-nav-btn" data-tab="matches">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Matches
+  </button>
+  <button class="mobile-nav-btn" data-tab="sources">
+    <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    Sources
+  </button>
+</nav>
 
 <script>
 // ===== STATE =====
@@ -760,6 +848,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'sources') {
       loadSources();
     }
+    // Smooth scroll to tabs
+    document.querySelector('.tabs-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 });
 
@@ -774,10 +864,7 @@ document.querySelectorAll('#conf-filters .conf-chip').forEach(btn => {
 });
 
 function applyConfFilter() {
-  document.querySelectorAll('.pick-card').forEach(card => {
-    const score = parseInt(card.dataset.score || '0', 10);
-    card.style.display = score >= confMinScore ? '' : 'none';
-  });
+  applyAllFilters();
 }
 
 // ===== CAROUSEL NAV =====
@@ -1456,6 +1543,7 @@ async function checkHealth() {
 // ===== LOAD ALL =====
 async function loadAll() {
   await Promise.all([loadStats(), loadTop5(), loadPicks(), loadMatches(), checkHealth()]);
+  updateLastUpdatedTime();
   // Reload lazy tabs if already visited
   if (S.valueBetsLoaded) loadValueBets();
   if (S.ouLoaded) loadOverUnder();
@@ -1470,6 +1558,7 @@ async function poll() {
       loadPicks(),
       loadMatches(true),
     ]);
+    updateLastUpdatedTime();
     if (statsChanged || matchesChanged) S.matchPredictions = {};
   } catch (e) {}
 }
@@ -1491,6 +1580,10 @@ function connectWS() {
     try {
       const msg = JSON.parse(ev.data);
       if (msg.event === 'predictions:updated') {
+        const sport = msg.data?.sport || '';
+        const count = msg.data?.count || 0;
+        const sportLabel = sport ? (sportConf(sport)?.label || sport) : '';
+        showToast(`${count} new ${sportLabel} prediction${count !== 1 ? 's' : ''} added`, '&#9889;');
         poll();
       }
     } catch {}
@@ -1694,6 +1787,139 @@ async function loadSources() {
     grid.innerHTML = '<div class="empty">Failed to load sources.</div>';
   }
 }
+
+// ===== SEARCH =====
+const searchInput = document.getElementById('search-input');
+const searchBar = document.getElementById('search-bar');
+const searchClear = document.getElementById('search-clear');
+let searchQuery = '';
+
+searchInput.addEventListener('input', (e) => {
+  searchQuery = e.target.value.toLowerCase().trim();
+  searchBar.classList.toggle('has-value', searchQuery.length > 0);
+  applyAllFilters();
+});
+searchClear.onclick = () => {
+  searchInput.value = '';
+  searchQuery = '';
+  searchBar.classList.remove('has-value');
+  applyAllFilters();
+};
+
+function applyAllFilters() {
+  document.querySelectorAll('.pick-card').forEach(card => {
+    const score = parseInt(card.dataset.score || '0', 10);
+    const teams = (card.querySelector('.pick-teams')?.textContent || '').toLowerCase();
+    const passScore = score >= confMinScore;
+    const passSearch = !searchQuery || teams.includes(searchQuery);
+    card.style.display = (passScore && passSearch) ? '' : 'none';
+  });
+  // Also filter matches tab
+  document.querySelectorAll('.match-card').forEach(card => {
+    const teams = (card.querySelector('.match-teams-col')?.textContent || '').toLowerCase();
+    const passSearch = !searchQuery || teams.includes(searchQuery);
+    card.style.display = passSearch ? '' : 'none';
+    // Also hide the detail wrap
+    const detail = card.nextElementSibling;
+    if (detail?.classList.contains('match-detail-wrap')) {
+      detail.style.display = passSearch ? '' : 'none';
+    }
+  });
+}
+
+// ===== SORT =====
+document.getElementById('sort-picks').addEventListener('change', (e) => {
+  const grid = document.getElementById('picks-list');
+  const cards = Array.from(grid.querySelectorAll('.pick-card'));
+  const dividers = Array.from(grid.querySelectorAll('.date-divider'));
+
+  const sortVal = e.target.value;
+
+  if (sortVal === 'score-desc') {
+    cards.sort((a, b) => parseInt(b.dataset.score || '0') - parseInt(a.dataset.score || '0'));
+  } else if (sortVal === 'score-asc') {
+    cards.sort((a, b) => parseInt(a.dataset.score || '0') - parseInt(b.dataset.score || '0'));
+  } else if (sortVal === 'time-asc') {
+    cards.sort((a, b) => {
+      const tA = a.querySelector('.pick-meta span')?.textContent || 'ZZ';
+      const tB = b.querySelector('.pick-meta span')?.textContent || 'ZZ';
+      return tA.localeCompare(tB);
+    });
+  } else if (sortVal === 'sources-desc') {
+    cards.sort((a, b) => {
+      const sA = a.querySelectorAll('.source-chip').length || parseInt(a.querySelector('.score-dot')?.textContent || '0');
+      const sB = b.querySelectorAll('.source-chip').length || parseInt(b.querySelector('.score-dot')?.textContent || '0');
+      return sB - sA;
+    });
+  }
+
+  // When sorting, hide date dividers and just show sorted cards
+  dividers.forEach(d => d.style.display = (sortVal === 'score-desc' || sortVal === 'score-asc' || sortVal === 'sources-desc') ? 'none' : '');
+
+  // Re-append sorted cards
+  for (const card of cards) {
+    grid.appendChild(card);
+  }
+});
+
+// ===== TOAST NOTIFICATIONS =====
+function showToast(message, icon = '&#9889;', duration = 4000) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-msg">${message}</span>
+    <button class="toast-close" onclick="this.parentElement.classList.add('hiding');setTimeout(()=>this.parentElement.remove(),300)">&times;</button>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('hiding');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// ===== LAST UPDATED =====
+function updateLastUpdatedTime() {
+  const el = document.getElementById('last-updated-text');
+  const now = new Date();
+  el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  el.parentElement.title = 'Last refreshed: ' + now.toLocaleString();
+}
+
+// ===== MOBILE NAV =====
+document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+  btn.onclick = () => {
+    // Update mobile nav active state
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    // Switch tab
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector(`.tab-btn[data-tab="${tab}"]`)?.classList.add('active');
+    S.activeTab = tab;
+    document.getElementById('panel-' + tab).classList.add('active');
+    // Lazy load
+    if (tab === 'value-bets' && !S.valueBetsLoaded) loadValueBets();
+    if (tab === 'over-under' && !S.ouLoaded) loadOverUnder();
+    if (tab === 'sources') loadSources();
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+});
+
+// Sync desktop tabs with mobile nav
+const origTabClick = document.querySelectorAll('.tab-btn');
+origTabClick.forEach(btn => {
+  const origHandler = btn.onclick;
+  btn.onclick = () => {
+    origHandler?.();
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === btn.dataset.tab);
+    });
+  };
+});
 
 // ===== INIT =====
 (async () => {
