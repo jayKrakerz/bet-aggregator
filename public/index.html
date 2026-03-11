@@ -343,6 +343,25 @@ body{min-height:100vh;overflow-x:hidden}
 .acc-card .acc-record{font-size:11px;color:var(--text-dim);margin-top:4px}
 .acc-placeholder{text-align:center;padding:24px;color:var(--text-muted);font-size:12px}
 
+/* ===== FETCH ALL BUTTON ===== */
+.fetch-spinning svg{animation:spin 1s linear infinite}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+
+/* ===== SOURCES TAB ===== */
+.sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.source-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);padding:14px 16px;transition:all 0.2s}
+.source-card:hover{border-color:rgba(255,255,255,0.1);box-shadow:var(--shadow-card)}
+.source-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.source-card-name{font-size:13px;font-weight:700;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.source-status{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.3px;flex-shrink:0}
+.source-status.working{background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid rgba(34,197,94,0.2)}
+.source-status.dead{background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2)}
+.source-card-stats{display:flex;gap:16px;margin-bottom:6px}
+.source-stat{display:flex;flex-direction:column;gap:1px}
+.source-stat-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.source-stat-val{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text)}
+.source-card-meta{font-size:10px;color:var(--text-muted)}
+
 /* ===== SKELETON LOADING ===== */
 .skeleton{position:relative;overflow:hidden;background:var(--elevated);border-radius:var(--radius-sm)}
 .skeleton::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);animation:shimmer 1.5s infinite}
@@ -421,6 +440,7 @@ body{min-height:100vh;overflow-x:hidden}
       <button class="chip" data-sport="football">Soccer</button>
     </div>
     <div class="header-right">
+      <button class="analyst-link" id="fetch-all-btn" title="Fetch all sources now"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg><span>Fetch All</span></button>
       <a href="/analyst" class="analyst-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4 7l-1 4H10l-1-4c-2-1.5-4-4-4-7a7 7 0 0 1 7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg><span>Analyst</span></a>
       <input type="date" class="date-input" id="date-filter" title="Filter by date">
       <div class="health" id="health">
@@ -477,6 +497,7 @@ body{min-height:100vh;overflow-x:hidden}
       <button class="tab-btn" data-tab="over-under">Over/Under</button>
       <button class="tab-btn" data-tab="value-bets">Value Bets</button>
       <button class="tab-btn" data-tab="matches">Matches</button>
+      <button class="tab-btn" data-tab="sources">Sources</button>
     </div>
 
     <!-- TAB: ALL PICKS -->
@@ -546,6 +567,24 @@ body{min-height:100vh;overflow-x:hidden}
         <div class="skeleton skel-match"></div>
         <div class="skeleton skel-match"></div>
         <div class="skeleton skel-match"></div>
+      </div>
+    </div>
+
+    <!-- TAB: SOURCES -->
+    <div class="tab-panel" id="panel-sources">
+      <div class="section-title">
+        <h2>Adapter Status</h2>
+        <span class="badge-count" id="sources-tab-count">--</span>
+      </div>
+      <div class="sources-filter" style="display:flex;gap:6px;margin-bottom:16px">
+        <button class="conf-chip active" data-src-filter="all">All</button>
+        <button class="conf-chip" data-src-filter="working">Working</button>
+        <button class="conf-chip" data-src-filter="dead">Dead</button>
+      </div>
+      <div class="sources-grid" id="sources-grid">
+        <div class="skeleton skel-pick"></div>
+        <div class="skeleton skel-pick"></div>
+        <div class="skeleton skel-pick"></div>
       </div>
     </div>
   </div>
@@ -717,6 +756,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
     if (btn.dataset.tab === 'over-under' && !S.ouLoaded) {
       loadOverUnder();
+    }
+    if (btn.dataset.tab === 'sources') {
+      loadSources();
     }
   };
 });
@@ -1531,6 +1573,126 @@ async function loadAccuracy() {
 
     updateROI();
   } catch {}
+}
+
+// ===== FETCH ALL BUTTON =====
+document.getElementById('fetch-all-btn').onclick = async () => {
+  const btn = document.getElementById('fetch-all-btn');
+  btn.disabled = true;
+  btn.classList.add('fetch-spinning');
+  btn.querySelector('span').textContent = 'Enqueuing...';
+  try {
+    const res = await fetch('/sources/trigger-all', { method: 'POST' });
+    const data = await res.json();
+    const jobIds = data.jobIds || [];
+    const total = data.enqueued;
+    btn.querySelector('span').textContent = `0 / ${total}`;
+
+    // Poll for completion
+    const pollStatus = async () => {
+      try {
+        const sr = await fetch('/sources/fetch-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobIds }),
+        });
+        const status = await sr.json();
+        const done = status.completed + status.failed;
+        btn.querySelector('span').textContent = `${done} / ${total}` + (status.failed ? ` (${status.failed} failed)` : '');
+
+        if (status.pending > 0) {
+          setTimeout(pollStatus, 3000);
+        } else {
+          // All done
+          btn.classList.remove('fetch-spinning');
+          const msg = status.failed
+            ? `${status.completed} ok, ${status.failed} failed`
+            : `${status.completed} done`;
+          btn.querySelector('span').textContent = msg;
+          // Refresh sources tab if open
+          if (S.activeTab === 'sources') loadSources();
+          poll();
+          setTimeout(() => {
+            btn.querySelector('span').textContent = 'Fetch All';
+            btn.disabled = false;
+          }, 5000);
+        }
+      } catch {
+        btn.querySelector('span').textContent = 'Poll error';
+        btn.classList.remove('fetch-spinning');
+        btn.disabled = false;
+      }
+    };
+    setTimeout(pollStatus, 5000);
+  } catch {
+    btn.querySelector('span').textContent = 'Error';
+    btn.classList.remove('fetch-spinning');
+    setTimeout(() => {
+      btn.querySelector('span').textContent = 'Fetch All';
+      btn.disabled = false;
+    }, 2000);
+  }
+};
+
+// ===== SOURCES TAB =====
+let sourcesFilter = 'all';
+
+document.querySelectorAll('[data-src-filter]').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('[data-src-filter]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    sourcesFilter = btn.dataset.srcFilter;
+    applySourcesFilter();
+  };
+});
+
+function applySourcesFilter() {
+  document.querySelectorAll('.source-card').forEach(card => {
+    const isWorking = card.dataset.status === 'working';
+    if (sourcesFilter === 'all') card.style.display = '';
+    else if (sourcesFilter === 'working') card.style.display = isWorking ? '' : 'none';
+    else card.style.display = isWorking ? 'none' : '';
+  });
+}
+
+async function loadSources() {
+  const grid = document.getElementById('sources-grid');
+  try {
+    const res = await api('/sources/status');
+    const sources = res.data || [];
+    const working = sources.filter(s => Number(s.today_count) > 0 || Number(s.week_count) > 0);
+    document.getElementById('sources-tab-count').textContent = `${working.length} / ${sources.length} active`;
+
+    grid.innerHTML = '';
+    for (const s of sources) {
+      const isWorking = Number(s.today_count) > 0 || Number(s.week_count) > 0;
+      const card = document.createElement('div');
+      card.className = 'source-card';
+      card.dataset.status = isWorking ? 'working' : 'dead';
+      const lf = s.last_fetched_at ? new Date(s.last_fetched_at).toLocaleString() : 'Never';
+      card.innerHTML = `
+        <div class="source-card-head">
+          <span class="source-card-name">${esc(s.slug)}</span>
+          <span class="source-status ${isWorking ? 'working' : 'dead'}">${isWorking ? 'Working' : 'Dead'}</span>
+        </div>
+        <div class="source-card-stats">
+          <div class="source-stat">
+            <span class="source-stat-label">Today</span>
+            <span class="source-stat-val" style="color:${Number(s.today_count) > 0 ? 'var(--success)' : 'var(--text-muted)'}">${Number(s.today_count).toLocaleString()}</span>
+          </div>
+          <div class="source-stat">
+            <span class="source-stat-label">This Week</span>
+            <span class="source-stat-val">${Number(s.week_count).toLocaleString()}</span>
+          </div>
+        </div>
+        <div class="source-card-meta">Last fetched: ${esc(lf)}</div>
+      `;
+      grid.appendChild(card);
+    }
+    applySourcesFilter();
+  } catch {
+    grid.innerHTML = '<div class="empty">Failed to load sources.</div>';
+  }
 }
 
 // ===== INIT =====

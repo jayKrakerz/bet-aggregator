@@ -20,7 +20,7 @@ export class PickswiseAdapter extends BaseAdapter {
     name: 'Pickswise',
     baseUrl: 'https://www.pickswise.com',
     fetchMethod: 'browser',
-    paths: { nba: '/nba/picks/' },
+    paths: { nba: '/nba/picks/', tennis: '/tennis/picks/' },
     cron: '0 */30 9-23 * * *',
     rateLimitMs: 3000,
     maxRetries: 3,

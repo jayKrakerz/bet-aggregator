@@ -7,7 +7,8 @@ import { predictionsRoutes } from './routes/predictions.js';
 import { sourcesRoutes } from './routes/sources.js';
 import { analystRoutes } from './routes/analyst.js';
 import { bullBoardPlugin } from './plugins/bull-board.js';
-import { websocketPlugin } from './plugins/websocket.js';
+import websocket from '@fastify/websocket';
+import { addClient } from './ws-hub.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,13 +22,18 @@ export async function createServer() {
     },
   });
 
+  // Register websocket BEFORE static to avoid route conflict
+  await app.register(websocket);
+  app.get('/ws', { websocket: true }, (socket) => {
+    addClient(socket);
+    socket.send(JSON.stringify({ event: 'connected', ts: Date.now() }));
+  });
+
   // Serve static dashboard from public/
   await app.register(fastifyStatic, {
     root: path.join(__dirname, '..', '..', 'public'),
     prefix: '/',
   });
-
-  await app.register(websocketPlugin);
   await app.register(healthRoutes);
   await app.register(predictionsRoutes, { prefix: '/predictions' });
   await app.register(sourcesRoutes, { prefix: '/sources' });

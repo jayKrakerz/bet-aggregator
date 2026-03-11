@@ -2,12 +2,13 @@ import { BaseAdapter } from './base-adapter.js';
 import type { SiteAdapterConfig } from '../types/adapter.js';
 import type { RawPrediction, Side, Confidence } from '../types/prediction.js';
 
-const SPORT_ID_MAP: Record<number, string> = {
-  1: 'football',
-  2: 'tennis',
-  3: 'nba',
-  9: 'mlb',
-};
+const SPORT_ID_MAP = new Map<string, string>([
+  ['1', 'football'],
+  ['2', 'tennis'],
+  ['3', 'nba'],
+  ['4', 'nhl'],
+  ['9', 'mlb'],
+]);
 
 const VALUE_BET_SPORT_MAP: Record<string, string> = {
   Soccer: 'football',
@@ -74,13 +75,14 @@ export class SportsAiAdapter extends BaseAdapter {
 
     // Navigate into pageProps — exact key path may vary, search common locations
     const entries = this.findArray(nextData, ['props', 'pageProps', 'predictions'])
+      ?? this.findArray(nextData, ['props', 'pageProps', 'highlights'])
       ?? this.findArray(nextData, ['props', 'pageProps', 'data'])
       ?? this.findArray(nextData, ['props', 'pageProps', 'matches'])
       ?? [];
 
     for (const entry of entries) {
       const sportId = entry.sport_id ?? entry.sportId;
-      const sport = SPORT_ID_MAP[sportId];
+      const sport = SPORT_ID_MAP.get(String(sportId));
       if (!sport) continue;
 
       const home = (entry.home ?? entry.homeTeam ?? '').trim();
@@ -219,6 +221,7 @@ export class SportsAiAdapter extends BaseAdapter {
     const predictions: RawPrediction[] = [];
 
     const entries = this.findArray(nextData, ['props', 'pageProps', 'valueBets'])
+      ?? this.findArray(nextData, ['props', 'pageProps', 'items'])
       ?? this.findArray(nextData, ['props', 'pageProps', 'data'])
       ?? this.findArray(nextData, ['props', 'pageProps', 'bets'])
       ?? [];
@@ -255,7 +258,11 @@ export class SportsAiAdapter extends BaseAdapter {
         }
       }
 
-      const trueOdds = parseFloat(entry.trueOdds ?? 0);
+      // trueOdds may be an array or a number
+      const rawTrueOdds = entry.trueOdds;
+      const trueOdds = Array.isArray(rawTrueOdds)
+        ? parseFloat(rawTrueOdds[0] ?? 0)
+        : parseFloat(rawTrueOdds ?? 0);
       const value = bestPrice || trueOdds || null;
 
       const confidence: Confidence =
