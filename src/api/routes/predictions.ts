@@ -3,6 +3,10 @@ import { sql } from '../../db/pool.js';
 import { type MatchPick, type ScoredMatch, scoreMatch, groupByMatch } from '../scoring.js';
 import { getAccuracyStats, getAccuracyHistory, getSourceAccuracy } from '../../db/queries.js';
 import { getCached, setCached, computeETag } from '../cache.js';
+import { generateHandicapPredictions } from '../handicap-engine.js';
+import { runFullBacktest } from '../backtest-handicap.js';
+import { getAllBookingCodes } from '../booking-codes-scraper.js';
+import { scrapeAllPlatformCodes } from '../all-codes-scraper.js';
 
 export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   // GET /predictions/stats — aggregate stats for dashboard
@@ -459,6 +463,269 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     void reply.header('Cache-Control', 'public, max-age=300');
     void reply.header('ETag', etag);
     return result;
+  });
+
+  // GET /predictions/handicap — spread/handicap predictions grouped by match
+  app.get('/handicap', async (request, reply) => {
+    const { sport, date } = request.query as { sport?: string; date?: string };
+    const cacheKey = [sport || 'all', date || 'upcoming', 'handicap'];
+
+    const cached = await getCached<{ data: unknown }>(cacheKey);
+    if (cached) {
+      const etag = computeETag(cached);
+      if (request.headers['if-none-match'] === etag) {
+        return reply.status(304).send();
+      }
+      void reply.header('Cache-Control', 'public, max-age=300');
+      void reply.header('ETag', etag);
+      return cached;
+    }
+
+    const rows = await sql<{
+      match_id: number;
+      game_date: string;
+      game_time: string | null;
+      sport: string;
+      home_team: string;
+      away_team: string;
+      side: string;
+      value: number | null;
+      source_name: string;
+      confidence: string | null;
+    }[]>`
+      SELECT
+        m.id as match_id,
+        to_char(m.game_date, 'YYYY-MM-DD') as game_date,
+        m.game_time,
+        m.sport,
+        ht.name as home_team,
+        att.name as away_team,
+        p.side,
+        p.value,
+        s.name as source_name,
+        p.confidence
+      FROM predictions p
+      JOIN matches m ON m.id = p.match_id
+      JOIN teams ht ON ht.id = m.home_team_id
+      JOIN teams att ON att.id = m.away_team_id
+      JOIN sources s ON s.id = p.source_id
+      WHERE p.pick_type = 'spread'
+        ${date ? sql`AND m.game_date = ${date}` : sql`AND m.game_date >= CURRENT_DATE`}
+        ${sport ? sql`AND m.sport = ${sport}` : sql``}
+      ORDER BY m.game_date, m.id
+    `;
+
+    // Group by match
+    const matchMap = new Map<number, {
+      matchId: number;
+      date: string;
+      gameTime: string | null;
+      sport: string;
+      homeTeam: string;
+      awayTeam: string;
+      predictions: { side: string; value: number | null; source: string; confidence: string | null }[];
+    }>();
+
+    for (const r of rows) {
+      if (!matchMap.has(r.match_id)) {
+        matchMap.set(r.match_id, {
+          matchId: r.match_id,
+          date: r.game_date.toString().includes('T') ? r.game_date.toString().split('T')[0]! : r.game_date.toString(),
+          gameTime: r.game_time,
+          sport: r.sport,
+          homeTeam: r.home_team,
+          awayTeam: r.away_team,
+          predictions: [],
+        });
+      }
+      matchMap.get(r.match_id)!.predictions.push({
+        side: r.side,
+        value: r.value,
+        source: r.source_name,
+        confidence: r.confidence,
+      });
+    }
+
+    // Build response with consensus (home vs away spread picks)
+    const data = [...matchMap.values()].map((m) => {
+      const homePreds = m.predictions.filter((p) => p.side === 'home');
+      const awayPreds = m.predictions.filter((p) => p.side === 'away');
+      const total = homePreds.length + awayPreds.length;
+      const consensus = homePreds.length > awayPreds.length ? 'home'
+        : awayPreds.length > homePreds.length ? 'away'
+        : 'split';
+      const consensusCount = consensus === 'home' ? homePreds.length
+        : consensus === 'away' ? awayPreds.length
+        : Math.max(homePreds.length, awayPreds.length);
+
+      // Most common spread value
+      const allValues = m.predictions.filter((p) => p.value != null).map((p) => p.value!);
+      const valueCounts = new Map<number, number>();
+      for (const v of allValues) {
+        valueCounts.set(v, (valueCounts.get(v) || 0) + 1);
+      }
+      let spread: number | null = null;
+      let maxCount = 0;
+      for (const [v, c] of valueCounts) {
+        if (c > maxCount) { spread = v; maxCount = c; }
+      }
+
+      return {
+        matchId: m.matchId,
+        match: `${m.homeTeam} vs ${m.awayTeam}`,
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
+        date: m.date,
+        gameTime: m.gameTime,
+        sport: m.sport,
+        consensus,
+        consensusCount,
+        total,
+        homeCount: homePreds.length,
+        awayCount: awayPreds.length,
+        spread,
+        sources: m.predictions.map((p) => ({
+          source: p.source,
+          side: p.side,
+          value: p.value,
+          confidence: p.confidence,
+        })),
+      };
+    });
+
+    // Sort: consensus picks first (non-split), then by source count
+    data.sort((a, b) => {
+      if (a.consensus === 'split' && b.consensus !== 'split') return 1;
+      if (a.consensus !== 'split' && b.consensus === 'split') return -1;
+      return b.total - a.total;
+    });
+
+    const result = { data, generatedAt: new Date().toISOString() };
+    await setCached(cacheKey, result);
+    const etag = computeETag(result);
+    void reply.header('Cache-Control', 'public, max-age=300');
+    void reply.header('ETag', etag);
+    return result;
+  });
+
+  // GET /predictions/handicap-ai — 1st Half Handicap predictions (soccer only)
+  // Uses Poisson model + team form + H2H + adapter consensus + web data
+  app.get('/handicap-ai', async (request, reply) => {
+    const { date } = request.query as { date?: string };
+    const cacheKey = ['football', date || 'upcoming', 'handicap-ai'];
+
+    const cached = await getCached<{ data: unknown }>(cacheKey);
+    if (cached) {
+      const etag = computeETag(cached);
+      if (request.headers['if-none-match'] === etag) {
+        return reply.status(304).send();
+      }
+      void reply.header('Cache-Control', 'public, max-age=300');
+      void reply.header('ETag', etag);
+      return cached;
+    }
+
+    const predictions = await generateHandicapPredictions(date);
+
+    const result = { data: predictions, generatedAt: new Date().toISOString() };
+
+    await setCached(cacheKey, result);
+    const etag = computeETag(result);
+    void reply.header('Cache-Control', 'public, max-age=300');
+    void reply.header('ETag', etag);
+    return result;
+  });
+
+  // GET /predictions/booking-codes — scraped Sportybet booking codes
+  app.get('/booking-codes', async (_request, reply) => {
+    const codes = await getAllBookingCodes();
+    void reply.header('Cache-Control', 'public, max-age=900');
+    return { data: codes, count: codes.length, generatedAt: new Date().toISOString() };
+  });
+
+  // GET /predictions/load-code/:code — proxy to Sportybet API to load a booking code
+  app.get<{ Params: { code: string } }>('/load-code/:code', async (request, reply) => {
+    const { code } = request.params;
+    if (!code || code.length < 5 || code.length > 8) {
+      return reply.status(400).send({ error: 'Invalid code format' });
+    }
+
+    try {
+      const res = await fetch(`https://www.sportybet.com/api/ng/orders/share/${encodeURIComponent(code)}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await res.json();
+      return data;
+    } catch {
+      return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
+    }
+  });
+
+  // GET /predictions/all-codes — codes for ALL betting platforms
+  app.get('/all-codes', async (_request, reply) => {
+    const codes = await scrapeAllPlatformCodes();
+    void reply.header('Cache-Control', 'public, max-age=900');
+    return { data: codes, count: codes.length, platforms: [...new Set(codes.map(c => c.platform))], generatedAt: new Date().toISOString() };
+  });
+
+  // GET /predictions/convert-code/:code — try to convert a code from any platform to Sportybet
+  // Works by: loading the code on Sportybet (many event IDs are universal Betradar IDs)
+  // If Sportybet recognizes the code natively, it returns the data directly
+  app.get<{ Params: { code: string } }>('/convert-code/:code', async (request, reply) => {
+    const { code } = request.params;
+    if (!code || code.length < 4 || code.length > 12) {
+      return reply.status(400).send({ error: 'Invalid code' });
+    }
+
+    try {
+      // First try loading directly on Sportybet (may work for shared Betradar IDs)
+      const sportyRes = await fetch(
+        `https://www.sportybet.com/api/ng/orders/share/${encodeURIComponent(code)}`,
+        { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) },
+      );
+      const sportyData = await sportyRes.json() as { bizCode: number; isAvailable: boolean; data?: Record<string, unknown> };
+
+      if (sportyData.bizCode === 10000 && sportyData.isAvailable) {
+        return { converted: true, platform: 'sportybet', sportyCode: code, data: sportyData };
+      }
+
+      // Code not directly loadable on Sportybet — return not found
+      return { converted: false, error: 'Code not recognized on Sportybet. Try using convertbetcodes.com to convert manually.' };
+    } catch {
+      return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
+    }
+  });
+
+  // POST /predictions/create-code — create a new Sportybet booking code from selected games
+  app.post('/create-code', async (request, reply) => {
+    const body = request.body as { selections?: Array<{ eventId: string; marketId: string; outcomeId: string; specifier?: string; sportId: string }> };
+    if (!body?.selections?.length) {
+      return reply.status(400).send({ error: 'No selections provided' });
+    }
+    if (body.selections.length > 50) {
+      return reply.status(400).send({ error: 'Too many selections (max 50)' });
+    }
+
+    try {
+      const res = await fetch('https://www.sportybet.com/api/ng/orders/share', {
+        method: 'POST',
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selections: body.selections }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const data = await res.json();
+      return data;
+    } catch {
+      return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
+    }
+  });
+
+  // GET /predictions/handicap-backtest — run backtest on 2025-26 season data
+  app.get('/handicap-backtest', async (_request, reply) => {
+    void reply.header('Content-Type', 'text/plain');
+    const report = await runFullBacktest();
+    return report;
   });
 
   // GET /predictions/accuracy — win/loss stats by sport/pickType

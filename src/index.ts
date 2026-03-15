@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createServer } from './api/server.js';
 import { startScheduler } from './scheduler/index.js';
 import { createFetchWorker } from './workers/fetch-worker.js';

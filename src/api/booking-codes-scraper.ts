@@ -1,0 +1,484 @@
+/**
+ * Sportybet Booking Code Scraper
+ *
+ * Scrapes free Sportybet booking codes from tipster sites.
+ * Uses cheerio for reliable HTML parsing instead of fragile regex.
+ */
+
+import * as cheerio from 'cheerio';
+import { logger } from '../utils/logger.js';
+
+export interface BookingCodeSelection {
+  homeTeam: string;
+  awayTeam: string;
+  league: string;
+  market: string;       // "1X2", "Over/Under", "Double Chance"
+  pick: string;         // "Home", "Over 2.5", "Home or Draw"
+  odds: number;
+  matchStatus: string;  // "Not start", "Ended", "Cancelled"
+  isWinning: number | null; // 1=won, 0=lost, null=pending
+  score: string | null; // "2:1"
+  // Raw Sportybet IDs for creating new codes
+  eventId: string;
+  marketId: string;
+  outcomeId: string;
+  specifier: string;
+  sportId: string;
+}
+
+export interface BookingCode {
+  code: string;
+  source: string;
+  sourceUrl: string;
+  events: number | null;
+  totalOdds: number | null;
+  market: string | null;
+  date: string | null;
+  status: string | null;
+  postedAgo: string | null;
+  // Validated data from Sportybet API
+  validated: boolean;
+  isValid: boolean;
+  selections: BookingCodeSelection[];
+  wonCount: number;
+  lostCount: number;
+  pendingCount: number;
+}
+
+// Cache
+let codesCache: BookingCode[] | null = null;
+let codesCacheTime = 0;
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+const HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml',
+};
+
+/**
+ * Validate Sportybet booking code format.
+ * Real codes: exactly 6 chars, mix of uppercase letters and digits.
+ * Examples from real sites: MNVGR8, WTR6D1, G3PB73, U70LRT, Y9B39Q
+ * NOT: FFFFFF (hex color), BBB100 (CSS), ADR6400L (too long)
+ */
+function isValidCode(s: string): boolean {
+  // Must be exactly 6 characters (Sportybet standard)
+  if (s.length !== 6) return false;
+  // Must be uppercase alphanumeric
+  if (!/^[A-Z0-9]{6}$/.test(s)) return false;
+  // Must have at least 1 letter AND at least 1 digit
+  if (!/[A-Z]/.test(s) || !/[0-9]/.test(s)) return false;
+  // Must not be a hex color (6 hex chars like FFFFFF, 000000, etc.)
+  if (/^[0-9A-F]{6}$/.test(s) && /^[0-9]{3,}/.test(s)) return false;
+  // Must not be repeating pattern (BBB100, AAA111)
+  if (/^(.)\1{2}/.test(s)) return false;
+  // Exclude common tokens
+  const banned = new Set(['HTTPS1', 'CLASS1', 'STYLE1', 'ASYNC1', 'MEDIA1', 'WIDTH1', 'BLOCK1', 'COLOR1', 'INPUT1']);
+  return !banned.has(s);
+}
+
+/** Scrape sportpremi.com */
+async function scrapeSportPremi(): Promise<BookingCode[]> {
+  try {
+    const res = await fetch('https://sportpremi.com/bet-codes/sportybet/', {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    const codes: BookingCode[] = [];
+
+    // SportPremi uses a WordPress table plugin (wptb)
+    // Each row has cells containing: events, code, odds in separate div containers
+    $('tr.wptb-row, table tr').each((_, row) => {
+      const cells = $(row).find('td');
+      if (cells.length < 2) return;
+
+      // Collect all text from all cells
+      const cellTexts: string[] = [];
+      cells.each((_, cell) => {
+        $(cell).find('p, div, span').each((_, el) => {
+          const t = $(el).text().trim();
+          if (t) cellTexts.push(t);
+        });
+      });
+
+      const rowText = cellTexts.join(' ');
+
+      // Find booking code
+      let code: string | null = null;
+      for (const t of cellTexts) {
+        const m = t.match(/^([A-Z][A-Z0-9]{5})$/);
+        if (m && isValidCode(m[1]!)) { code = m[1]!; break; }
+      }
+      if (!code) {
+        const m = rowText.match(/\b([A-Z][A-Z0-9]{5})\b/);
+        if (m && isValidCode(m[1]!)) code = m[1]!;
+      }
+      if (!code || codes.some(c => c.code === code)) return;
+
+      // Extract events count (e.g. "22events" or "47events")
+      const eventsMatch = rowText.match(/(\d{1,3})\s*events?/i);
+      // Extract odds (e.g. "83.51")
+      const oddsMatch = rowText.match(/([\d,]+\.\d{2})/);
+
+      codes.push({
+        code,
+        source: 'SportPremi',
+        sourceUrl: 'https://sportpremi.com/bet-codes/sportybet/',
+        events: eventsMatch ? parseInt(eventsMatch[1]!) : null,
+        totalOdds: oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null,
+        market: null,
+        date: new Date().toISOString().split('T')[0]!,
+        status: 'pending',
+        postedAgo: null,
+        validated: false, isValid: false, selections: [],
+        wonCount: 0, lostCount: 0, pendingCount: 0,
+      });
+    });
+
+    // Fallback: scan all <p> tags for codes if table parsing found nothing
+    if (codes.length === 0) {
+      $('p').each((_, el) => {
+        const text = $(el).text().trim();
+        const match = text.match(/^([A-Z][A-Z0-9]{5})$/);
+        if (match && isValidCode(match[1]!)) {
+          codes.push({
+            code: match[1]!,
+            source: 'SportPremi',
+            sourceUrl: 'https://sportpremi.com/bet-codes/sportybet/',
+            events: null, totalOdds: null, market: null,
+            date: new Date().toISOString().split('T')[0]!,
+            status: 'pending', postedAgo: null,
+            validated: false, isValid: false, selections: [],
+            wonCount: 0, lostCount: 0, pendingCount: 0,
+          });
+        }
+      });
+    }
+
+    return codes;
+  } catch (err) {
+    logger.warn({ err }, 'Failed to scrape SportPremi');
+    return [];
+  }
+}
+
+/** Scrape paqbet.com */
+async function scrapePaqBet(): Promise<BookingCode[]> {
+  try {
+    const res = await fetch('https://paqbet.com/pg/bet-codes', {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    const codes: BookingCode[] = [];
+
+    // PaqBet uses card elements with structured data
+    $('[class*="card"], [class*="code"], [class*="bet"], .row, article, tr').each((_, el) => {
+      const text = $(el).text().trim();
+      const codeMatches = text.match(/\b([A-Z0-9]{5,8})\b/g) || [];
+
+      for (const code of codeMatches) {
+        if (!isValidCode(code)) continue;
+        if (codes.some(c => c.code === code)) continue;
+
+        // Extract odds
+        const oddsMatch = text.match(/@\s*([\d,.]+)/);
+        // Extract events count
+        const eventsMatch = text.match(/(\d{1,3})\s*(?:match|game|event|selection)/i);
+        // Extract market type
+        const marketMatch = text.match(/(?:1st Half Handicap|Over \d+\.\d|Under \d+\.\d|BTTS|Both Teams|1X2|Double Chance|Correct Score|GG\/NG|Handicap|Draw No Bet)/i);
+        // Extract time
+        const timeMatch = text.match(/((?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s+Mar\s+\d{1,2})/i);
+        // Extract status
+        const wonMatch = text.match(/\b(won|win)\b/i);
+        const lostMatch = text.match(/\b(lost|lose)\b/i);
+
+        codes.push({
+          code,
+          source: 'PaqBet',
+          sourceUrl: 'https://paqbet.com/pg/bet-codes',
+          events: eventsMatch ? parseInt(eventsMatch[1]!) : null,
+          totalOdds: oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null,
+          market: marketMatch ? marketMatch[0] : null,
+          date: timeMatch ? timeMatch[0] : new Date().toISOString().split('T')[0]!,
+          status: wonMatch ? 'won' : lostMatch ? 'lost' : 'pending',
+          postedAgo: null,
+          validated: false, isValid: false, selections: [],
+          wonCount: 0, lostCount: 0, pendingCount: 0,
+        });
+      }
+    });
+
+    return codes;
+  } catch (err) {
+    logger.warn({ err }, 'Failed to scrape PaqBet');
+    return [];
+  }
+}
+
+/** Scrape convertbetcodes.com */
+async function scrapeConvertBetCodes(): Promise<BookingCode[]> {
+  try {
+    const res = await fetch('https://convertbetcodes.com/c/free-bet-codes-for-today/sportybet', {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    const codes: BookingCode[] = [];
+
+    // Structure: each conversion card is an <h4> containing:
+    // Left side: source code + platform badge
+    // Right side: converted code + platform badge (sportybet)
+    // Above it: events count and odds in spans
+    $('h4').each((_, h4) => {
+      const h4Text = $(h4).text().trim();
+
+      // Check if this card has sportybet
+      if (!/sportybet/i.test(h4Text)) return;
+
+      // Find all potential codes in this h4
+      const codeMatches = h4Text.match(/\b([A-Z][A-Z0-9]{4,7})\b/g) || [];
+
+      // Find the sportybet code specifically — it's in a span near the sportybet badge
+      const rightSpan = $(h4).find('.float-right').first().text().trim();
+      const leftSpan = $(h4).find('.float-left').first().text().trim();
+
+      // Determine which side has the sportybet code
+      let sportyCode: string | null = null;
+      if (/sportybet/i.test(rightSpan)) {
+        const m = rightSpan.match(/\b([A-Z][A-Z0-9]{4,7})\b/);
+        if (m) sportyCode = m[1]!;
+      } else if (/sportybet/i.test(leftSpan)) {
+        const m = leftSpan.match(/\b([A-Z][A-Z0-9]{4,7})\b/);
+        if (m) sportyCode = m[1]!;
+      }
+
+      // Fallback: any valid code in the h4
+      if (!sportyCode) {
+        for (const c of codeMatches) {
+          if (isValidCode(c)) { sportyCode = c; break; }
+        }
+      }
+
+      if (!sportyCode || codes.some(c => c.code === sportyCode)) return;
+
+      // Find events and odds — they're in sibling/parent elements above the h4
+      const parent = $(h4).parent();
+      const parentText = parent.text();
+      const eventsMatch = parentText.match(/(\d{1,3})\s*events?/i);
+      const oddsMatch = parentText.match(/@([\d,.]+)\s*odds/i);
+      const agoMatch = parentText.match(/(\d+\s*(?:hour|minute|min|hr|day)s?\s*ago)/i);
+
+      codes.push({
+        code: sportyCode,
+        source: 'ConvertBetCodes',
+        sourceUrl: 'https://convertbetcodes.com/c/free-bet-codes-for-today/sportybet',
+        events: eventsMatch ? parseInt(eventsMatch[1]!) : null,
+        totalOdds: oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null,
+        market: null,
+        date: new Date().toISOString().split('T')[0]!,
+        status: 'pending',
+        postedAgo: agoMatch ? agoMatch[0] : null,
+        validated: false, isValid: false, selections: [],
+        wonCount: 0, lostCount: 0, pendingCount: 0,
+      });
+    });
+
+    return codes;
+  } catch (err) {
+    logger.warn({ err }, 'Failed to scrape ConvertBetCodes');
+    return [];
+  }
+}
+
+/**
+ * Validate a booking code against the Sportybet Nigeria API.
+ * Returns match details, odds, and win/loss status for each selection.
+ */
+async function validateCode(code: string): Promise<{
+  isValid: boolean;
+  selections: BookingCodeSelection[];
+  totalOdds: number;
+}> {
+  try {
+    const res = await fetch(`https://www.sportybet.com/api/ng/orders/share/${code}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return { isValid: false, selections: [], totalOdds: 0 };
+
+    const data = await res.json() as {
+      bizCode: number;
+      isAvailable: boolean;
+      data?: {
+        ticket?: {
+          selections?: Array<{
+            eventId: string;
+            marketId: string;
+            outcomeId: string;
+            specifier?: string;
+            sportId: string;
+          }>;
+        };
+        outcomes?: Array<{
+          eventId: string;
+          homeTeamName: string;
+          awayTeamName: string;
+          setScore?: string;
+          matchStatus: string;
+          sport: { id: string; category: { name: string; tournament: { name: string } } };
+          markets: Array<{
+            id: string;
+            specifier?: string;
+            desc: string;
+            outcomes: Array<{
+              id: string;
+              odds: string;
+              desc: string;
+              isWinning?: number;
+            }>;
+          }>;
+        }>;
+      };
+    };
+
+    if (data.bizCode !== 10000 || !data.isAvailable || !data.data?.outcomes) {
+      return { isValid: false, selections: [], totalOdds: 0 };
+    }
+
+    const selections: BookingCodeSelection[] = [];
+    let totalOdds = 1;
+
+    for (const outcome of data.data.outcomes) {
+      const market = outcome.markets[0];
+      if (!market || !market.outcomes[0]) continue;
+
+      const sel = market.outcomes[0];
+      const odds = parseFloat(sel.odds) || 1;
+      totalOdds *= odds;
+
+      // Find matching ticket selection for raw IDs
+      const ticketSel = data.data.ticket?.selections?.find(
+        ts => ts.eventId === outcome.eventId && ts.marketId === market.id,
+      );
+
+      selections.push({
+        homeTeam: outcome.homeTeamName,
+        awayTeam: outcome.awayTeamName,
+        league: `${outcome.sport.category.name} - ${outcome.sport.category.tournament.name}`,
+        market: market.desc,
+        pick: sel.desc,
+        odds,
+        matchStatus: outcome.matchStatus || 'Unknown',
+        eventId: outcome.eventId,
+        marketId: market.id,
+        outcomeId: sel.id,
+        specifier: ticketSel?.specifier || market.specifier || '',
+        sportId: outcome.sport.id,
+        isWinning: sel.isWinning ?? null,
+        score: outcome.setScore || null,
+      });
+    }
+
+    return {
+      isValid: true,
+      selections,
+      totalOdds: Math.round(totalOdds * 100) / 100,
+    };
+  } catch {
+    return { isValid: false, selections: [], totalOdds: 0 };
+  }
+}
+
+/**
+ * Get all booking codes from all sources.
+ * Validates each code against Sportybet API.
+ * Deduplicates by code string, keeps the entry with most data.
+ */
+export async function getAllBookingCodes(): Promise<BookingCode[]> {
+  if (codesCache && Date.now() - codesCacheTime < CACHE_TTL) {
+    return codesCache;
+  }
+
+  const [sportPremi, paqBet, convertBet] = await Promise.allSettled([
+    scrapeSportPremi(),
+    scrapePaqBet(),
+    scrapeConvertBetCodes(),
+  ]);
+
+  const allCodes: BookingCode[] = [];
+  if (sportPremi.status === 'fulfilled') allCodes.push(...sportPremi.value);
+  if (paqBet.status === 'fulfilled') allCodes.push(...paqBet.value);
+  if (convertBet.status === 'fulfilled') allCodes.push(...convertBet.value);
+
+  // Deduplicate
+  const byCode = new Map<string, BookingCode>();
+  for (const c of allCodes) {
+    const existing = byCode.get(c.code);
+    if (!existing) {
+      byCode.set(c.code, c);
+    } else {
+      if (!existing.market && c.market) existing.market = c.market;
+      if (!existing.totalOdds && c.totalOdds) existing.totalOdds = c.totalOdds;
+      if (!existing.events && c.events) existing.events = c.events;
+      if (!existing.postedAgo && c.postedAgo) existing.postedAgo = c.postedAgo;
+    }
+  }
+
+  const raw = [...byCode.values()];
+
+  // Validate all codes against Sportybet API (in batches of 5 to avoid rate limiting)
+  for (let i = 0; i < raw.length; i += 5) {
+    const batch = raw.slice(i, i + 5);
+    const validations = await Promise.all(
+      batch.map(c => validateCode(c.code)),
+    );
+    for (let j = 0; j < batch.length; j++) {
+      const code = batch[j]!;
+      const val = validations[j]!;
+      code.validated = true;
+      code.isValid = val.isValid;
+      code.selections = val.selections;
+      if (val.isValid && val.totalOdds > 0) {
+        code.totalOdds = val.totalOdds;
+        code.events = val.selections.length;
+      }
+      code.wonCount = val.selections.filter(s => s.isWinning === 1).length;
+      code.lostCount = val.selections.filter(s => s.isWinning === 0).length;
+      code.pendingCount = val.selections.filter(s => s.isWinning === null).length;
+    }
+  }
+
+  // Only keep valid codes
+  const result = raw.filter(c => c.isValid);
+
+  // Sort: codes with pending selections first (playable), then by odds
+  result.sort((a, b) => {
+    // Codes with pending games first (still playable)
+    if (a.pendingCount > 0 && b.pendingCount === 0) return -1;
+    if (a.pendingCount === 0 && b.pendingCount > 0) return 1;
+    // Then by total odds (lower = safer)
+    return (a.totalOdds || 999) - (b.totalOdds || 999);
+  });
+
+  codesCache = result;
+  codesCacheTime = Date.now();
+  logger.info({
+    scraped: raw.length + (raw.length - result.length),
+    valid: result.length,
+    invalid: raw.length - result.length,
+    withPending: result.filter(c => c.pendingCount > 0).length,
+  }, 'Booking codes validated');
+
+  return result;
+}

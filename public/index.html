@@ -287,7 +287,58 @@ body{min-height:100vh;overflow-x:hidden}
 .ou-best-src{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--text-dim);font-weight:600}
 @media(max-width:600px){
   .ou-best-row{grid-template-columns:1fr}
+  .hc-best-row{grid-template-columns:1fr}
 }
+
+/* ===== HANDICAP CARDS ===== */
+.hc-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:14px 18px;cursor:pointer;transition:all 0.25s}
+.hc-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-card-hover);border-color:rgba(59,130,246,0.15)}
+.hc-card.expanded{border-color:rgba(59,130,246,0.3)}
+.hc-card-head{display:flex;align-items:center;gap:12px}
+.hc-card-match{flex:1;min-width:0}
+.hc-card-match-name{font-size:14px;font-weight:700;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hc-card-match-name .vs{color:var(--text-muted);font-weight:400;font-size:11px;margin:0 4px}
+.hc-card-meta{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:11px;color:var(--text-muted)}
+.hc-consensus{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
+.hc-consensus-side{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px}
+.hc-consensus-side.home{color:var(--home)}
+.hc-consensus-side.away{color:var(--away)}
+.hc-consensus-side.split{color:var(--text-muted)}
+.hc-consensus-count{font-size:10px;color:var(--text-dim);font-weight:600}
+.hc-spread{font-size:20px;font-weight:800;color:var(--accent);flex-shrink:0;min-width:48px;text-align:center;font-variant-numeric:tabular-nums}
+.hc-bar-wrap{margin-top:10px;display:flex;align-items:center;gap:8px}
+.hc-bar-label{font-size:10px;font-weight:700;width:50px;text-align:center;flex-shrink:0}
+.hc-bar-label.home{color:var(--home)}
+.hc-bar-label.away{color:var(--away)}
+.hc-bar-track{flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;display:flex}
+.hc-bar-fill-home{height:100%;background:var(--home);border-radius:4px 0 0 4px;transition:width 0.4s ease}
+.hc-bar-fill-away{height:100%;background:var(--away);border-radius:0 4px 4px 0;transition:width 0.4s ease}
+.hc-sources{margin-top:10px;display:none;flex-wrap:wrap;gap:4px}
+.hc-card.expanded .hc-sources{display:flex}
+.hc-source-chip{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03)}
+.hc-source-chip.home{color:var(--home);border-color:rgba(59,130,246,0.2)}
+.hc-source-chip.away{color:var(--away);border-color:rgba(239,68,68,0.2)}
+
+/* Best handicap picks row */
+.hc-best-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px}
+.hc-best-col{min-width:0}
+.hc-best-header{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hc-best-header.home{color:var(--home)}
+.hc-best-header.away{color:var(--away)}
+.hc-best-list{display:grid;gap:8px}
+.hc-best-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);padding:12px 14px;transition:all 0.2s;cursor:default}
+.hc-best-card.home{border-left:3px solid var(--home)}
+.hc-best-card.away{border-left:3px solid var(--away)}
+.hc-best-card:hover{border-color:rgba(255,255,255,0.1);box-shadow:var(--shadow-card)}
+.hc-best-rank{font-size:10px;font-weight:800;color:var(--text-muted);margin-bottom:4px}
+.hc-best-match{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.2px}
+.hc-best-meta{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
+.hc-best-spread{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
+.hc-best-spread.home{color:var(--home)}
+.hc-best-spread.away{color:var(--away)}
+.hc-best-consensus{font-size:10px;color:var(--text-dim);font-weight:600}
+.hc-best-sources{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
+.hc-best-src{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--text-dim);font-weight:600}
 
 /* ===== MATCH CARDS ===== */
 .matches-list{display:grid;gap:6px;padding-bottom:20px}
@@ -316,32 +367,7 @@ body{min-height:100vh;overflow-x:hidden}
 .value-text{font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
 
 /* ===== BOTTOM SECTION GRID ===== */
-.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:28px}
 
-/* ===== ROI SIMULATOR ===== */
-.roi-section{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:20px}
-.roi-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
-.roi-header h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text)}
-.roi-toggle{font-size:10px;color:var(--accent);font-weight:600}
-.roi-body{overflow:hidden;max-height:0;transition:max-height 0.3s ease}
-.roi-section.open .roi-body{max-height:300px}
-.roi-controls{display:flex;gap:20px;padding-top:16px;flex-wrap:wrap}
-.roi-field{display:flex;flex-direction:column;gap:4px}
-.roi-field label{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px}
-.roi-field input[type=range]{width:180px;accent-color:var(--accent);background:transparent}
-.roi-field .roi-val{font-size:13px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums}
-.roi-result{padding-top:14px;font-size:12px;color:var(--text-dim);line-height:1.6}
-.roi-result .highlight{color:var(--accent);font-weight:700}
-
-/* ===== ACCURACY DASHBOARD ===== */
-.accuracy-section{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:20px}
-.accuracy-section h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:14px;color:var(--text)}
-.accuracy-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
-.acc-card{background:var(--elevated);border-radius:var(--radius-sm);padding:14px;text-align:center;border:1px solid rgba(255,255,255,0.04)}
-.acc-card .acc-sport{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:6px}
-.acc-card .acc-rate{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
-.acc-card .acc-record{font-size:11px;color:var(--text-dim);margin-top:4px}
-.acc-placeholder{text-align:center;padding:24px;color:var(--text-muted);font-size:12px}
 
 /* ===== FETCH ALL BUTTON ===== */
 .fetch-spinning svg{animation:spin 1s linear infinite}
@@ -381,7 +407,6 @@ body{min-height:100vh;overflow-x:hidden}
 
 /* ===== RESPONSIVE ===== */
 @media(max-width:1024px){
-  .bottom-grid{grid-template-columns:1fr}
 }
 @media(max-width:768px){
   .header{padding:0 16px;height:50px}
@@ -405,7 +430,7 @@ body{min-height:100vh;overflow-x:hidden}
   .match-card-header{padding:8px 12px;gap:8px}
   .match-tips{padding-left:70px}
   .tab-btn{padding:10px 16px;font-size:12px}
-  .bottom-grid{grid-template-columns:1fr}
+  #panel-booking-codes > div:first-child{grid-template-columns:1fr !important}
 }
 @media(max-width:480px){
   .header-right .date-input{display:none}
@@ -495,7 +520,10 @@ body{min-height:100vh;overflow-x:hidden}
     <div class="tabs-header" id="tabs-header">
       <button class="tab-btn active" data-tab="all-picks">All Picks</button>
       <button class="tab-btn" data-tab="over-under">Over/Under</button>
+      <button class="tab-btn" data-tab="handicap">1H Handicap</button>
       <button class="tab-btn" data-tab="value-bets">Value Bets</button>
+      <button class="tab-btn" data-tab="booking-codes">Sportybet</button>
+      <button class="tab-btn" data-tab="all-codes">All Codes</button>
       <button class="tab-btn" data-tab="matches">Matches</button>
       <button class="tab-btn" data-tab="sources">Sources</button>
     </div>
@@ -542,6 +570,36 @@ body{min-height:100vh;overflow-x:hidden}
       </div>
     </div>
 
+    <!-- TAB: 1ST HALF HANDICAP -->
+    <div class="tab-panel" id="panel-handicap">
+      <div style="margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);display:flex;align-items:center;gap:12px">
+        <span style="font-size:22px">&#9917;</span>
+        <div>
+          <div style="font-size:14px;font-weight:700">1st Half - Asian Handicap</div>
+          <div style="font-size:11px;color:var(--text-dim)">Soccer only. Poisson model with real FH stats from top 5 leagues. Shows H1, H1.5, H2 lines per match. Primary pick targets best odds with 60%+ probability.</div>
+        </div>
+      </div>
+      <div class="hc-best-row" id="hc-top-picks">
+        <div class="hc-best-col">
+          <div class="hc-best-header" style="color:var(--success)">Safest Picks <span class="badge-count" id="hc-safe-count">--</span></div>
+          <div class="hc-best-list" id="hc-safe-list"></div>
+        </div>
+        <div class="hc-best-col">
+          <div class="hc-best-header" style="color:var(--amber)">Best Value <span class="badge-count" id="hc-value-count">--</span></div>
+          <div class="hc-best-list" id="hc-value-list"></div>
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:16px">
+        <h2>All 1st Half Handicap Picks</h2>
+        <span class="badge-count" id="hc-count">--</span>
+      </div>
+      <div class="picks-list" id="hc-list">
+        <div class="skeleton skel-pick"></div>
+        <div class="skeleton skel-pick"></div>
+        <div class="skeleton skel-pick"></div>
+      </div>
+    </div>
+
     <!-- TAB: VALUE BETS -->
     <div class="tab-panel" id="panel-value-bets">
       <div class="section-title">
@@ -549,6 +607,98 @@ body{min-height:100vh;overflow-x:hidden}
         <span class="badge-count" id="value-count">--</span>
       </div>
       <div class="value-cards" id="value-list">
+        <div class="skeleton skel-pick"></div>
+        <div class="skeleton skel-pick"></div>
+        <div class="skeleton skel-pick"></div>
+      </div>
+    </div>
+
+    <!-- TAB: BOOKING CODES -->
+    <div class="tab-panel" id="panel-booking-codes">
+
+      <!-- ROW 1: LOAD CODE + QUICK GENERATE (side by side) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+
+        <!-- LEFT: Load Code -->
+        <div style="background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:16px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">&#128269;</span> Check a Code
+          </div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="load-code-input" placeholder="e.g. Z4PMH3" maxlength="8" style="flex:1;padding:8px 12px;font-size:15px;font-family:monospace;letter-spacing:2px;text-transform:uppercase;border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-xs);background:var(--bg);color:var(--text);outline:none" />
+            <button id="load-code-btn" style="padding:8px 16px;font-size:12px;font-weight:700;border:none;border-radius:var(--radius-xs);background:var(--accent);color:#fff;cursor:pointer;font-family:inherit">Load</button>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Validates against Sportybet API and shows all selections</div>
+        </div>
+
+        <!-- RIGHT: Quick Generate -->
+        <div style="background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:16px" id="auto-gen-section">
+          <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">&#9889;</span> Generate Safe Code
+            <span class="badge-count" id="pool-count" style="margin-left:auto">--</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="auto-gen-btns">
+            <button class="auto-gen-btn" data-target="2" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(34,197,94,0.25);border-radius:var(--radius-xs);background:rgba(34,197,94,0.06);color:var(--success);cursor:pointer;font-family:inherit">x2</button>
+            <button class="auto-gen-btn" data-target="3" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(34,197,94,0.25);border-radius:var(--radius-xs);background:rgba(34,197,94,0.06);color:var(--success);cursor:pointer;font-family:inherit">x3</button>
+            <button class="auto-gen-btn" data-target="5" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius-xs);background:rgba(245,158,11,0.06);color:var(--amber);cursor:pointer;font-family:inherit">x5</button>
+            <button class="auto-gen-btn" data-target="10" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius-xs);background:rgba(245,158,11,0.06);color:var(--amber);cursor:pointer;font-family:inherit">x10</button>
+            <button class="auto-gen-btn" data-target="20" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius-xs);background:rgba(239,68,68,0.06);color:var(--danger);cursor:pointer;font-family:inherit">x20</button>
+            <button class="auto-gen-btn" data-target="50" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius-xs);background:rgba(239,68,68,0.06);color:var(--danger);cursor:pointer;font-family:inherit">x50</button>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Picks safest games by market type, league quality & odds</div>
+        </div>
+      </div>
+
+      <!-- RESULTS AREA (loaded code / generated codes) -->
+      <div id="loaded-code-result" style="display:none;margin-bottom:14px"></div>
+      <div id="auto-gen-results" style="margin-bottom:14px"></div>
+      <div id="generated-code-result" style="display:none;margin-bottom:14px"></div>
+
+      <!-- STICKY SELECTION BAR -->
+      <div id="generate-bar" style="display:none;position:sticky;top:var(--header-h);z-index:50;padding:8px 16px;background:rgba(59,130,246,0.1);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius-sm);margin-bottom:14px;align-items:center;gap:10px">
+        <span style="font-size:12px;font-weight:700;color:var(--accent)" id="gen-count">0 selected</span>
+        <span style="font-size:11px;color:var(--text-dim)" id="gen-odds">Total: --</span>
+        <div style="flex:1"></div>
+        <button id="gen-clear-btn" style="padding:5px 12px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-xs);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit">Clear</button>
+        <button id="gen-code-btn" style="padding:6px 16px;font-size:12px;font-weight:700;border:none;border-radius:var(--radius-xs);background:var(--accent);color:#fff;cursor:pointer;font-family:inherit">Generate Code</button>
+      </div>
+
+      <!-- SCRAPED CODES LIST -->
+      <div class="section-title">
+        <h2>Scraped Codes</h2>
+        <span class="badge-count" id="codes-count">--</span>
+      </div>
+      <div class="picks-list" id="codes-list">
+        <div class="skeleton skel-pick"></div>
+        <div class="skeleton skel-pick"></div>
+        <div class="skeleton skel-pick"></div>
+      </div>
+    </div>
+
+    <!-- TAB: ALL CODES -->
+    <div class="tab-panel" id="panel-all-codes">
+      <!-- CONVERT INPUT -->
+      <div style="background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:16px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">&#128260;</span> Convert to Sportybet
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="convert-code-input" placeholder="Paste Bet9ja, 1xBet, etc. code..." maxlength="12" style="flex:1;padding:8px 12px;font-size:14px;font-family:monospace;letter-spacing:1px;text-transform:uppercase;border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-xs);background:var(--bg);color:var(--text);outline:none" />
+          <button id="convert-code-btn" style="padding:8px 16px;font-size:12px;font-weight:700;border:none;border-radius:var(--radius-xs);background:var(--success);color:#fff;cursor:pointer;font-family:inherit">Convert</button>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Checks if the code works on Sportybet (many codes share universal match IDs)</div>
+        <div id="convert-result" style="display:none;margin-top:10px"></div>
+      </div>
+      <!-- PLATFORM FILTERS -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap;overflow-x:auto" id="platform-filters">
+        <button class="chip active" data-platform="" style="font-size:11px;padding:5px 12px">All</button>
+      </div>
+      <!-- CODES LIST -->
+      <div class="section-title">
+        <h2>All Platform Codes</h2>
+        <span class="badge-count" id="all-codes-count">--</span>
+      </div>
+      <div class="picks-list" id="all-codes-list">
         <div class="skeleton skel-pick"></div>
         <div class="skeleton skel-pick"></div>
         <div class="skeleton skel-pick"></div>
@@ -589,39 +739,7 @@ body{min-height:100vh;overflow-x:hidden}
     </div>
   </div>
 
-  <!-- BOTTOM: ROI + ACCURACY SIDE BY SIDE -->
-  <div class="bottom-grid">
-    <div class="roi-section" id="roi-section">
-      <div class="roi-header" onclick="document.getElementById('roi-section').classList.toggle('open')">
-        <h3>ROI Simulator</h3>
-        <span class="roi-toggle">Expand</span>
-      </div>
-      <div class="roi-body">
-        <div class="roi-controls">
-          <div class="roi-field">
-            <label>Bet Amount ($)</label>
-            <input type="range" id="roi-amount" min="5" max="100" value="25" step="5" oninput="updateROI()">
-            <span class="roi-val" id="roi-amount-val">$25</span>
-          </div>
-          <div class="roi-field">
-            <label>Min Score Filter</label>
-            <input type="range" id="roi-min-score" min="50" max="90" value="65" step="5" oninput="updateROI()">
-            <span class="roi-val" id="roi-min-score-val">65+</span>
-          </div>
-        </div>
-        <div class="roi-result" id="roi-result">
-          Accuracy data needed to calculate projected ROI. Results will appear once predictions are graded.
-        </div>
-      </div>
-    </div>
 
-    <div class="accuracy-section" id="accuracy-section">
-      <h3>Prediction Accuracy</h3>
-      <div id="accuracy-grid" class="accuracy-grid">
-        <div class="acc-placeholder">Accuracy data will appear once predictions are graded.</div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -635,6 +753,10 @@ const S = {
   lastPicksSig: '',
   activeTab: 'all-picks',
   ouLoaded: false,
+  hcLoaded: false,
+  codesLoaded: false,
+  allCodesLoaded: false,
+  allCodesData: [],
 };
 
 const API = '';
@@ -756,6 +878,15 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
     if (btn.dataset.tab === 'over-under' && !S.ouLoaded) {
       loadOverUnder();
+    }
+    if (btn.dataset.tab === 'handicap' && !S.hcLoaded) {
+      loadHandicap();
+    }
+    if (btn.dataset.tab === 'all-codes' && !S.allCodesLoaded) {
+      loadAllCodes();
+    }
+    if (btn.dataset.tab === 'booking-codes' && !S.codesLoaded) {
+      loadBookingCodes();
     }
     if (btn.dataset.tab === 'sources') {
       loadSources();
@@ -1182,6 +1313,899 @@ function createOUCard(m) {
   return card;
 }
 
+// ===== 1ST HALF HANDICAP =====
+async function loadHandicap() {
+  S.hcLoaded = true;
+  const grid = document.getElementById('hc-list');
+  const params = new URLSearchParams();
+  if (S.date) params.set('date', S.date);
+
+  try {
+    const res = await api('/predictions/handicap-ai?' + params.toString());
+    const items = res.data || [];
+
+    document.getElementById('hc-count').textContent = items.length ? `${items.length} picks` : '--';
+
+    populateHCTopPicks(items);
+
+    if (!items.length) {
+      grid.innerHTML = '<div class="empty">No 1st half handicap picks found. Soccer matches with sufficient data needed.</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    for (const m of items) {
+      grid.appendChild(createHCCard(m));
+    }
+  } catch {
+    grid.innerHTML = '<div class="empty">Unable to load handicap predictions.</div>';
+  }
+}
+
+function populateHCTopPicks(items) {
+  const safeGrid = document.getElementById('hc-safe-list');
+  const valueGrid = document.getElementById('hc-value-list');
+
+  // Safest = highest win probability (H1 or H1.5 picks with 75%+)
+  const safest = items.filter(m => m.winProb >= 75 && m.handicap <= 1.5).slice(0, 5);
+  // Best value = best odds with 65%+ win prob, any line
+  const value = [...items]
+    .filter(m => m.impliedOdds >= 1.15 && m.winProb >= 65)
+    .sort((a, b) => b.impliedOdds - a.impliedOdds)
+    .slice(0, 5);
+
+  document.getElementById('hc-safe-count').textContent = safest.length ? `Top ${safest.length}` : '--';
+  document.getElementById('hc-value-count').textContent = value.length ? `Top ${value.length}` : '--';
+
+  safeGrid.innerHTML = safest.length
+    ? safest.map((m, i) => createHCTopCardHTML(m, i + 1)).join('')
+    : '<div class="empty" style="font-size:12px">No picks above 75% probability yet.</div>';
+
+  valueGrid.innerHTML = value.length
+    ? value.map((m, i) => createHCTopCardHTML(m, i + 1)).join('')
+    : '<div class="empty" style="font-size:12px">No value picks found yet.</div>';
+}
+
+function hcPickColor(prob) {
+  if (prob >= 90) return 'var(--success)';
+  if (prob >= 80) return 'var(--accent)';
+  if (prob >= 75) return 'var(--amber)';
+  return 'var(--text-dim)';
+}
+
+function createHCTopCardHTML(m, rank) {
+  const pickCol = m.pickSide === 'away' ? 'var(--away)' : 'var(--home)';
+  return `
+    <div class="hc-best-card ${m.pickSide}" style="border-left-color:${pickCol}">
+      <div class="hc-best-rank" style="display:flex;justify-content:space-between;align-items:center">
+        <span>#${rank}</span>
+        <span style="color:${hcPickColor(m.winProb)};font-size:13px;font-weight:800">${m.winProb}%</span>
+      </div>
+      <div class="hc-best-match">${esc(m.homeTeam)} vs ${esc(m.awayTeam)}</div>
+      <div class="hc-best-meta" style="margin-top:6px">
+        <span style="background:rgba(34,197,94,0.1);color:var(--success);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;border:1px solid rgba(34,197,94,0.2)">${esc(m.pick)}</span>
+        <span style="font-size:10px;color:var(--text-dim);font-weight:600">@${m.impliedOdds}</span>
+        <span style="font-size:9px;color:var(--text-muted)">1st Half</span>
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-dim)">
+        FH Score: ${m.likelyFHScore} (${(m.likelyFHProb * 100).toFixed(0)}%) · xG: ${m.fhHomeGoals.toFixed(2)} - ${m.fhAwayGoals.toFixed(2)}
+      </div>
+      ${m.lines && m.lines.length > 1 ? `<div style="display:flex;gap:4px;margin-top:6px">${m.lines.map(l => '<span class="hc-best-src" style="color:' + (l.handicap === m.handicap ? 'var(--accent)' : 'var(--text-muted)') + '">H' + l.handicap + ' @' + l.impliedOdds + ' (' + l.winProb + '%)</span>').join('')}</div>` : ''}
+      <div class="hc-best-sources" style="margin-top:4px">
+        ${m.factors.homeFHStats ? `<span class="hc-best-src">${esc(m.factors.homeFHStats.name)}: FH ${m.factors.homeFHStats.fhScoredHome}/${m.factors.homeFHStats.fhConcededHome}</span>` : m.factors.homeForm ? `<span class="hc-best-src">${esc(m.homeTeam)}: ${m.factors.homeForm.form} · ${m.factors.homeForm.avgScored} gpg</span>` : ''}
+        ${m.factors.awayFHStats ? `<span class="hc-best-src">${esc(m.factors.awayFHStats.name)}: FH ${m.factors.awayFHStats.fhScoredAway}/${m.factors.awayFHStats.fhConcededAway}</span>` : m.factors.awayForm ? `<span class="hc-best-src">${esc(m.awayTeam)}: ${m.factors.awayForm.form} · ${m.factors.awayForm.avgScored} gpg</span>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function createHCCard(m) {
+  const card = document.createElement('div');
+  card.className = 'hc-card';
+
+  const pickCol = m.pickSide === 'away' ? 'var(--away)' : 'var(--home)';
+  const probCol = hcPickColor(m.winProb);
+
+  // Build factors detail for expanded view
+  let factorsHTML = '';
+  if (m.factors.homeForm) {
+    const hf = m.factors.homeForm;
+    factorsHTML += `<div class="hc-source-chip home">${esc(m.homeTeam)}: ${hf.form} · ${hf.avgScored} gpg · ${hf.avgConceded} conceded · ${hf.winRate}% WR</div>`;
+  }
+  if (m.factors.awayForm) {
+    const af = m.factors.awayForm;
+    factorsHTML += `<div class="hc-source-chip away">${esc(m.awayTeam)}: ${af.form} · ${af.avgScored} gpg · ${af.avgConceded} conceded · ${af.winRate}% WR</div>`;
+  }
+  if (m.factors.h2h) {
+    factorsHTML += `<div class="hc-source-chip" style="color:var(--text-dim)">H2H (last ${m.factors.h2h.total}): Home ${m.factors.h2h.homeWins} - Draw ${m.factors.h2h.draws} - Away ${m.factors.h2h.awayWins}</div>`;
+  }
+  if (m.factors.homeSplit) {
+    factorsHTML += `<div class="hc-source-chip home">${esc(m.homeTeam)} home: ${m.factors.homeSplit.winPct}% WR (${m.factors.homeSplit.wins}/${m.factors.homeSplit.total})</div>`;
+  }
+  if (m.factors.awaySplit) {
+    factorsHTML += `<div class="hc-source-chip away">${esc(m.awayTeam)} away: ${m.factors.awaySplit.winPct}% WR (${m.factors.awaySplit.wins}/${m.factors.awaySplit.total})</div>`;
+  }
+  if (m.factors.adapterMoneyline) {
+    const ml = m.factors.adapterMoneyline;
+    const mlTeam = ml.side === 'home' ? m.homeTeam : m.awayTeam;
+    factorsHTML += `<div class="hc-source-chip" style="color:var(--amber);border-color:rgba(245,158,11,0.2)">ML: ${ml.count}/${ml.total} pick ${esc(mlTeam)}</div>`;
+  }
+  if (m.factors.adapterOverUnder) {
+    const ou = m.factors.adapterOverUnder;
+    factorsHTML += `<div class="hc-source-chip" style="color:var(--amber);border-color:rgba(245,158,11,0.2)">O/U: ${ou.line || '?'} (${ou.side})</div>`;
+  }
+  if (m.factors.homeFHStats) {
+    const s = m.factors.homeFHStats;
+    factorsHTML += `<div class="hc-source-chip" style="color:var(--success);border-color:rgba(34,197,94,0.2)">&#9917; ${esc(s.name)} FH: ${s.fhScoredHome} scored · ${s.fhConcededHome} conceded (home) · ${s.league}</div>`;
+  }
+  if (m.factors.awayFHStats) {
+    const s = m.factors.awayFHStats;
+    factorsHTML += `<div class="hc-source-chip" style="color:var(--success);border-color:rgba(34,197,94,0.2)">&#9917; ${esc(s.name)} FH: ${s.fhScoredAway} scored · ${s.fhConcededAway} conceded (away) · ${s.league}</div>`;
+  }
+
+  card.innerHTML = `
+    <div class="hc-card-head">
+      <div class="hc-card-match">
+        <div class="hc-card-match-name">${esc(m.homeTeam)} <span class="vs">vs</span> ${esc(m.awayTeam)}</div>
+        <div class="hc-card-meta">
+          <span>${formatDate(m.date)}</span>
+          ${m.gameTime ? '<span>' + esc(formatShortTime(m.gameTime)) + '</span>' : ''}
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
+        <span style="background:rgba(34,197,94,0.1);color:${pickCol};font-size:12px;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid rgba(34,197,94,0.2);white-space:nowrap">${esc(m.pick)}</span>
+        <span style="font-size:9px;color:var(--text-muted)">1st Half - Handicap</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:52px">
+        <span style="font-size:20px;font-weight:800;color:${probCol}">${m.winProb}%</span>
+        <span style="font-size:10px;color:var(--text-dim);font-weight:600">@${m.impliedOdds}</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--text-dim)">
+      <span>FH xG: <b style="color:var(--text)">${m.fhHomeGoals.toFixed(2)} - ${m.fhAwayGoals.toFixed(2)}</b></span>
+      <span>Likely: <b style="color:var(--text)">${m.likelyFHScore}</b> (${(m.likelyFHProb * 100).toFixed(0)}%)</span>
+      <span>Push: <b>${m.pushProb}%</b></span>
+      <span>Loss: <b style="color:var(--danger)">${m.lossProb}%</b></span>
+    </div>
+    ${m.lines && m.lines.length > 1 ? `
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+      ${m.lines.map(l => {
+        const isActive = l.handicap === m.handicap;
+        const bg = isActive ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.04)';
+        const border = isActive ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)';
+        const col = l.winProb >= 80 ? 'var(--success)' : l.winProb >= 65 ? 'var(--accent)' : 'var(--amber)';
+        return '<div style="display:flex;flex-direction:column;align-items:center;padding:6px 12px;border-radius:8px;background:' + bg + ';border:1px solid ' + border + ';min-width:80px">' +
+          '<span style="font-size:11px;font-weight:700;color:' + col + '">' + esc(l.pick) + '</span>' +
+          '<span style="font-size:14px;font-weight:800;color:var(--text);margin-top:2px">@' + l.impliedOdds + '</span>' +
+          '<span style="font-size:9px;color:var(--text-dim)">' + l.winProb + '% win · ' + l.lossProb + '% loss</span>' +
+        '</div>';
+      }).join('')}
+    </div>` : ''}
+    ${m.analysis ? `<div style="margin-top:8px;font-size:11px;color:var(--text-dim);line-height:1.5;display:none" class="hc-analysis">${esc(m.analysis)}</div>` : ''}
+    <div class="hc-sources">
+      ${factorsHTML}
+    </div>
+  `;
+
+  card.onclick = () => {
+    card.classList.toggle('expanded');
+    const analysis = card.querySelector('.hc-analysis');
+    if (analysis) analysis.style.display = card.classList.contains('expanded') ? 'block' : 'none';
+  };
+  return card;
+}
+
+// ===== BOOKING CODES =====
+async function loadBookingCodes() {
+  S.codesLoaded = true;
+  const grid = document.getElementById('codes-list');
+
+  try {
+    const res = await api('/predictions/booking-codes');
+    const codes = res.data || [];
+
+    document.getElementById('codes-count').textContent = codes.length ? `${codes.length} codes` : '--';
+
+    if (!codes.length) {
+      grid.innerHTML = '<div class="empty">No booking codes found. Sites may be updating — try again in a few minutes.</div>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    for (const c of codes) {
+      grid.appendChild(createCodeCard(c));
+      addToGamePool(c.selections);
+    }
+  } catch {
+    grid.innerHTML = '<div class="empty">Unable to load booking codes.</div>';
+  }
+}
+
+function buildSelectionsHTML(selections, expanded) {
+  if (!selections || !selections.length) return '';
+  const showing = expanded ? selections : selections.slice(0, 5);
+  const rows = showing.map(s => {
+    const icon = s.isWinning === 1 ? '&#9989;' : s.isWinning === 0 ? '&#10060;' : '&#9203;';
+    const color = s.isWinning === 1 ? 'var(--success)' : s.isWinning === 0 ? 'var(--danger)' : 'var(--text)';
+    const leagueShort = (s.league || '').split(' - ').pop() || '';
+    const canSelect = s.eventId && s.matchStatus !== 'Ended' && s.matchStatus !== 'Cancelled' && s.isWinning === null;
+    const selData = canSelect ? `data-sel='${JSON.stringify({eventId:s.eventId,marketId:s.marketId,outcomeId:s.outcomeId,specifier:s.specifier||'',sportId:s.sportId}).replace(/'/g,"&#39;")}'` : '';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.03);${canSelect ? 'cursor:pointer' : ''}" class="sel-row" ${selData}>
+      ${canSelect ? `<input type="checkbox" class="sel-check" style="flex-shrink:0;width:14px;height:14px;cursor:pointer;accent-color:var(--accent)" />` : `<span style="flex-shrink:0;width:14px;text-align:center">${icon}</span>`}
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${esc(s.homeTeam)} vs ${esc(s.awayTeam)}</span>
+      <span style="color:var(--text-muted);font-size:9px;flex-shrink:0">${esc(leagueShort)}</span>
+      <span style="color:var(--accent);font-size:10px;flex-shrink:0;min-width:50px">${esc(s.market)}</span>
+      <span style="color:${color};font-weight:700;flex-shrink:0;min-width:70px">${esc(s.pick)}</span>
+      <span style="font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0;min-width:40px;text-align:right;color:var(--amber)">@${s.odds}</span>
+      ${s.score ? `<span style="color:var(--text-muted);flex-shrink:0;min-width:30px;text-align:center;font-weight:600">${s.score}</span>` : '<span style="flex-shrink:0;min-width:30px"></span>'}
+    </div>`;
+  }).join('');
+
+  const moreCount = selections.length - showing.length;
+  const dataAttr = ' data-all-selections=\'' + JSON.stringify(selections).replace(/'/g, '&#39;') + '\'';
+  let toggleLabel = '';
+  if (moreCount > 0) {
+    toggleLabel = `<div style="text-align:center;padding:6px;font-size:10px;color:var(--accent);cursor:pointer;font-weight:600" class="show-more-btn"${dataAttr}>Show ${moreCount} more &#9660;</div>`;
+  } else if (expanded && selections.length > 5) {
+    toggleLabel = `<div style="text-align:center;padding:6px;font-size:10px;color:var(--accent);cursor:pointer;font-weight:600" class="show-less-btn"${dataAttr}>Show less &#9650;</div>`;
+  }
+
+  return `<div style="margin-top:10px;border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-sm);overflow:hidden;background:rgba(0,0,0,0.15)">
+    <div style="display:flex;padding:6px 10px;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.06)">
+      <span style="width:16px"></span>
+      <span style="flex:1;padding-left:6px">Match</span>
+      <span style="min-width:50px">League</span>
+      <span style="min-width:50px">Market</span>
+      <span style="min-width:70px">Pick</span>
+      <span style="min-width:40px;text-align:right">Odds</span>
+      <span style="min-width:30px;text-align:center">Score</span>
+    </div>
+    ${rows}
+    ${toggleLabel}
+  </div>`;
+}
+
+function createCodeCard(c) {
+  const card = document.createElement('div');
+  card.className = 'ou-card';
+  card.style.padding = '12px 14px';
+
+  const oddsText = c.totalOdds ? c.totalOdds.toLocaleString(undefined, {maximumFractionDigits:2}) : '?';
+  const hasPending = c.pendingCount > 0;
+  const allWon = c.wonCount > 0 && c.lostCount === 0 && c.pendingCount === 0;
+  const anyLost = c.lostCount > 0;
+
+  // Status badge
+  let statusBadge = '';
+  if (hasPending) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:10px">&#9203; ${c.pendingCount} live</span>`;
+  else if (allWon) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--success);background:rgba(34,197,94,0.1);padding:2px 8px;border-radius:10px">&#9989; Won</span>`;
+  else if (anyLost) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--danger);background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:10px">&#10060; ${c.lostCount} lost</span>`;
+
+  // Score tally
+  const tally = [
+    c.wonCount ? `<span style="color:var(--success)">${c.wonCount}&#10003;</span>` : '',
+    c.lostCount ? `<span style="color:var(--danger)">${c.lostCount}&#10060;</span>` : '',
+    c.pendingCount ? `<span style="color:var(--text-dim)">${c.pendingCount}&#9203;</span>` : '',
+  ].filter(Boolean).join(' ');
+
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <!-- Code + Copy -->
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-size:17px;font-weight:800;font-family:monospace;letter-spacing:1.5px;color:var(--success);user-select:all">${esc(c.code)}</span>
+        <button class="copy-btn" style="font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid rgba(34,197,94,0.25);background:rgba(34,197,94,0.08);color:var(--success);cursor:pointer;font-family:inherit;font-weight:700">COPY</button>
+      </div>
+      <!-- Stats -->
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;font-size:11px;color:var(--text-dim)">
+        ${c.events ? `<span>${c.events}g</span>` : ''}
+        ${c.totalOdds ? `<span style="color:var(--amber);font-weight:700">@${oddsText}</span>` : ''}
+        <span style="font-size:10px">${tally}</span>
+      </div>
+      <!-- Status + Source -->
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        ${statusBadge}
+        ${c.postedAgo ? `<span style="font-size:9px;color:var(--text-muted)">${esc(c.postedAgo)}</span>` : ''}
+      </div>
+    </div>
+    ${buildSelectionsHTML(c.selections, false)}
+  `;
+
+  const copyBtn = card.querySelector('.copy-btn');
+  copyBtn.onclick = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(c.code).then(() => {
+      copyBtn.textContent = 'OK!';
+      copyBtn.style.background = 'rgba(34,197,94,0.2)';
+      setTimeout(() => { copyBtn.textContent = 'COPY'; copyBtn.style.background = ''; }, 1500);
+    });
+  };
+
+  return card;
+}
+
+// ===== ALL-PLATFORM CODES =====
+const PLATFORM_COLORS = {
+  sportybet:'#22c55e', bet9ja:'#e63946', '1xbet':'#3b82f6', betway:'#8b5cf6',
+  msport:'#f59e0b', betpawa:'#06b6d4', betwinner:'#ec4899', betika:'#14b8a6',
+  '22bet':'#f97316', hollywoodbet:'#a855f7', megapari:'#6366f1', melbet:'#0ea5e9',
+  linebet:'#84cc16', bangbet:'#ef4444', merrybet:'#10b981', sportpesa:'#3b82f6',
+  soccabet:'#22c55e', helabet:'#f59e0b', paripesa:'#8b5cf6', odibet:'#06b6d4',
+  betbaba:'#ec4899',
+};
+
+async function loadAllCodes() {
+  S.allCodesLoaded = true;
+  const grid = document.getElementById('all-codes-list');
+  try {
+    const res = await api('/predictions/all-codes');
+    S.allCodesData = res.data || [];
+    const platforms = res.platforms || [];
+
+    document.getElementById('all-codes-count').textContent = S.allCodesData.length ? S.allCodesData.length + ' codes' : '--';
+
+    // Build platform filter chips
+    const filterDiv = document.getElementById('platform-filters');
+    filterDiv.innerHTML = '<button class="chip active" data-platform="" style="font-size:11px;padding:5px 12px">All (' + S.allCodesData.length + ')</button>';
+    // Count per platform
+    const platCounts = {};
+    for (const c of S.allCodesData) { platCounts[c.platform] = (platCounts[c.platform] || 0) + 1; }
+    // Sort platforms by count descending
+    const sorted = Object.entries(platCounts).sort((a, b) => b[1] - a[1]);
+    for (const [plat, count] of sorted) {
+      const color = PLATFORM_COLORS[plat] || 'var(--text-dim)';
+      filterDiv.innerHTML += `<button class="chip" data-platform="${esc(plat)}" style="font-size:11px;padding:5px 12px;color:${color};border-color:${color}40">${esc(plat)} (${count})</button>`;
+    }
+
+    // Attach filter clicks
+    filterDiv.querySelectorAll('.chip').forEach(btn => {
+      btn.onclick = () => {
+        filterDiv.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderAllCodes(btn.dataset.platform);
+      };
+    });
+
+    renderAllCodes('');
+  } catch {
+    grid.innerHTML = '<div class="empty">Unable to load codes.</div>';
+  }
+}
+
+function renderAllCodes(platformFilter) {
+  const grid = document.getElementById('all-codes-list');
+  const filtered = platformFilter
+    ? S.allCodesData.filter(c => c.platform === platformFilter)
+    : S.allCodesData;
+
+  document.getElementById('all-codes-count').textContent = filtered.length + ' codes';
+
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty">No codes found for this platform.</div>';
+    return;
+  }
+
+  grid.innerHTML = '';
+  for (const c of filtered) {
+    grid.appendChild(createAllCodeCard(c));
+  }
+}
+
+function createAllCodeCard(c) {
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;transition:all 0.2s';
+
+  const color = PLATFORM_COLORS[c.platform] || 'var(--text-dim)';
+  const oddsText = c.totalOdds ? c.totalOdds.toLocaleString(undefined, {maximumFractionDigits:2}) : '';
+  const isSporty = c.platform === 'sportybet';
+  const hasSportyEquiv = c.sportyCode && c.sportyCode !== c.code;
+
+  // Sportybet equivalent badge
+  let sportyBadge = '';
+  if (hasSportyEquiv) {
+    sportyBadge = `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(34,197,94,0.08);color:var(--success);border:1px solid rgba(34,197,94,0.2);cursor:pointer;user-select:all" class="sporty-equiv" title="Click to copy Sportybet code">Sporty: ${esc(c.sportyCode)}</span>`;
+  } else if (!isSporty) {
+    sportyBadge = `<button class="try-convert-btn" data-code="${esc(c.code)}" style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(59,130,246,0.08);color:var(--accent);border:1px solid rgba(59,130,246,0.2);cursor:pointer;font-family:inherit">Try Sportybet</button>`;
+  }
+
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;background:${color}18;color:${color};border:1px solid ${color}30;text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;min-width:60px;text-align:center">${esc(c.platform)}</span>
+      <span style="font-size:16px;font-weight:800;font-family:monospace;letter-spacing:1.5px;color:var(--text);user-select:all;flex-shrink:0">${esc(c.code)}</span>
+      <button class="copy-btn" style="font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--text-dim);cursor:pointer;font-family:inherit;font-weight:700;flex-shrink:0">COPY</button>
+      ${sportyBadge}
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;font-size:11px;color:var(--text-dim);justify-content:flex-end">
+        ${c.events ? `<span>${c.events}g</span>` : ''}
+        ${oddsText ? `<span style="color:var(--amber);font-weight:700">@${oddsText}</span>` : ''}
+        ${c.postedAgo ? `<span style="color:var(--text-muted)">${esc(c.postedAgo)}</span>` : ''}
+      </div>
+    </div>
+    ${c.convertedFrom ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Converted from ${esc(c.convertedFrom.platform)}: ${esc(c.convertedFrom.code)}</div>` : ''}
+  `;
+
+  // Copy main code
+  card.querySelector('.copy-btn').onclick = (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(c.code).then(() => {
+      e.target.textContent = 'OK!';
+      e.target.style.color = 'var(--success)';
+      setTimeout(() => { e.target.textContent = 'COPY'; e.target.style.color = ''; }, 1500);
+    });
+  };
+
+  // Copy Sportybet equivalent
+  const sportyEquiv = card.querySelector('.sporty-equiv');
+  if (sportyEquiv) {
+    sportyEquiv.onclick = (e) => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(c.sportyCode).then(() => {
+        sportyEquiv.textContent = 'Copied!';
+        setTimeout(() => { sportyEquiv.textContent = 'Sporty: ' + c.sportyCode; }, 1500);
+      });
+    };
+  }
+
+  // Try convert button
+  const tryBtn = card.querySelector('.try-convert-btn');
+  if (tryBtn) {
+    tryBtn.onclick = async (e) => {
+      e.stopPropagation();
+      tryBtn.textContent = '...';
+      tryBtn.disabled = true;
+      try {
+        const res = await fetch('/predictions/convert-code/' + encodeURIComponent(c.code));
+        const data = await res.json();
+        if (data.converted) {
+          tryBtn.textContent = 'Works on Sporty!';
+          tryBtn.style.color = 'var(--success)';
+          tryBtn.style.borderColor = 'rgba(34,197,94,0.3)';
+          tryBtn.style.background = 'rgba(34,197,94,0.08)';
+        } else {
+          tryBtn.textContent = 'Not on Sporty';
+          tryBtn.style.color = 'var(--danger)';
+          tryBtn.style.borderColor = 'rgba(239,68,68,0.2)';
+        }
+      } catch {
+        tryBtn.textContent = 'Error';
+        tryBtn.style.color = 'var(--danger)';
+      }
+    };
+  }
+
+  return card;
+}
+
+// ===== CODE CONVERTER =====
+document.getElementById('convert-code-btn').onclick = async () => {
+  const input = document.getElementById('convert-code-input');
+  const resultDiv = document.getElementById('convert-result');
+  const code = input.value.trim().toUpperCase();
+  if (!code || code.length < 4) return;
+
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<span style="color:var(--text-dim);font-size:12px">Checking ' + esc(code) + ' on Sportybet...</span>';
+
+  try {
+    const res = await fetch('/predictions/convert-code/' + encodeURIComponent(code));
+    const data = await res.json();
+
+    if (data.converted) {
+      resultDiv.innerHTML = `
+        <div style="padding:10px;border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-xs);background:rgba(34,197,94,0.05)">
+          <span style="color:var(--success);font-weight:700">&#10003; Works on Sportybet!</span>
+          <span style="font-size:18px;font-weight:800;font-family:monospace;letter-spacing:2px;color:var(--success);margin-left:10px;user-select:all">${esc(code)}</span>
+          <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" style="margin-left:8px;padding:3px 10px;font-size:10px;font-weight:700;border:1px solid rgba(34,197,94,0.3);border-radius:4px;background:rgba(34,197,94,0.1);color:var(--success);cursor:pointer;font-family:inherit">Copy</button>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:4px">This code loads directly on Sportybet. Paste it in the Sportybet app.</div>
+        </div>
+      `;
+    } else {
+      resultDiv.innerHTML = `
+        <div style="padding:10px;border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-xs);background:rgba(239,68,68,0.03)">
+          <span style="color:var(--danger);font-weight:700">&#10060; Not recognized on Sportybet</span>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Try <a href="https://convertbetcodes.com" target="_blank" rel="noopener" style="color:var(--accent)">convertbetcodes.com</a> for manual conversion, or check the code list below for pre-converted Sportybet equivalents.</div>
+        </div>
+      `;
+    }
+  } catch {
+    resultDiv.innerHTML = '<span style="color:var(--danger);font-size:12px">Connection error</span>';
+  }
+};
+document.getElementById('convert-code-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('convert-code-btn').click();
+});
+
+// ===== GAME POOL & AUTO-GENERATE =====
+// Global pool of all available pending selections from all codes
+let gamePool = [];
+
+function addToGamePool(selections) {
+  if (!selections) return;
+  for (const s of selections) {
+    // Only pending games with valid IDs and odds
+    if (!s.eventId || s.isWinning !== null) continue;
+    if (s.matchStatus === 'Ended' || s.matchStatus === 'Cancelled') continue;
+    if (!s.odds || s.odds <= 1) continue;
+    // Dedup by eventId+marketId+outcomeId
+    const key = s.eventId + ':' + s.marketId + ':' + s.outcomeId;
+    if (gamePool.some(g => g._key === key)) continue;
+    gamePool.push({ ...s, _key: key });
+  }
+  // Sort pool by safety score (highest = safest first)
+  gamePool.sort((a, b) => safetyScore(b) - safetyScore(a));
+  // Update pool count
+  document.getElementById('pool-count').textContent = gamePool.length > 0 ? gamePool.length + ' games' : 'load codes first';
+}
+
+// ===== SAFETY SCORING =====
+// Score each selection 0-100 where higher = safer
+
+const TOP_LEAGUES = new Set([
+  'premier league', 'laliga', 'la liga', 'bundesliga', 'serie a', 'ligue 1',
+  'eredivisie', 'championship', 'liga portugal', 'super lig', 'pro league',
+  'premier league, women',
+]);
+
+const MID_LEAGUES = new Set([
+  '2. bundesliga', 'la liga 2', 'serie b', 'ligue 2', 'super league',
+  'liga mx', 'clausura', 'mls', 'copa libertadores', 'copa sudamericana',
+  'champions league', 'europa league', 'conference league',
+]);
+
+function safetyScore(g) {
+  let score = 50; // base
+
+  // 1. MARKET TYPE (biggest factor — some markets are inherently safer)
+  const mkt = (g.market || '').toLowerCase();
+  const pick = (g.pick || '').toLowerCase();
+
+  if (mkt.includes('over/under') || mkt.includes('total goals')) {
+    if (pick.includes('under 5.5') || pick.includes('under 6.5')) score += 25;
+    else if (pick.includes('under 4.5')) score += 22;
+    else if (pick.includes('under 3.5')) score += 18;
+    else if (pick.includes('under 2.5')) score += 10;
+    else if (pick.includes('over 0.5')) score += 20;
+    else if (pick.includes('over 1.5')) score += 12;
+    else if (pick.includes('over 2.5')) score += 5;
+    else score += 8; // other O/U
+  } else if (mkt.includes('double chance')) {
+    score += 15; // two outcomes covered out of three
+  } else if (mkt.includes('1st half') && mkt.includes('handicap')) {
+    if (pick.includes('0:2') || pick.includes('2:0')) score += 18; // +2 FH handicap
+    else if (pick.includes('0:1') || pick.includes('1:0')) score += 8;
+    else score += 5;
+  } else if (mkt.includes('handicap')) {
+    score += 5;
+  } else if (mkt === '1x2') {
+    score += 0; // riskiest common market
+  } else if (mkt.includes('both teams') || mkt.includes('btts') || mkt.includes('gg')) {
+    score += 3;
+  } else if (mkt.includes('correct score')) {
+    score -= 15; // very risky
+  } else {
+    score += 2;
+  }
+
+  // 2. LEAGUE QUALITY (known leagues are more predictable)
+  const league = (g.league || '').toLowerCase();
+  const leagueName = league.split(' - ').pop() || league;
+  if ([...TOP_LEAGUES].some(l => leagueName.includes(l))) score += 10;
+  else if ([...MID_LEAGUES].some(l => leagueName.includes(l))) score += 5;
+  else score -= 5; // unknown/obscure league = less predictable
+
+  // 3. ODDS (lower = generally safer, but diminishing returns)
+  const odds = g.odds || 1;
+  if (odds <= 1.05) score += 15;
+  else if (odds <= 1.10) score += 12;
+  else if (odds <= 1.20) score += 8;
+  else if (odds <= 1.30) score += 5;
+  else if (odds <= 1.50) score += 2;
+  else if (odds > 2.0) score -= 10;
+  else if (odds > 1.5) score -= 3;
+
+  // 4. MATCH STATUS (in-progress games where we can see the state are informative)
+  const status = (g.matchStatus || '').toLowerCase();
+  if (status.includes('ht') || status.includes('half')) score += 3; // at halftime
+  if (status === 'not start') score += 0; // neutral
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function pickSafestGames(targetOdds) {
+  if (!gamePool.length) return [];
+
+  // Score all games and sort by safety (highest first)
+  const scored = gamePool.map(g => ({ ...g, _safety: safetyScore(g) }));
+  scored.sort((a, b) => b._safety - a._safety);
+
+  // Greedy pick: take safest games until total odds >= target
+  const picked = [];
+  let total = 1;
+  for (const g of scored) {
+    if (total >= targetOdds) break;
+    picked.push(g);
+    total *= g.odds;
+  }
+
+  // Fine-tune: if we overshot, check if removing the last game is closer to target
+  if (picked.length > 1) {
+    const withoutLast = total / picked[picked.length - 1].odds;
+    if (withoutLast >= targetOdds * 0.75 && Math.abs(withoutLast - targetOdds) < Math.abs(total - targetOdds)) {
+      picked.pop();
+    }
+  }
+
+  return picked;
+}
+
+async function generateSafeCode(targetOdds, btn) {
+  const picked = pickSafestGames(targetOdds);
+  if (picked.length === 0) return;
+
+  const resultsDiv = document.getElementById('auto-gen-results');
+  const actualOdds = picked.reduce((acc, g) => acc * g.odds, 1);
+
+  // Show loading
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+
+  try {
+    const selections = picked.map(g => ({
+      eventId: g.eventId,
+      marketId: g.marketId,
+      outcomeId: g.outcomeId,
+      specifier: g.specifier || '',
+      sportId: g.sportId,
+    }));
+
+    const res = await fetch('/predictions/create-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections }),
+    });
+    const data = await res.json();
+
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      const card = document.createElement('div');
+      card.style.cssText = 'border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);background:rgba(34,197,94,0.03);padding:14px;margin-bottom:10px';
+      const avgSafety = Math.round(picked.reduce((s, g) => s + (g._safety || safetyScore(g)), 0) / picked.length);
+      const safetyColor = avgSafety >= 75 ? 'var(--success)' : avgSafety >= 55 ? 'var(--accent)' : 'var(--amber)';
+
+      card.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="font-size:24px;font-weight:800;font-family:monospace;letter-spacing:3px;color:var(--success);user-select:all">${esc(code)}</span>
+          <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)})" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid rgba(34,197,94,0.4);border-radius:5px;background:rgba(34,197,94,0.1);color:var(--success);cursor:pointer;font-family:inherit">Copy</button>
+          <span style="font-size:15px;font-weight:800;color:var(--amber)">@${actualOdds.toFixed(2)}</span>
+          <span style="font-size:11px;color:var(--text-dim)">${picked.length} games</span>
+          <span style="font-size:11px;font-weight:700;color:${safetyColor}">Safety: ${avgSafety}/100</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;font-size:10px">
+          ${picked.map(g => {
+            const s = g._safety || safetyScore(g);
+            const c = s >= 75 ? 'var(--success)' : s >= 55 ? 'var(--accent)' : 'var(--amber)';
+            return '<span style="padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)"><span style="color:' + c + ';font-weight:700">' + s + '</span> ' + esc(g.pick) + ' @' + g.odds + '</span>';
+          }).join('')}
+        </div>
+        ${buildSelectionsHTML(picked, picked.length <= 15)}
+      `;
+      resultsDiv.prepend(card);
+    } else {
+      resultsDiv.innerHTML = '<div style="padding:10px;color:var(--danger);font-size:12px">Failed: ' + (data.message || 'Unknown error') + '</div>' + resultsDiv.innerHTML;
+    }
+  } catch {
+    resultsDiv.innerHTML = '<div style="padding:10px;color:var(--danger);font-size:12px">Failed to generate code.</div>' + resultsDiv.innerHTML;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '~' + targetOdds + ' odds';
+}
+
+// Attach click handlers to auto-gen buttons
+document.querySelectorAll('.auto-gen-btn').forEach(btn => {
+  btn.onclick = () => generateSafeCode(parseInt(btn.dataset.target), btn);
+});
+
+// ===== SELECTION & CODE GENERATION =====
+function updateGenerateBar() {
+  const checks = document.querySelectorAll('.sel-check:checked');
+  const bar = document.getElementById('generate-bar');
+  const count = checks.length;
+
+  if (count > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('gen-count').textContent = count + ' selected';
+    // Calculate total odds
+    let totalOdds = 1;
+    checks.forEach(chk => {
+      const row = chk.closest('.sel-row');
+      const oddsSpan = row?.querySelector('[style*="color:var(--amber)"]');
+      if (oddsSpan) {
+        const odds = parseFloat(oddsSpan.textContent.replace('@', ''));
+        if (odds > 0) totalOdds *= odds;
+      }
+    });
+    document.getElementById('gen-odds').textContent = 'Total odds: ' + totalOdds.toFixed(2);
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+// Delegated checkbox change handler
+document.addEventListener('change', (e) => {
+  if (e.target.classList?.contains('sel-check')) {
+    updateGenerateBar();
+  }
+});
+
+// Also allow clicking the row to toggle checkbox
+document.addEventListener('click', (e) => {
+  const row = e.target.closest('.sel-row');
+  if (!row || e.target.classList?.contains('sel-check')) return;
+  const chk = row.querySelector('.sel-check');
+  if (chk) {
+    chk.checked = !chk.checked;
+    updateGenerateBar();
+  }
+});
+
+// Clear button
+document.getElementById('gen-clear-btn').onclick = () => {
+  document.querySelectorAll('.sel-check:checked').forEach(c => c.checked = false);
+  updateGenerateBar();
+};
+
+// Generate Code button
+document.getElementById('gen-code-btn').onclick = async () => {
+  const checks = document.querySelectorAll('.sel-check:checked');
+  const selections = [];
+  checks.forEach(chk => {
+    const row = chk.closest('.sel-row');
+    const raw = row?.getAttribute('data-sel');
+    if (raw) {
+      try { selections.push(JSON.parse(raw)); } catch {}
+    }
+  });
+
+  if (!selections.length) return;
+
+  const resultDiv = document.getElementById('generated-code-result');
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<div style="padding:12px;color:var(--text-dim);font-size:12px">Generating code with ' + selections.length + ' selections...</div>';
+
+  try {
+    const res = await fetch('/predictions/create-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections }),
+    });
+    const data = await res.json();
+
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      const url = data.data.shareURL || '';
+      resultDiv.innerHTML = `
+        <div style="border:2px solid rgba(34,197,94,0.5);border-radius:var(--radius-sm);background:rgba(34,197,94,0.05);padding:16px;text-align:center">
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">YOUR NEW BOOKING CODE</div>
+          <div style="font-size:32px;font-weight:800;font-family:monospace;letter-spacing:4px;color:var(--success);user-select:all;margin-bottom:8px">${esc(code)}</div>
+          <div style="display:flex;justify-content:center;gap:8px">
+            <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',2000)})" style="padding:8px 20px;font-size:13px;font-weight:700;border:1px solid rgba(34,197,94,0.4);border-radius:6px;background:rgba(34,197,94,0.1);color:var(--success);cursor:pointer;font-family:inherit">Copy Code</button>
+            ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" style="padding:8px 20px;font-size:13px;font-weight:700;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center">Open in Sportybet &#8599;</a>` : ''}
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:8px">${selections.length} games selected</div>
+        </div>
+      `;
+    } else {
+      resultDiv.innerHTML = '<div style="padding:12px;color:var(--danger);font-size:12px">Failed to generate code: ' + (data.message || 'Unknown error') + '</div>';
+    }
+  } catch {
+    resultDiv.innerHTML = '<div style="padding:12px;color:var(--danger);font-size:12px">Failed to reach server.</div>';
+  }
+};
+
+// ===== SHOW MORE / LESS (delegated) =====
+document.addEventListener('click', (e) => {
+  const moreBtn = e.target.closest('.show-more-btn');
+  const lessBtn = e.target.closest('.show-less-btn');
+  const btn = moreBtn || lessBtn;
+  if (!btn) return;
+  e.stopPropagation();
+  const raw = btn.getAttribute('data-all-selections');
+  if (!raw) return;
+  try {
+    const selections = JSON.parse(raw);
+    const expand = !!moreBtn; // show-more = expand, show-less = collapse
+    const container = btn.parentElement;
+    if (container) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = buildSelectionsHTML(selections, expand);
+      container.replaceWith(tmp.firstElementChild);
+    }
+  } catch {}
+});
+
+// ===== LOAD CODE =====
+document.getElementById('load-code-btn').onclick = async () => {
+  const input = document.getElementById('load-code-input');
+  const resultDiv = document.getElementById('loaded-code-result');
+  const code = input.value.trim().toUpperCase();
+  if (!code || code.length < 5) {
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<div style="padding:12px;color:var(--danger);font-size:12px">Enter a valid 6-character Sportybet code</div>';
+    return;
+  }
+
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<div style="padding:12px;color:var(--text-dim);font-size:12px">Loading code ' + esc(code) + '...</div>';
+
+  try {
+    const res = await fetch('/predictions/load-code/' + encodeURIComponent(code));
+    const data = await res.json();
+
+    if (data.bizCode !== 10000 || !data.isAvailable || !data.data?.outcomes) {
+      resultDiv.innerHTML = '<div style="padding:12px;border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);background:rgba(239,68,68,0.05)"><span style="color:var(--danger);font-weight:700">&#10060; Invalid code</span><span style="color:var(--text-dim);margin-left:8px;font-size:12px">Code "' + esc(code) + '" not found on Sportybet</span></div>';
+      return;
+    }
+
+    const outcomes = data.data.outcomes;
+    // Find ticket selections for raw IDs
+    const ticketSels = data.data?.ticket?.selections || [];
+    const selections = outcomes.map(o => {
+      const m = o.markets?.[0];
+      const sel = m?.outcomes?.[0];
+      const ts = ticketSels.find(t => t.eventId === o.eventId && t.marketId === m?.id);
+      return {
+        homeTeam: o.homeTeamName || '?',
+        awayTeam: o.awayTeamName || '?',
+        league: (o.sport?.category?.name || '') + ' - ' + (o.sport?.category?.tournament?.name || ''),
+        market: m?.desc || '?',
+        pick: sel?.desc || '?',
+        odds: parseFloat(sel?.odds || '1'),
+        matchStatus: o.matchStatus || 'Unknown',
+        isWinning: sel?.isWinning ?? null,
+        score: o.setScore || null,
+        eventId: o.eventId || '',
+        marketId: m?.id || '',
+        outcomeId: sel?.id || '',
+        specifier: ts?.specifier || m?.specifier || '',
+        sportId: o.sport?.id || 'sr:sport:1',
+      };
+    });
+
+    const won = selections.filter(s => s.isWinning === 1).length;
+    const lost = selections.filter(s => s.isWinning === 0).length;
+    const pending = selections.filter(s => s.isWinning === null).length;
+    const totalOdds = selections.reduce((acc, s) => acc * s.odds, 1);
+
+    const statusColor = pending > 0 ? 'var(--accent)' : lost > 0 ? 'var(--danger)' : 'var(--success)';
+    const statusText = pending > 0 ? pending + ' pending' : lost > 0 ? 'Lost (' + lost + ' failed)' : 'All Won!';
+
+    resultDiv.innerHTML = `
+      <div style="border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);background:rgba(34,197,94,0.03);padding:14px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:22px;font-weight:800;font-family:monospace;letter-spacing:2px;color:var(--success)">${esc(code)}</span>
+          <span style="font-size:9px;color:var(--success);font-weight:700">&#10003; VALID</span>
+          <span style="font-size:11px;color:${statusColor};font-weight:700">${statusText}</span>
+        </div>
+        <div style="display:flex;gap:12px;font-size:12px;color:var(--text-dim);margin-bottom:8px">
+          <span><b style="color:var(--text)">${selections.length}</b> games</span>
+          <span>Total: <b style="color:var(--amber)">${totalOdds.toLocaleString(undefined,{maximumFractionDigits:2})}</b></span>
+          ${won ? '<span style="color:var(--success)"><b>' + won + '</b> &#10003;</span>' : ''}
+          ${lost ? '<span style="color:var(--danger)"><b>' + lost + '</b> &#10060;</span>' : ''}
+        </div>
+        ${buildSelectionsHTML(selections, selections.length <= 20)}
+      </div>
+    `;
+    // Add loaded games to the pool for auto-generation
+    addToGamePool(selections);
+  } catch (err) {
+    resultDiv.innerHTML = '<div style="padding:12px;color:var(--danger);font-size:12px">Failed to load code. Check your connection.</div>';
+  }
+};
+
+// Enter key on input
+document.getElementById('load-code-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('load-code-btn').click();
+});
+
 // ===== VALUE BETS =====
 async function loadValueBets() {
   S.valueBetsLoaded = true;
@@ -1459,6 +2483,7 @@ async function loadAll() {
   // Reload lazy tabs if already visited
   if (S.valueBetsLoaded) loadValueBets();
   if (S.ouLoaded) loadOverUnder();
+  if (S.hcLoaded) loadHandicap();
 }
 
 // ===== POLL =====
@@ -1503,76 +2528,6 @@ function connectWS() {
     wsRetryMs = Math.min(wsRetryMs * 2, 30000);
   };
   ws.onerror = () => ws.close();
-}
-
-// ===== ROI SIMULATOR =====
-let accuracyData = null;
-
-function updateROI() {
-  const amount = parseInt(document.getElementById('roi-amount').value);
-  const minScore = parseInt(document.getElementById('roi-min-score').value);
-  document.getElementById('roi-amount-val').textContent = '$' + amount;
-  document.getElementById('roi-min-score-val').textContent = minScore + '+';
-
-  const el = document.getElementById('roi-result');
-  if (!accuracyData || !accuracyData.length) {
-    el.innerHTML = 'Accuracy data needed to calculate projected ROI. Results will appear once predictions are graded.';
-    return;
-  }
-  const total = accuracyData.reduce((s, d) => s + (d.wins || 0) + (d.losses || 0), 0);
-  const wins = accuracyData.reduce((s, d) => s + (d.wins || 0), 0);
-  if (total < 10) {
-    el.innerHTML = `Only <span class="highlight">${total}</span> graded picks so far. Need at least 10 for meaningful projections.`;
-    return;
-  }
-  const winRate = wins / total;
-  const avgOdds = 1.91;
-  const projectedPerBet = (winRate * avgOdds - 1) * amount;
-  const daily = projectedPerBet * 3;
-  el.innerHTML = `Based on <span class="highlight">${(winRate * 100).toFixed(1)}%</span> win rate across <span class="highlight">${total}</span> picks at $${amount}/bet:<br>` +
-    `Projected per bet: <span class="highlight">$${projectedPerBet.toFixed(2)}</span> | ` +
-    `Daily (~3 picks): <span class="highlight">$${daily.toFixed(2)}</span> | ` +
-    `Monthly: <span class="highlight">$${(daily * 30).toFixed(0)}</span>`;
-}
-
-// ===== ACCURACY DASHBOARD =====
-async function loadAccuracy() {
-  try {
-    const res = await api('/predictions/accuracy');
-    accuracyData = res.data || [];
-    const grid = document.getElementById('accuracy-grid');
-
-    if (!accuracyData.length) {
-      grid.innerHTML = '<div class="acc-placeholder">Accuracy data will appear once predictions are graded.</div>';
-      return;
-    }
-
-    const bySport = {};
-    for (const d of accuracyData) {
-      if (!bySport[d.sport]) bySport[d.sport] = { wins: 0, losses: 0, pushes: 0 };
-      bySport[d.sport].wins += d.wins || 0;
-      bySport[d.sport].losses += d.losses || 0;
-      bySport[d.sport].pushes += d.pushes || 0;
-    }
-
-    grid.innerHTML = '';
-    for (const [sport, data] of Object.entries(bySport)) {
-      const decided = data.wins + data.losses;
-      const rate = decided > 0 ? ((data.wins / decided) * 100).toFixed(1) : '--';
-      const conf = sportConf(sport);
-      const rateColor = decided > 0 ? (data.wins / decided >= 0.55 ? 'var(--success)' : data.wins / decided >= 0.5 ? 'var(--amber)' : 'var(--danger)') : 'var(--text-muted)';
-      const card = document.createElement('div');
-      card.className = 'acc-card';
-      card.innerHTML = `
-        <div class="acc-sport" style="color:${conf.color}">${conf.label}</div>
-        <div class="acc-rate" style="color:${rateColor}">${rate}%</div>
-        <div class="acc-record">${data.wins}W - ${data.losses}L - ${data.pushes}P</div>
-      `;
-      grid.appendChild(card);
-    }
-
-    updateROI();
-  } catch {}
 }
 
 // ===== FETCH ALL BUTTON =====
@@ -1698,11 +2653,9 @@ async function loadSources() {
 // ===== INIT =====
 (async () => {
   await loadAll();
-  loadAccuracy();
   connectWS();
   setInterval(checkHealth, POLL_MS);
   setInterval(poll, POLL_MS);
-  setInterval(loadAccuracy, 300000);
 
   // Register service worker
   if ('serviceWorker' in navigator) {
