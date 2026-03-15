@@ -1827,12 +1827,21 @@ function addToGamePool(selections) {
     // Dedup by eventId+marketId+outcomeId
     const key = s.eventId + ':' + s.marketId + ':' + s.outcomeId;
     if (gamePool.some(g => g._key === key)) continue;
-    gamePool.push({ ...s, _key: key });
+    // Derive matchDate from estimateStartTime if not already set
+    let matchDate = s.matchDate || null;
+    if (!matchDate && s.estimateStartTime) {
+      const d = new Date(s.estimateStartTime);
+      matchDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    gamePool.push({ ...s, _key: key, matchDate });
   }
   // Sort pool by safety score (highest = safest first)
   gamePool.sort((a, b) => safetyScore(b) - safetyScore(a));
-  // Update pool count
-  document.getElementById('pool-count').textContent = gamePool.length > 0 ? gamePool.length + ' games' : 'load codes first';
+  // Update pool count — show today's games separately
+  const now = new Date();
+  const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const todayCount = gamePool.filter(g => !g.matchDate || g.matchDate === todayStr).length;
+  document.getElementById('pool-count').textContent = gamePool.length > 0 ? todayCount + ' today / ' + gamePool.length + ' total' : 'load codes first';
 }
 
 // ===== SAFETY SCORING =====
@@ -1912,8 +1921,13 @@ function safetyScore(g) {
 function pickSafestGames(targetOdds) {
   if (!gamePool.length) return [];
 
+  // Only pick from today's games
+  const today = new Date();
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  const todayGames = gamePool.filter(g => !g.matchDate || g.matchDate === todayStr);
+
   // Score all games and sort by safety (highest first)
-  const scored = gamePool.map(g => ({ ...g, _safety: safetyScore(g) }));
+  const scored = todayGames.map(g => ({ ...g, _safety: safetyScore(g) }));
   scored.sort((a, b) => b._safety - a._safety);
 
   // Greedy pick: take safest games until total odds >= target

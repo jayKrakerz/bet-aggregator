@@ -18,6 +18,8 @@ export interface BookingCodeSelection {
   matchStatus: string;  // "Not start", "Ended", "Cancelled"
   isWinning: number | null; // 1=won, 0=lost, null=pending
   score: string | null; // "2:1"
+  matchDate: string | null; // "YYYY-MM-DD" local date of the match
+  estimateStartTime: number | null; // epoch ms from Sportybet API
   // Raw Sportybet IDs for creating new codes
   eventId: string;
   marketId: string;
@@ -54,6 +56,12 @@ const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml',
 };
+
+/** Return today's date as YYYY-MM-DD in local timezone (not UTC). */
+function todayLocal(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
 
 /**
  * Validate Sportybet booking code format.
@@ -131,7 +139,7 @@ async function scrapeSportPremi(): Promise<BookingCode[]> {
         events: eventsMatch ? parseInt(eventsMatch[1]!) : null,
         totalOdds: oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null,
         market: null,
-        date: new Date().toISOString().split('T')[0]!,
+        date: todayLocal(),
         status: 'pending',
         postedAgo: null,
         validated: false, isValid: false, selections: [],
@@ -150,7 +158,7 @@ async function scrapeSportPremi(): Promise<BookingCode[]> {
             source: 'SportPremi',
             sourceUrl: 'https://sportpremi.com/bet-codes/sportybet/',
             events: null, totalOdds: null, market: null,
-            date: new Date().toISOString().split('T')[0]!,
+            date: todayLocal(),
             status: 'pending', postedAgo: null,
             validated: false, isValid: false, selections: [],
             wonCount: 0, lostCount: 0, pendingCount: 0,
@@ -207,7 +215,7 @@ async function scrapePaqBet(): Promise<BookingCode[]> {
           events: eventsMatch ? parseInt(eventsMatch[1]!) : null,
           totalOdds: oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null,
           market: marketMatch ? marketMatch[0] : null,
-          date: timeMatch ? timeMatch[0] : new Date().toISOString().split('T')[0]!,
+          date: timeMatch ? timeMatch[0] : todayLocal(),
           status: wonMatch ? 'won' : lostMatch ? 'lost' : 'pending',
           postedAgo: null,
           validated: false, isValid: false, selections: [],
@@ -286,7 +294,7 @@ async function scrapeConvertBetCodes(): Promise<BookingCode[]> {
         events: eventsMatch ? parseInt(eventsMatch[1]!) : null,
         totalOdds: oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null,
         market: null,
-        date: new Date().toISOString().split('T')[0]!,
+        date: todayLocal(),
         status: 'pending',
         postedAgo: agoMatch ? agoMatch[0] : null,
         validated: false, isValid: false, selections: [],
@@ -336,6 +344,7 @@ async function validateCode(code: string): Promise<{
           awayTeamName: string;
           setScore?: string;
           matchStatus: string;
+          estimateStartTime?: number;
           sport: { id: string; category: { name: string; tournament: { name: string } } };
           markets: Array<{
             id: string;
@@ -372,6 +381,13 @@ async function validateCode(code: string): Promise<{
         ts => ts.eventId === outcome.eventId && ts.marketId === market.id,
       );
 
+      // Derive local YYYY-MM-DD from estimateStartTime (epoch ms)
+      let matchDate: string | null = null;
+      if (outcome.estimateStartTime) {
+        const d = new Date(outcome.estimateStartTime);
+        matchDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      }
+
       selections.push({
         homeTeam: outcome.homeTeamName,
         awayTeam: outcome.awayTeamName,
@@ -380,6 +396,8 @@ async function validateCode(code: string): Promise<{
         pick: sel.desc,
         odds,
         matchStatus: outcome.matchStatus || 'Unknown',
+        matchDate,
+        estimateStartTime: outcome.estimateStartTime ?? null,
         eventId: outcome.eventId,
         marketId: market.id,
         outcomeId: sel.id,
