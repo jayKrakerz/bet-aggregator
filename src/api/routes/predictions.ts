@@ -1,642 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { sql } from '../../db/pool.js';
-import { type MatchPick, type ScoredMatch, scoreMatch, groupByMatch } from '../scoring.js';
-import { getAccuracyStats, getAccuracyHistory, getSourceAccuracy } from '../../db/queries.js';
-import { getCached, setCached, computeETag } from '../cache.js';
-import { generateHandicapPredictions } from '../handicap-engine.js';
-import { runFullBacktest } from '../backtest-handicap.js';
 import { getAllBookingCodes } from '../booking-codes-scraper.js';
-import { scrapeAllPlatformCodes } from '../all-codes-scraper.js';
 
 export const predictionsRoutes: FastifyPluginAsync = async (app) => {
-  // GET /predictions/stats — aggregate stats for dashboard
-  app.get('/stats', async () => {
-    const [stats] = await sql<
-      {
-        total_predictions: number;
-        active_sources: number;
-        total_matches: number;
-        pick_types: number;
-      }[]
-    >`
-      SELECT
-        count(*)::int as total_predictions,
-        count(DISTINCT p.source_id)::int as active_sources,
-        count(DISTINCT p.match_id)::int as total_matches,
-        count(DISTINCT p.pick_type)::int as pick_types
-      FROM predictions p
-    `;
-    const bySport = await sql`
-      SELECT sport, count(*)::int as count FROM predictions GROUP BY sport ORDER BY count DESC
-    `;
-    const bySource = await sql`
-      SELECT s.name, s.slug, count(*)::int as count
-      FROM predictions p JOIN sources s ON s.id = p.source_id
-      GROUP BY s.name, s.slug ORDER BY count DESC
-    `;
-    const byPickType = await sql`
-      SELECT pick_type, count(*)::int as count
-      FROM predictions GROUP BY pick_type ORDER BY count DESC
-    `;
-    return { ...stats, bySport, bySource, byPickType };
-  });
 
-  // GET /predictions/matches — matches with prediction counts for card UI
-  app.get('/matches', async (request) => {
-    const { sport, date, source } = request.query as {
-      sport?: string;
-      date?: string;
-      source?: string;
-    };
-
-    const matches = await sql`
-      SELECT
-        m.id,
-        m.sport,
-        m.game_date,
-        m.game_time,
-        ht.name as home_team,
-        ht.abbreviation as home_abbr,
-        att.name as away_team,
-        att.abbreviation as away_abbr,
-        count(p.id)::int as prediction_count,
-        array_agg(DISTINCT s.slug) as sources,
-        array_agg(DISTINCT p.pick_type) as pick_types,
-        (SELECT coalesce(json_agg(json_build_object(
-          'pick_type', sub.pick_type,
-          'side', sub.side,
-          'count', sub.cnt,
-          'best_confidence', sub.best_confidence,
-          'avg_value', sub.avg_value
-        )), '[]'::json) FROM (
-          SELECT
-            p2.pick_type,
-            p2.side,
-            count(*)::int as cnt,
-            CASE max(CASE p2.confidence
-              WHEN 'best_bet' THEN 4 WHEN 'high' THEN 3
-              WHEN 'medium' THEN 2 WHEN 'low' THEN 1 ELSE 0 END)
-              WHEN 4 THEN 'best_bet' WHEN 3 THEN 'high'
-              WHEN 2 THEN 'medium' WHEN 1 THEN 'low' ELSE null END
-              as best_confidence,
-            round(avg(p2.value)::numeric, 1) as avg_value
-          FROM predictions p2
-          WHERE p2.match_id = m.id
-          GROUP BY p2.pick_type, p2.side
-        ) sub) as tips
-      FROM matches m
-      JOIN teams ht ON ht.id = m.home_team_id
-      JOIN teams att ON att.id = m.away_team_id
-      LEFT JOIN predictions p ON p.match_id = m.id
-      LEFT JOIN sources s ON s.id = p.source_id
-      WHERE 1=1
-        ${sport ? sql`AND m.sport = ${sport}` : sql``}
-        ${date ? sql`AND m.game_date = ${date}` : sql`AND m.game_date >= CURRENT_DATE`}
-        ${source ? sql`AND s.slug = ${source}` : sql``}
-      GROUP BY m.id, m.sport, m.game_date, m.game_time,
-               ht.name, ht.abbreviation, att.name, att.abbreviation
-      HAVING count(p.id) > 0
-      ORDER BY m.game_date ASC, m.game_time ASC NULLS LAST
-      LIMIT 200
-    `;
-
-    return { data: matches, count: matches.length };
-  });
-
-  // Shared SQL query for fetching all upcoming predictions (with team IDs for scoring)
-  async function fetchUpcomingPicks(sportFilter?: string, dateFilter?: string) {
-    return sql<MatchPick[]>`
-      SELECT
-        m.id as match_id,
-        to_char(m.game_date, 'YYYY-MM-DD') as game_date,
-        m.game_time,
-        m.sport,
-        ht.name as home_team,
-        att.name as away_team,
-        m.home_team_id,
-        m.away_team_id,
-        p.pick_type,
-        p.side,
-        p.value,
-        s.name as source_name,
-        p.picker_name,
-        p.confidence,
-        p.reasoning
-      FROM predictions p
-      JOIN matches m ON m.id = p.match_id
-      JOIN teams ht ON ht.id = m.home_team_id
-      JOIN teams att ON att.id = m.away_team_id
-      JOIN sources s ON s.id = p.source_id
-      WHERE 1=1
-        ${dateFilter ? sql`AND m.game_date = ${dateFilter}` : sql`AND m.game_date >= CURRENT_DATE`}
-        ${sportFilter ? sql`AND m.sport = ${sportFilter}` : sql``}
-      ORDER BY m.game_date, m.id
-    `;
-  }
-
-  // Score all matches (async), optionally filtering by minimum threshold
-  async function scoreAllMatches(picks: MatchPick[], minScore: number): Promise<ScoredMatch[]> {
-    const matchMap = groupByMatch(picks);
-    const entries = [...matchMap.entries()];
-
-    // Process in batches of 10 for concurrency control
-    const scored: ScoredMatch[] = [];
-    for (let i = 0; i < entries.length; i += 10) {
-      const batch = entries.slice(i, i + 10);
-      const results = await Promise.all(
-        batch.map(([matchId, { info, picks: matchPicks }]) =>
-          scoreMatch(matchId, info, matchPicks),
-        ),
-      );
-      for (const result of results) {
-        if (result && result.score >= minScore) scored.push(result);
-      }
-    }
-
-    scored.sort((a, b) => b.score - a.score);
-    return scored;
-  }
-
-  // GET /predictions/top-picks — flat top-N picks sorted by score
-  app.get('/top-picks', async (request, reply) => {
-    const { sport, date, limit: limitStr } = request.query as {
-      sport?: string;
-      date?: string;
-      limit?: string;
-    };
-
-    const limit = Math.min(Math.max(parseInt(limitStr || '5', 10) || 5, 1), 10);
-    const cacheKey = [sport || 'all', date || 'upcoming', 'top-picks', String(limit)];
-
-    const cached = await getCached<ReturnType<typeof formatTopPicks>>(cacheKey);
-    if (cached) {
-      const etag = computeETag(cached);
-      if (request.headers['if-none-match'] === etag) {
-        return reply.status(304).send();
-      }
-      void reply.header('Cache-Control', 'public, max-age=300');
-      void reply.header('ETag', etag);
-      return cached;
-    }
-
-    const picks = await fetchUpcomingPicks(sport, date);
-    const scored = await scoreAllMatches(picks, 30);
-    const topPicks = scored.slice(0, limit);
-    const result = formatTopPicks(topPicks);
-
-    await setCached(cacheKey, result);
-    const etag = computeETag(result);
-    void reply.header('Cache-Control', 'public, max-age=300');
-    void reply.header('ETag', etag);
-    return result;
-  });
-
-  function formatTopPicks(topPicks: ScoredMatch[]) {
-    return {
-      data: topPicks.map((s, i) => ({
-        rank: i + 1,
-        score: s.score,
-        match: `${s.homeTeam} vs ${s.awayTeam}`,
-        sport: s.sport,
-        date: s.date,
-        pick: s.recommendation,
-        analysis: s.analysis,
-        value: {
-          estimatedProb: s.estimatedProb,
-          marketImpliedProb: s.impliedProb,
-          edge: s.edge,
-          expectedValue: s.expectedValue,
-          bestOdds: s.bestOdds,
-        },
-        breakdown: {
-          confidence: s.confidenceScore,
-          margin: s.marginScore,
-          sourceAgreement: s.sourceAgreement,
-          sourceAccuracy: s.sourceAccuracy,
-          value: s.valueScore,
-          alignment: s.alignmentScore,
-          form: s.formScore,
-          h2h: s.h2hScore,
-          homeAdvantage: s.homeAdvantage,
-        },
-      })),
-      generatedAt: new Date().toISOString(),
-    };
-  }
-
-  // GET /predictions/value-bets — picks with positive expected value
-  app.get('/value-bets', async (request, reply) => {
-    const { sport, date, limit: limitStr } = request.query as {
-      sport?: string;
-      date?: string;
-      limit?: string;
-    };
-
-    const limit = Math.min(Math.max(parseInt(limitStr || '10', 10) || 10, 1), 25);
-    const cacheKey = [sport || 'all', date || 'upcoming', 'value-bets', String(limit)];
-
-    const cached = await getCached<{ data: unknown }>(cacheKey);
-    if (cached) {
-      const etag = computeETag(cached);
-      if (request.headers['if-none-match'] === etag) {
-        return reply.status(304).send();
-      }
-      void reply.header('Cache-Control', 'public, max-age=300');
-      void reply.header('ETag', etag);
-      return cached;
-    }
-
-    const picks = await fetchUpcomingPicks(sport, date);
-    const scored = await scoreAllMatches(picks, 0);
-
-    // Filter to only positive EV picks that have odds data
-    const valueBets = scored
-      .filter((s) => s.expectedValue !== null && s.expectedValue > 0)
-      .sort((a, b) => (b.expectedValue ?? 0) - (a.expectedValue ?? 0))
-      .slice(0, limit);
-
-    const result = {
-      data: valueBets.map((s, i) => ({
-        rank: i + 1,
-        match: `${s.homeTeam} vs ${s.awayTeam}`,
-        sport: s.sport,
-        date: s.date,
-        gameTime: s.gameTime,
-        pick: s.recommendation,
-        pickType: s.pickType,
-        estimatedProb: s.estimatedProb,
-        marketImpliedProb: s.impliedProb,
-        edge: s.edge,
-        expectedValue: s.expectedValue,
-        bestOdds: s.bestOdds,
-        score: s.score,
-        analysis: s.analysis,
-        sources: s.sources,
-      })),
-      generatedAt: new Date().toISOString(),
-    };
-
-    await setCached(cacheKey, result);
-    const etag = computeETag(result);
-    void reply.header('Cache-Control', 'public, max-age=300');
-    void reply.header('ETag', etag);
-    return result;
-  });
-
-  // GET /predictions/best-multis — intelligent best picks with scoring engine
-  app.get('/best-multis', async (request, reply) => {
-    const { sport, date } = request.query as { sport?: string; date?: string };
-    const cacheKey = [sport || 'all', date || 'upcoming', 'best-multis'];
-
-    const cached = await getCached<{ data: unknown }>(cacheKey);
-    if (cached) {
-      const etag = computeETag(cached);
-      if (request.headers['if-none-match'] === etag) {
-        return reply.status(304).send();
-      }
-      void reply.header('Cache-Control', 'public, max-age=300');
-      void reply.header('ETag', etag);
-      return cached;
-    }
-
-    const picks = await fetchUpcomingPicks(sport, date);
-    const scored = await scoreAllMatches(picks, 50);
-
-    const byDate: Record<string, ScoredMatch[]> = {};
-    for (const s of scored) {
-      if (!byDate[s.date]) byDate[s.date] = [];
-      byDate[s.date]!.push(s);
-    }
-
-    const result = {
-      data: Object.entries(byDate)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, dayPicks]) => ({
-          date,
-          picks: dayPicks.sort((a, b) => (a.gameTime ?? '').localeCompare(b.gameTime ?? '')),
-        })),
-    };
-
-    await setCached(cacheKey, result);
-    const etag = computeETag(result);
-    void reply.header('Cache-Control', 'public, max-age=300');
-    void reply.header('ETag', etag);
-    return result;
-  });
-
-  // GET /predictions/over-under — over/under predictions grouped by match
-  app.get('/over-under', async (request, reply) => {
-    const { sport, date } = request.query as { sport?: string; date?: string };
-    const cacheKey = [sport || 'all', date || 'upcoming', 'over-under'];
-
-    const cached = await getCached<{ data: unknown }>(cacheKey);
-    if (cached) {
-      const etag = computeETag(cached);
-      if (request.headers['if-none-match'] === etag) {
-        return reply.status(304).send();
-      }
-      void reply.header('Cache-Control', 'public, max-age=300');
-      void reply.header('ETag', etag);
-      return cached;
-    }
-
-    const rows = await sql<{
-      match_id: number;
-      game_date: string;
-      game_time: string | null;
-      sport: string;
-      home_team: string;
-      away_team: string;
-      side: string;
-      value: number | null;
-      source_name: string;
-      confidence: string | null;
-    }[]>`
-      SELECT
-        m.id as match_id,
-        to_char(m.game_date, 'YYYY-MM-DD') as game_date,
-        m.game_time,
-        m.sport,
-        ht.name as home_team,
-        att.name as away_team,
-        p.side,
-        p.value,
-        s.name as source_name,
-        p.confidence
-      FROM predictions p
-      JOIN matches m ON m.id = p.match_id
-      JOIN teams ht ON ht.id = m.home_team_id
-      JOIN teams att ON att.id = m.away_team_id
-      JOIN sources s ON s.id = p.source_id
-      WHERE p.pick_type = 'over_under'
-        ${date ? sql`AND m.game_date = ${date}` : sql`AND m.game_date >= CURRENT_DATE`}
-        ${sport ? sql`AND m.sport = ${sport}` : sql``}
-      ORDER BY m.game_date, m.id
-    `;
-
-    // Group by match
-    const matchMap = new Map<number, {
-      matchId: number;
-      date: string;
-      gameTime: string | null;
-      sport: string;
-      homeTeam: string;
-      awayTeam: string;
-      predictions: { side: string; value: number | null; source: string; confidence: string | null }[];
-    }>();
-
-    for (const r of rows) {
-      if (!matchMap.has(r.match_id)) {
-        matchMap.set(r.match_id, {
-          matchId: r.match_id,
-          date: r.game_date.toString().includes('T') ? r.game_date.toString().split('T')[0]! : r.game_date.toString(),
-          gameTime: r.game_time,
-          sport: r.sport,
-          homeTeam: r.home_team,
-          awayTeam: r.away_team,
-          predictions: [],
-        });
-      }
-      matchMap.get(r.match_id)!.predictions.push({
-        side: r.side,
-        value: r.value,
-        source: r.source_name,
-        confidence: r.confidence,
-      });
-    }
-
-    // Build response with consensus
-    const data = [...matchMap.values()].map((m) => {
-      const overPreds = m.predictions.filter((p) => p.side === 'over');
-      const underPreds = m.predictions.filter((p) => p.side === 'under');
-      const total = overPreds.length + underPreds.length;
-      const consensus = overPreds.length > underPreds.length ? 'over'
-        : underPreds.length > overPreds.length ? 'under'
-        : 'split';
-      const consensusCount = consensus === 'over' ? overPreds.length
-        : consensus === 'under' ? underPreds.length
-        : Math.max(overPreds.length, underPreds.length);
-
-      // Most common line value
-      const allValues = m.predictions.filter((p) => p.value != null).map((p) => p.value!);
-      const valueCounts = new Map<number, number>();
-      for (const v of allValues) {
-        valueCounts.set(v, (valueCounts.get(v) || 0) + 1);
-      }
-      let line: number | null = null;
-      let maxCount = 0;
-      for (const [v, c] of valueCounts) {
-        if (c > maxCount) { line = v; maxCount = c; }
-      }
-
-      return {
-        matchId: m.matchId,
-        match: `${m.homeTeam} vs ${m.awayTeam}`,
-        date: m.date,
-        gameTime: m.gameTime,
-        sport: m.sport,
-        consensus,
-        consensusCount,
-        total,
-        overCount: overPreds.length,
-        underCount: underPreds.length,
-        line,
-        sources: m.predictions.map((p) => ({
-          source: p.source,
-          side: p.side,
-          value: p.value,
-          confidence: p.confidence,
-        })),
-      };
-    });
-
-    // Sort: consensus picks first (non-split), then by source count
-    data.sort((a, b) => {
-      if (a.consensus === 'split' && b.consensus !== 'split') return 1;
-      if (a.consensus !== 'split' && b.consensus === 'split') return -1;
-      return b.total - a.total;
-    });
-
-    const result = { data, generatedAt: new Date().toISOString() };
-    await setCached(cacheKey, result);
-    const etag = computeETag(result);
-    void reply.header('Cache-Control', 'public, max-age=300');
-    void reply.header('ETag', etag);
-    return result;
-  });
-
-  // GET /predictions/handicap — spread/handicap predictions grouped by match
-  app.get('/handicap', async (request, reply) => {
-    const { sport, date } = request.query as { sport?: string; date?: string };
-    const cacheKey = [sport || 'all', date || 'upcoming', 'handicap'];
-
-    const cached = await getCached<{ data: unknown }>(cacheKey);
-    if (cached) {
-      const etag = computeETag(cached);
-      if (request.headers['if-none-match'] === etag) {
-        return reply.status(304).send();
-      }
-      void reply.header('Cache-Control', 'public, max-age=300');
-      void reply.header('ETag', etag);
-      return cached;
-    }
-
-    const rows = await sql<{
-      match_id: number;
-      game_date: string;
-      game_time: string | null;
-      sport: string;
-      home_team: string;
-      away_team: string;
-      side: string;
-      value: number | null;
-      source_name: string;
-      confidence: string | null;
-    }[]>`
-      SELECT
-        m.id as match_id,
-        to_char(m.game_date, 'YYYY-MM-DD') as game_date,
-        m.game_time,
-        m.sport,
-        ht.name as home_team,
-        att.name as away_team,
-        p.side,
-        p.value,
-        s.name as source_name,
-        p.confidence
-      FROM predictions p
-      JOIN matches m ON m.id = p.match_id
-      JOIN teams ht ON ht.id = m.home_team_id
-      JOIN teams att ON att.id = m.away_team_id
-      JOIN sources s ON s.id = p.source_id
-      WHERE p.pick_type = 'spread'
-        ${date ? sql`AND m.game_date = ${date}` : sql`AND m.game_date >= CURRENT_DATE`}
-        ${sport ? sql`AND m.sport = ${sport}` : sql``}
-      ORDER BY m.game_date, m.id
-    `;
-
-    // Group by match
-    const matchMap = new Map<number, {
-      matchId: number;
-      date: string;
-      gameTime: string | null;
-      sport: string;
-      homeTeam: string;
-      awayTeam: string;
-      predictions: { side: string; value: number | null; source: string; confidence: string | null }[];
-    }>();
-
-    for (const r of rows) {
-      if (!matchMap.has(r.match_id)) {
-        matchMap.set(r.match_id, {
-          matchId: r.match_id,
-          date: r.game_date.toString().includes('T') ? r.game_date.toString().split('T')[0]! : r.game_date.toString(),
-          gameTime: r.game_time,
-          sport: r.sport,
-          homeTeam: r.home_team,
-          awayTeam: r.away_team,
-          predictions: [],
-        });
-      }
-      matchMap.get(r.match_id)!.predictions.push({
-        side: r.side,
-        value: r.value,
-        source: r.source_name,
-        confidence: r.confidence,
-      });
-    }
-
-    // Build response with consensus (home vs away spread picks)
-    const data = [...matchMap.values()].map((m) => {
-      const homePreds = m.predictions.filter((p) => p.side === 'home');
-      const awayPreds = m.predictions.filter((p) => p.side === 'away');
-      const total = homePreds.length + awayPreds.length;
-      const consensus = homePreds.length > awayPreds.length ? 'home'
-        : awayPreds.length > homePreds.length ? 'away'
-        : 'split';
-      const consensusCount = consensus === 'home' ? homePreds.length
-        : consensus === 'away' ? awayPreds.length
-        : Math.max(homePreds.length, awayPreds.length);
-
-      // Most common spread value
-      const allValues = m.predictions.filter((p) => p.value != null).map((p) => p.value!);
-      const valueCounts = new Map<number, number>();
-      for (const v of allValues) {
-        valueCounts.set(v, (valueCounts.get(v) || 0) + 1);
-      }
-      let spread: number | null = null;
-      let maxCount = 0;
-      for (const [v, c] of valueCounts) {
-        if (c > maxCount) { spread = v; maxCount = c; }
-      }
-
-      return {
-        matchId: m.matchId,
-        match: `${m.homeTeam} vs ${m.awayTeam}`,
-        homeTeam: m.homeTeam,
-        awayTeam: m.awayTeam,
-        date: m.date,
-        gameTime: m.gameTime,
-        sport: m.sport,
-        consensus,
-        consensusCount,
-        total,
-        homeCount: homePreds.length,
-        awayCount: awayPreds.length,
-        spread,
-        sources: m.predictions.map((p) => ({
-          source: p.source,
-          side: p.side,
-          value: p.value,
-          confidence: p.confidence,
-        })),
-      };
-    });
-
-    // Sort: consensus picks first (non-split), then by source count
-    data.sort((a, b) => {
-      if (a.consensus === 'split' && b.consensus !== 'split') return 1;
-      if (a.consensus !== 'split' && b.consensus === 'split') return -1;
-      return b.total - a.total;
-    });
-
-    const result = { data, generatedAt: new Date().toISOString() };
-    await setCached(cacheKey, result);
-    const etag = computeETag(result);
-    void reply.header('Cache-Control', 'public, max-age=300');
-    void reply.header('ETag', etag);
-    return result;
-  });
-
-  // GET /predictions/handicap-ai — 1st Half Handicap predictions (soccer only)
-  // Uses Poisson model + team form + H2H + adapter consensus + web data
-  app.get('/handicap-ai', async (request, reply) => {
-    const { date } = request.query as { date?: string };
-    const cacheKey = ['football', date || 'upcoming', 'handicap-ai'];
-
-    const cached = await getCached<{ data: unknown }>(cacheKey);
-    if (cached) {
-      const etag = computeETag(cached);
-      if (request.headers['if-none-match'] === etag) {
-        return reply.status(304).send();
-      }
-      void reply.header('Cache-Control', 'public, max-age=300');
-      void reply.header('ETag', etag);
-      return cached;
-    }
-
-    const predictions = await generateHandicapPredictions(date);
-
-    const result = { data: predictions, generatedAt: new Date().toISOString() };
-
-    await setCached(cacheKey, result);
-    const etag = computeETag(result);
-    void reply.header('Cache-Control', 'public, max-age=300');
-    void reply.header('ETag', etag);
-    return result;
-  });
-
-  // GET /predictions/track-codes?codes=ABC123,DEF456 — bulk fetch live status for tracked codes
+  // GET /predictions/track-codes?codes=ABC123,DEF456 — bulk live status
   app.get('/track-codes', async (request, reply) => {
     const { codes: codesParam } = request.query as { codes?: string };
     if (!codesParam) return reply.status(400).send({ error: 'No codes provided' });
@@ -649,30 +16,22 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         signal: AbortSignal.timeout(8000),
       });
-      if (!res.ok) return { code, valid: false, selections: [], wonCount: 0, lostCount: 0, pendingCount: 0, totalOdds: 0, isDead: false, cashoutAdvice: 'Code not found' };
+      if (!res.ok) return { code, valid: false, selections: [] as unknown[], wonCount: 0, lostCount: 0, pendingCount: 0, totalOdds: 0, isDead: false, cashoutAdvice: 'Code not found' };
 
       const data = await res.json() as {
         bizCode: number;
-        isAvailable: boolean;
         data?: {
           outcomes?: Array<{
-            eventId: string;
-            homeTeamName: string;
-            awayTeamName: string;
-            setScore?: string;
-            matchStatus: string;
+            eventId: string; homeTeamName: string; awayTeamName: string;
+            setScore?: string; matchStatus: string;
             sport: { id: string; category: { name: string; tournament: { name: string } } };
-            markets: Array<{
-              id: string;
-              desc: string;
-              outcomes: Array<{ id: string; odds: string; desc: string; isWinning?: number }>;
-            }>;
+            markets: Array<{ id: string; desc: string; outcomes: Array<{ id: string; odds: string; desc: string; isWinning?: number }> }>;
           }>;
         };
       };
 
       if (data.bizCode !== 10000 || !data.data?.outcomes) {
-        return { code, valid: false, selections: [], wonCount: 0, lostCount: 0, pendingCount: 0, totalOdds: 0, isDead: false, cashoutAdvice: 'Code not recognized' };
+        return { code, valid: false, selections: [] as unknown[], wonCount: 0, lostCount: 0, pendingCount: 0, totalOdds: 0, isDead: false, cashoutAdvice: 'Code not recognized' };
       }
 
       const selections = [];
@@ -684,15 +43,11 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         const odds = parseFloat(sel.odds) || 1;
         totalOdds *= odds;
         selections.push({
-          homeTeam: o.homeTeamName,
-          awayTeam: o.awayTeamName,
+          homeTeam: o.homeTeamName, awayTeam: o.awayTeamName,
           league: `${o.sport.category.name} - ${o.sport.category.tournament.name}`,
-          market: mkt.desc,
-          pick: sel.desc,
-          odds,
+          market: mkt.desc, pick: sel.desc, odds,
           matchStatus: o.matchStatus || 'Unknown',
-          isWinning: sel.isWinning ?? null,
-          score: o.setScore || null,
+          isWinning: sel.isWinning ?? null, score: o.setScore || null,
         });
       }
 
@@ -705,89 +60,41 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       let cashoutAdvice: string;
       if (isDead) cashoutAdvice = `Dead — ${lostCount} game${lostCount > 1 ? 's' : ''} lost`;
       else if (pendingCount === 0 && wonCount > 0) cashoutAdvice = 'All games won! Collect winnings';
-      else if (wonCount > 0 && wonCount / total >= 0.7 && pendingCount <= 2) cashoutAdvice = `Consider cashout — ${wonCount}/${total} won, ${pendingCount} risky game${pendingCount > 1 ? 's' : ''} left`;
+      else if (wonCount > 0 && wonCount / total >= 0.7 && pendingCount <= 2) cashoutAdvice = `Consider cashout — ${wonCount}/${total} won, ${pendingCount} left`;
       else if (pendingCount === total) cashoutAdvice = 'All games pending';
       else cashoutAdvice = `${wonCount} won, ${pendingCount} pending`;
 
-      return {
-        code,
-        valid: true,
-        selections,
-        wonCount,
-        lostCount,
-        pendingCount,
-        totalOdds: Math.round(totalOdds * 100) / 100,
-        isDead,
-        cashoutAdvice,
-      };
+      return { code, valid: true, selections, wonCount, lostCount, pendingCount, totalOdds: Math.round(totalOdds * 100) / 100, isDead, cashoutAdvice };
     }));
 
-    const tracked = results.map(r => r.status === 'fulfilled' ? r.value : { code: '?', valid: false, selections: [], wonCount: 0, lostCount: 0, pendingCount: 0, totalOdds: 0, isDead: false, cashoutAdvice: 'Error' });
-    return { data: tracked };
+    return { data: results.map(r => r.status === 'fulfilled' ? r.value : { code: '?', valid: false, selections: [], wonCount: 0, lostCount: 0, pendingCount: 0, totalOdds: 0, isDead: false, cashoutAdvice: 'Error' }) };
   });
 
-  // GET /predictions/booking-codes — scraped Sportybet booking codes
+  // GET /predictions/booking-codes — all scraped Sportybet codes
   app.get('/booking-codes', async (_request, reply) => {
     const codes = await getAllBookingCodes();
     void reply.header('Cache-Control', 'public, max-age=900');
     return { data: codes, count: codes.length, generatedAt: new Date().toISOString() };
   });
 
-  // GET /predictions/load-code/:code — proxy to Sportybet API to load a booking code
+  // GET /predictions/load-code/:code — load a single code from Sportybet
   app.get<{ Params: { code: string } }>('/load-code/:code', async (request, reply) => {
     const { code } = request.params;
     if (!code || code.length < 5 || code.length > 8) {
       return reply.status(400).send({ error: 'Invalid code format' });
     }
-
     try {
       const res = await fetch(`https://www.sportybet.com/api/ng/orders/share/${encodeURIComponent(code)}`, {
         headers: { 'User-Agent': 'Mozilla/5.0' },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(8000),
       });
-      const data = await res.json();
-      return data;
+      return await res.json();
     } catch {
       return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
     }
   });
 
-  // GET /predictions/all-codes — codes for ALL betting platforms
-  app.get('/all-codes', async (_request, reply) => {
-    const codes = await scrapeAllPlatformCodes();
-    void reply.header('Cache-Control', 'public, max-age=900');
-    return { data: codes, count: codes.length, platforms: [...new Set(codes.map(c => c.platform))], generatedAt: new Date().toISOString() };
-  });
-
-  // GET /predictions/convert-code/:code — try to convert a code from any platform to Sportybet
-  // Works by: loading the code on Sportybet (many event IDs are universal Betradar IDs)
-  // If Sportybet recognizes the code natively, it returns the data directly
-  app.get<{ Params: { code: string } }>('/convert-code/:code', async (request, reply) => {
-    const { code } = request.params;
-    if (!code || code.length < 4 || code.length > 12) {
-      return reply.status(400).send({ error: 'Invalid code' });
-    }
-
-    try {
-      // First try loading directly on Sportybet (may work for shared Betradar IDs)
-      const sportyRes = await fetch(
-        `https://www.sportybet.com/api/ng/orders/share/${encodeURIComponent(code)}`,
-        { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) },
-      );
-      const sportyData = await sportyRes.json() as { bizCode: number; isAvailable: boolean; data?: Record<string, unknown> };
-
-      if (sportyData.bizCode === 10000 && sportyData.isAvailable) {
-        return { converted: true, platform: 'sportybet', sportyCode: code, data: sportyData };
-      }
-
-      // Code not directly loadable on Sportybet — return not found
-      return { converted: false, error: 'Code not recognized on Sportybet. Try using convertbetcodes.com to convert manually.' };
-    } catch {
-      return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
-    }
-  });
-
-  // POST /predictions/create-code — create a new Sportybet booking code from selected games
+  // POST /predictions/create-code — create a Sportybet booking code
   app.post('/create-code', async (request, reply) => {
     const body = request.body as { selections?: Array<{ eventId: string; marketId: string; outcomeId: string; specifier?: string; sportId: string }> };
     if (!body?.selections?.length) {
@@ -796,7 +103,6 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     if (body.selections.length > 50) {
       return reply.status(400).send({ error: 'Too many selections (max 50)' });
     }
-
     try {
       const res = await fetch('https://www.sportybet.com/api/ng/orders/share', {
         method: 'POST',
@@ -804,155 +110,9 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         body: JSON.stringify({ selections: body.selections }),
         signal: AbortSignal.timeout(10000),
       });
-      const data = await res.json();
-      return data;
+      return await res.json();
     } catch {
       return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
     }
-  });
-
-  // GET /predictions/handicap-backtest — run backtest on 2025-26 season data
-  app.get('/handicap-backtest', async (_request, reply) => {
-    void reply.header('Content-Type', 'text/plain');
-    const report = await runFullBacktest();
-    return report;
-  });
-
-  // GET /predictions/accuracy — win/loss stats by sport/pickType
-  app.get('/accuracy', async (request) => {
-    const { sport, pickType } = request.query as { sport?: string; pickType?: string };
-    const stats = await getAccuracyStats({ sport, pickType });
-
-    // Summarize into { sport, pickType, wins, losses, pushes, voids, winRate }
-    const grouped: Record<string, { wins: number; losses: number; pushes: number; voids: number }> = {};
-    for (const row of stats) {
-      const key = `${row.sport}:${row.pick_type}`;
-      if (!grouped[key]) grouped[key] = { wins: 0, losses: 0, pushes: 0, voids: 0 };
-      const g = grouped[key]!;
-      if (row.grade === 'win') g.wins = row.count;
-      else if (row.grade === 'loss') g.losses = row.count;
-      else if (row.grade === 'push') g.pushes = row.count;
-      else if (row.grade === 'void') g.voids = row.count;
-    }
-
-    const data = Object.entries(grouped).map(([key, g]) => {
-      const [s, pt] = key.split(':');
-      const decided = g.wins + g.losses;
-      return {
-        sport: s,
-        pickType: pt,
-        ...g,
-        winRate: decided > 0 ? Math.round((g.wins / decided) * 1000) / 10 : null,
-      };
-    });
-
-    return { data };
-  });
-
-  // GET /predictions/accuracy/sources — per-source accuracy leaderboard
-  app.get('/accuracy/sources', async (request) => {
-    const { sport } = request.query as { sport?: string };
-    const rows = await getSourceAccuracy();
-
-    const data = rows
-      .filter((r) => !sport || r.sport === sport)
-      .map((r) => ({
-        source: r.name,
-        slug: r.slug,
-        sport: r.sport,
-        wins: r.wins,
-        losses: r.losses,
-        decided: r.decided,
-        winRate: r.decided > 0 ? Math.round((r.wins / r.decided) * 1000) / 10 : 0,
-      }))
-      .sort((a, b) => b.winRate - a.winRate || b.decided - a.decided);
-
-    return { data };
-  });
-
-  // GET /predictions/accuracy/history?days=30
-  app.get('/accuracy/history', async (request) => {
-    const { days: daysStr } = request.query as { days?: string };
-    const days = Math.min(Math.max(parseInt(daysStr || '30', 10) || 30, 1), 365);
-    const data = await getAccuracyHistory(days);
-    return { data };
-  });
-
-  // GET /predictions?sport=nba&date=2026-02-16&source=covers-com
-  app.get('/', async (request) => {
-    const { sport, date, source } = request.query as {
-      sport?: string;
-      date?: string;
-      source?: string;
-    };
-
-    const predictions = await sql`
-      SELECT
-        p.id,
-        p.sport,
-        p.pick_type,
-        p.side,
-        p.value,
-        p.picker_name,
-        p.confidence,
-        p.reasoning,
-        p.fetched_at,
-        p.created_at,
-        s.name as source_name,
-        s.slug as source_slug,
-        s.base_url as source_url,
-        ht.name as home_team_name,
-        ht.abbreviation as home_team_abbr,
-        att.name as away_team_name,
-        att.abbreviation as away_team_abbr,
-        m.game_date,
-        m.game_time,
-        m.id as match_id
-      FROM predictions p
-      JOIN sources s ON s.id = p.source_id
-      JOIN teams ht ON ht.id = p.home_team_id
-      JOIN teams att ON att.id = p.away_team_id
-      JOIN matches m ON m.id = p.match_id
-      WHERE 1=1
-        ${sport ? sql`AND p.sport = ${sport}` : sql``}
-        ${date ? sql`AND m.game_date = ${date}` : sql``}
-        ${source ? sql`AND s.slug = ${source}` : sql``}
-      ORDER BY m.game_date DESC, p.created_at DESC
-      LIMIT 500
-    `;
-
-    return { data: predictions, count: predictions.length };
-  });
-
-  // GET /predictions/:matchId
-  app.get<{ Params: { matchId: string } }>('/:matchId', async (request, reply) => {
-    const { matchId } = request.params;
-
-    const predictions = await sql`
-      SELECT
-        p.id,
-        p.sport,
-        p.pick_type,
-        p.side,
-        p.value,
-        p.picker_name,
-        p.confidence,
-        p.reasoning,
-        p.fetched_at,
-        p.created_at,
-        s.name as source_name,
-        s.slug as source_slug,
-        s.base_url as source_url
-      FROM predictions p
-      JOIN sources s ON s.id = p.source_id
-      WHERE p.match_id = ${matchId}
-      ORDER BY p.created_at DESC
-    `;
-
-    if (predictions.length === 0) {
-      return reply.status(404).send({ error: 'No predictions found for this match' });
-    }
-
-    return { data: predictions, count: predictions.length };
   });
 };
