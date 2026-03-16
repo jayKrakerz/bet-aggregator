@@ -15,7 +15,7 @@ async function getApp() {
     void reply.header('Access-Control-Allow-Headers', 'Content-Type');
   });
 
-  app.options('/*', async (_req, reply) => reply.status(204).send());
+  app.options('/*', async (_req: FastifyRequest, reply: FastifyReply) => reply.status(204).send());
 
   app.get('/health', async () => ({
     status: 'healthy',
