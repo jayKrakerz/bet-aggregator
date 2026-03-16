@@ -7,6 +7,7 @@
 
 import * as cheerio from 'cheerio';
 import { logger } from '../utils/logger.js';
+import { scrapeSocialMediaCodes } from './social-codes-scraper.js';
 
 export interface BookingCodeSelection {
   homeTeam: string;
@@ -58,30 +59,34 @@ const HEADERS = {
 };
 
 /** Return today's date as YYYY-MM-DD in local timezone (not UTC). */
-function todayLocal(): string {
+export function todayLocal(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 /**
  * Validate Sportybet booking code format.
- * Real codes: exactly 6 chars, mix of uppercase letters and digits.
- * Examples from real sites: MNVGR8, WTR6D1, G3PB73, U70LRT, Y9B39Q
- * NOT: FFFFFF (hex color), BBB100 (CSS), ADR6400L (too long)
+ * Real codes: exactly 6 chars, uppercase alphanumeric.
+ * Can be all-letters (TXUWQH), all-digits+letters mix (8K68G8), etc.
+ * Examples: MNVGR8, WTR6D1, TXUWQH, 8K68G8, ZBEGPN
  */
-function isValidCode(s: string): boolean {
+export function isValidCode(s: string): boolean {
   // Must be exactly 6 characters (Sportybet standard)
   if (s.length !== 6) return false;
   // Must be uppercase alphanumeric
   if (!/^[A-Z0-9]{6}$/.test(s)) return false;
-  // Must have at least 1 letter AND at least 1 digit
-  if (!/[A-Z]/.test(s) || !/[0-9]/.test(s)) return false;
-  // Must not be a hex color (6 hex chars like FFFFFF, 000000, etc.)
+  // Must have at least 1 letter (pure digit strings are not codes)
+  if (!/[A-Z]/.test(s)) return false;
+  // Must not be all hex-looking with 3+ leading digits (likely CSS color)
   if (/^[0-9A-F]{6}$/.test(s) && /^[0-9]{3,}/.test(s)) return false;
   // Must not be repeating pattern (BBB100, AAA111)
   if (/^(.)\1{2}/.test(s)) return false;
-  // Exclude common tokens
-  const banned = new Set(['HTTPS1', 'CLASS1', 'STYLE1', 'ASYNC1', 'MEDIA1', 'WIDTH1', 'BLOCK1', 'COLOR1', 'INPUT1']);
+  // Exclude common HTML/CSS tokens that happen to be 6 uppercase alphanum chars
+  const banned = new Set([
+    'HTTPS1', 'CLASS1', 'STYLE1', 'ASYNC1', 'MEDIA1', 'WIDTH1',
+    'BLOCK1', 'COLOR1', 'INPUT1', 'EVENTS', 'SCROLL', 'HIDDEN',
+    'INLINE', 'NORMAL', 'CANCEL', 'SUBMIT', 'BUTTON', 'RETURN',
+  ]);
   return !banned.has(s);
 }
 
@@ -118,11 +123,11 @@ async function scrapeSportPremi(): Promise<BookingCode[]> {
       // Find booking code
       let code: string | null = null;
       for (const t of cellTexts) {
-        const m = t.match(/^([A-Z][A-Z0-9]{5})$/);
+        const m = t.match(/^([A-Z0-9]{6})$/);
         if (m && isValidCode(m[1]!)) { code = m[1]!; break; }
       }
       if (!code) {
-        const m = rowText.match(/\b([A-Z][A-Z0-9]{5})\b/);
+        const m = rowText.match(/\b([A-Z0-9]{6})\b/);
         if (m && isValidCode(m[1]!)) code = m[1]!;
       }
       if (!code || codes.some(c => c.code === code)) return;
@@ -151,7 +156,7 @@ async function scrapeSportPremi(): Promise<BookingCode[]> {
     if (codes.length === 0) {
       $('p').each((_, el) => {
         const text = $(el).text().trim();
-        const match = text.match(/^([A-Z][A-Z0-9]{5})$/);
+        const match = text.match(/^([A-Z0-9]{6})$/);
         if (match && isValidCode(match[1]!)) {
           codes.push({
             code: match[1]!,
@@ -255,7 +260,7 @@ async function scrapeConvertBetCodes(): Promise<BookingCode[]> {
       if (!/sportybet/i.test(h4Text)) return;
 
       // Find all potential codes in this h4
-      const codeMatches = h4Text.match(/\b([A-Z][A-Z0-9]{4,7})\b/g) || [];
+      const codeMatches = h4Text.match(/\b([A-Z0-9]{6})\b/g) || [];
 
       // Find the sportybet code specifically — it's in a span near the sportybet badge
       const rightSpan = $(h4).find('.float-right').first().text().trim();
@@ -264,11 +269,11 @@ async function scrapeConvertBetCodes(): Promise<BookingCode[]> {
       // Determine which side has the sportybet code
       let sportyCode: string | null = null;
       if (/sportybet/i.test(rightSpan)) {
-        const m = rightSpan.match(/\b([A-Z][A-Z0-9]{4,7})\b/);
-        if (m) sportyCode = m[1]!;
+        const m = rightSpan.match(/\b([A-Z0-9]{6})\b/);
+        if (m && isValidCode(m[1]!)) sportyCode = m[1]!;
       } else if (/sportybet/i.test(leftSpan)) {
-        const m = leftSpan.match(/\b([A-Z][A-Z0-9]{4,7})\b/);
-        if (m) sportyCode = m[1]!;
+        const m = leftSpan.match(/\b([A-Z0-9]{6})\b/);
+        if (m && isValidCode(m[1]!)) sportyCode = m[1]!;
       }
 
       // Fallback: any valid code in the h4
@@ -307,6 +312,105 @@ async function scrapeConvertBetCodes(): Promise<BookingCode[]> {
     logger.warn({ err }, 'Failed to scrape ConvertBetCodes');
     return [];
   }
+}
+
+// Sportybet country codes that have a working Code Hub API
+const SPORTYBET_COUNTRIES = [
+  { code: 'ng', name: 'Nigeria' },
+  { code: 'gh', name: 'Ghana' },
+  { code: 'ke', name: 'Kenya' },
+  { code: 'zm', name: 'Zambia' },
+  { code: 'tz', name: 'Tanzania' },
+];
+
+type CodeHubEntry = {
+  shareCode: string;
+  foldsAmount: number;
+  totalOdds: number;
+  popularity: number;
+  deadline: number;
+  createTime: number;
+  shareCodeDetail: Array<{
+    eventId: string;
+    homeTeamName: string;
+    awayTeamName: string;
+    startTime: number;
+    marketId: number;
+    marketDescription: string;
+    marketSpecifiers: string;
+    outcomeId: number;
+    outcomeDescription: string;
+    odds: number;
+    sportId: string;
+    tournamentId: string;
+  }>;
+};
+
+/** Fetch codes from a single Sportybet country hub */
+async function fetchCountryCodeHub(country: { code: string; name: string }): Promise<BookingCode[]> {
+  try {
+    const res = await fetch(`https://www.sportybet.com/api/${country.code}/orders/bookingCode/recommendedCode`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+
+    const data = await res.json() as { bizCode: number; data?: CodeHubEntry[] };
+    if (data.bizCode !== 10000 || !data.data) return [];
+
+    return data.data.map(entry => {
+      const selections: BookingCodeSelection[] = entry.shareCodeDetail.map(s => {
+        const startDate = new Date(s.startTime);
+        const matchDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+        return {
+          homeTeam: s.homeTeamName, awayTeam: s.awayTeamName,
+          league: s.tournamentId, market: s.marketDescription,
+          pick: s.outcomeDescription, odds: s.odds,
+          matchStatus: s.startTime > Date.now() ? 'Not start' : 'Live',
+          matchDate, estimateStartTime: s.startTime,
+          eventId: s.eventId, marketId: String(s.marketId),
+          outcomeId: String(s.outcomeId), specifier: s.marketSpecifiers || '',
+          sportId: s.sportId, isWinning: null, score: null,
+        };
+      });
+
+      return {
+        code: entry.shareCode,
+        source: `Sportybet ${country.name}`,
+        sourceUrl: `https://www.sportybet.com/${country.code}/m/code-hub/codes`,
+        events: entry.foldsAmount,
+        totalOdds: Math.round(entry.totalOdds * 100) / 100,
+        market: null, date: todayLocal(), status: 'pending', postedAgo: null,
+        validated: true, isValid: true, selections,
+        wonCount: 0, lostCount: 0,
+        pendingCount: selections.filter(s => s.isWinning === null).length,
+      } satisfies BookingCode;
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Scrape Sportybet Code Hub — all countries in parallel (100 codes total) */
+async function scrapeSportyBetCodeHub(): Promise<BookingCode[]> {
+  const results = await Promise.allSettled(
+    SPORTYBET_COUNTRIES.map(c => fetchCountryCodeHub(c)),
+  );
+
+  const allCodes: BookingCode[] = [];
+  const seen = new Set<string>();
+
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    for (const code of r.value) {
+      if (seen.has(code.code)) continue; // dedup across countries
+      seen.add(code.code);
+      allCodes.push(code);
+    }
+  }
+
+  logger.info({ count: allCodes.length, countries: SPORTYBET_COUNTRIES.length }, 'Sportybet Code Hub: codes fetched');
+  return allCodes;
 }
 
 /**
@@ -428,16 +532,20 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
     return codesCache;
   }
 
-  const [sportPremi, paqBet, convertBet] = await Promise.allSettled([
+  const [sportPremi, paqBet, convertBet, social, codeHub] = await Promise.allSettled([
     scrapeSportPremi(),
     scrapePaqBet(),
     scrapeConvertBetCodes(),
+    scrapeSocialMediaCodes(),
+    scrapeSportyBetCodeHub(),
   ]);
 
   const allCodes: BookingCode[] = [];
   if (sportPremi.status === 'fulfilled') allCodes.push(...sportPremi.value);
   if (paqBet.status === 'fulfilled') allCodes.push(...paqBet.value);
   if (convertBet.status === 'fulfilled') allCodes.push(...convertBet.value);
+  if (social.status === 'fulfilled') allCodes.push(...social.value);
+  if (codeHub.status === 'fulfilled') allCodes.push(...codeHub.value);
 
   // Deduplicate
   const byCode = new Map<string, BookingCode>();
@@ -455,9 +563,11 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
 
   const raw = [...byCode.values()];
 
-  // Validate all codes against Sportybet API (in batches of 5 to avoid rate limiting)
-  for (let i = 0; i < raw.length; i += 5) {
-    const batch = raw.slice(i, i + 5);
+  // Validate ALL codes against Sportybet API to get correct ticket selection IDs
+  // (needed for manual code generation from selected games)
+  const needsValidation = raw;
+  for (let i = 0; i < needsValidation.length; i += 5) {
+    const batch = needsValidation.slice(i, i + 5);
     const validations = await Promise.all(
       batch.map(c => validateCode(c.code)),
     );

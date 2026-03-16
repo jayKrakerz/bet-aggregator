@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#0b0f19">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="EdgeScore">
+<meta name="apple-mobile-web-app-title" content="BetPulse">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg">
 <link rel="apple-touch-icon" href="/icons/icon-192.svg">
-<title>JA EdgeScore</title>
+<title>BetPulse</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -29,17 +29,14 @@
   --amber-soft:rgba(245,158,11,0.12);
   --success:#22c55e;
   --danger:#ef4444;
-  --nba:#ea580c;--nfl:#3b82f6;--soccer:#22c55e;--nhl:#06b6d4;--mlb:#ef4444;--ncaab:#a855f7;
-  --home:#3b82f6;--away:#ef4444;--draw:#a855f7;
-  --over:#22c55e;--under:#f59e0b;--yes:#22c55e;--no:#ef4444;
-  --score-green:#22c55e;--score-lime:#84cc16;--score-amber:#f59e0b;--score-red:#ef4444;
+  --purple:#8b5cf6;
   --radius:12px;--radius-sm:8px;--radius-xs:6px;
   --header-h:56px;
   --shadow-card:0 1px 3px rgba(0,0,0,0.3),0 4px 12px rgba(0,0,0,0.2);
   --shadow-card-hover:0 4px 16px rgba(0,0,0,0.4),0 8px 24px rgba(0,0,0,0.25);
   --shadow-expanded:0 4px 24px rgba(59,130,246,0.15),0 12px 32px rgba(0,0,0,0.3);
 }
-html{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:13px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+html{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{min-height:100vh;overflow-x:hidden}
 
 ::-webkit-scrollbar{width:5px;height:5px}
@@ -51,393 +48,190 @@ body{min-height:100vh;overflow-x:hidden}
 .header{position:sticky;top:0;z-index:100;height:var(--header-h);background:rgba(11,15,25,0.85);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;padding:0 24px}
 .header-inner{display:flex;align-items:center;gap:16px;width:100%;max-width:1400px;margin:0 auto}
 .logo{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.logo h1{font-size:17px;font-weight:800;letter-spacing:-0.5px;color:var(--text);white-space:nowrap}
+.logo h1{font-size:18px;font-weight:800;letter-spacing:-0.5px;white-space:nowrap;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header-spacer{flex:1}
 
-/* Sport chips */
-.sport-chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;flex:1;min-width:0;justify-content:center}
-.sport-chips::-webkit-scrollbar{display:none}
+/* ===== CHIPS (used by platform filters) ===== */
 .chip{padding:6px 14px;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.08);border-radius:20px;background:rgba(255,255,255,0.04);color:var(--text-dim);cursor:pointer;transition:all 0.2s;font-family:inherit;white-space:nowrap;letter-spacing:0.1px;backdrop-filter:blur(8px)}
 .chip:hover{background:rgba(255,255,255,0.08);color:var(--text);border-color:rgba(255,255,255,0.15)}
 .chip.active{background:#fff;color:#0b0f19;border-color:#fff;font-weight:700}
 
 /* Header right */
 .header-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.analyst-link{text-decoration:none;display:inline-flex;align-items:center;gap:5px;padding:6px 14px;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.08);border-radius:20px;background:rgba(255,255,255,0.04);color:var(--text-dim);transition:all 0.2s;font-family:inherit}
-.analyst-link:hover{background:rgba(255,255,255,0.08);color:var(--text)}
-.date-input{padding:6px 10px;font-size:12px;border:1px solid rgba(255,255,255,0.1);border-radius:20px;background:rgba(255,255,255,0.06);color:var(--text);font-family:inherit;cursor:pointer;width:130px;transition:all 0.2s}
-.date-input::-webkit-calendar-picker-indicator{filter:invert(1);opacity:0.5}
-.date-input:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2)}
 .health{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);padding:5px 12px;border-radius:20px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06)}
-.health-dot{width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 8px rgba(34,197,94,0.6);flex-shrink:0}
+.health-dot{width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 8px rgba(34,197,94,0.6);flex-shrink:0;animation:pulse 2.5s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.health-dot{animation:pulse 2.5s ease-in-out infinite}
 
 /* ===== LAYOUT ===== */
 .container{max-width:1400px;margin:0 auto;padding:0 24px 60px}
 
-/* ===== HERO STATS ===== */
-.hero-stats{position:relative;display:flex;align-items:center;justify-content:center;gap:0;padding:20px 28px;margin:20px 0;background:var(--surface);border-radius:var(--radius);overflow:hidden}
-.hero-stats::before{content:'';position:absolute;inset:-1px;border-radius:var(--radius);padding:1px;background:linear-gradient(135deg,var(--accent),#8b5cf6,var(--amber));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
-.stat-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 32px;position:relative}
-.stat-item:not(:last-child)::after{content:'';position:absolute;right:0;top:15%;height:70%;width:1px;background:rgba(255,255,255,0.06)}
-.stat-item .stat-val{font-size:28px;font-weight:800;letter-spacing:-0.5px;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.2}
-.stat-item .stat-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;font-weight:600}
-@keyframes count-flash{0%{transform:scale(1.1)}100%{transform:scale(1)}}
-.stat-item.updated .stat-val{animation:count-flash 0.3s ease-out}
-
-/* ===== TOP PICKS CAROUSEL ===== */
-.carousel-section{margin-bottom:28px}
-.carousel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.carousel-header h2{font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:10px}
-.carousel-header .badge-count{font-size:11px;color:var(--amber);background:var(--amber-soft);padding:3px 10px;border-radius:20px;font-weight:600;font-variant-numeric:tabular-nums}
-.carousel-nav{display:flex;gap:6px}
-.carousel-btn{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--text-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;font-size:14px}
-.carousel-btn:hover{background:rgba(255,255,255,0.1);color:var(--text);border-color:rgba(255,255,255,0.2)}
-.carousel-track{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none;padding:4px 0 8px}
-.carousel-track::-webkit-scrollbar{display:none}
-
-/* Top pick cards */
-.top-card{flex:0 0 270px;scroll-snap-align:start;background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:18px;position:relative;overflow:hidden;cursor:pointer;transition:all 0.25s}
-.top-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-card-hover);border-color:rgba(255,255,255,0.08)}
-.top-card.expanded{border-color:var(--accent);box-shadow:var(--shadow-expanded);transform:none}
-.top-card-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-.top-card .score-ring{width:48px;height:48px;font-size:17px}
-.top-card-info{flex:1;min-width:0}
-.top-card-match{font-size:14px;font-weight:700;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.top-card-match .vs{color:var(--text-muted);font-weight:400;font-size:11px;margin:0 4px}
-.top-card-meta{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
-.top-card-rank{position:absolute;top:12px;right:14px;font-size:32px;font-weight:900;color:rgba(255,255,255,0.03);line-height:1;letter-spacing:-1px}
-.top-card-pills{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-.ev-badge{font-size:11px;font-weight:700;color:var(--success);background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);padding:3px 8px;border-radius:var(--radius-xs);font-variant-numeric:tabular-nums}
-.top-card-analysis{font-size:11px;line-height:1.6;color:var(--text-dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.top-card.expanded .top-card-analysis{-webkit-line-clamp:unset;display:block}
-.top-card-detail{max-height:0;overflow:hidden;transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1)}
-.top-card.expanded .top-card-detail{max-height:500px}
-.top-card-sources{padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);margin-top:10px;display:flex;flex-wrap:wrap;gap:4px}
-
-/* ===== SCORE RING (conic gradient) ===== */
-.score-ring{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;letter-spacing:-0.5px;font-variant-numeric:tabular-nums;flex-shrink:0;position:relative}
-.score-ring-bg{position:absolute;inset:0;border-radius:50%;border:3px solid rgba(255,255,255,0.06)}
-.score-ring-fill{position:absolute;inset:0;border-radius:50%;-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#fff calc(100% - 3px))}
-.score-ring-val{position:relative;z-index:1}
+/* ===== ACTION BAR ===== */
+.action-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;margin:16px 0;background:linear-gradient(135deg,rgba(59,130,246,0.06),rgba(139,92,246,0.06));border:1px solid rgba(99,102,241,0.15);border-radius:var(--radius);flex-wrap:wrap}
+.action-bar-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ab-stat{font-size:13px;color:var(--text-dim);font-weight:500}
+.ab-num{font-weight:800;color:var(--text);font-variant-numeric:tabular-nums}
+.ab-divider{width:1px;height:16px;background:rgba(255,255,255,0.08)}
+.ab-quick-btn{padding:10px 24px;font-size:14px;font-weight:700;border:none;border-radius:20px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;cursor:pointer;font-family:inherit;transition:all 0.2s;box-shadow:0 2px 12px rgba(59,130,246,0.3);white-space:nowrap}
+.ab-quick-btn:hover{box-shadow:0 4px 20px rgba(59,130,246,0.4);transform:translateY(-1px)}
+.ab-quick-btn:active{transform:translateY(0)}
 
 /* ===== TABS ===== */
-.tabs-container{margin-top:4px}
-.tabs-header{display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:20px;position:relative}
-.tab-btn{padding:12px 24px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;border:none;background:none;font-family:inherit;position:relative;transition:color 0.2s}
+.tabs-container{margin-top:8px}
+.tabs-header{display:inline-flex;gap:4px;margin-bottom:24px;position:relative;background:rgba(255,255,255,0.04);border-radius:10px;padding:4px;border:1px solid rgba(255,255,255,0.06)}
+.tab-btn{padding:10px 24px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;border:none;background:none;font-family:inherit;position:relative;transition:all 0.25s;border-radius:8px;letter-spacing:0.1px}
 .tab-btn:hover{color:var(--text-dim)}
-.tab-btn.active{color:var(--text)}
-.tab-btn.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--accent);border-radius:2px 2px 0 0}
+.tab-btn.active{color:#fff;background:var(--accent);box-shadow:0 2px 8px rgba(59,130,246,0.3)}
+.tab-btn.active::after{display:none}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 
-/* ===== CONFIDENCE FILTERS ===== */
-.conf-filters{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
-.conf-chip{padding:6px 14px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,0.08);border-radius:20px;background:rgba(255,255,255,0.04);color:var(--text-dim);cursor:pointer;transition:all 0.2s;font-family:inherit}
-.conf-chip:hover{border-color:var(--accent);color:var(--accent)}
-.conf-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* ===== SECTION CARD (reusable) ===== */
+.section-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:20px;transition:border-color 0.3s,box-shadow 0.3s}
+.section-card:hover{border-color:rgba(59,130,246,0.12);box-shadow:0 0 20px rgba(59,130,246,0.04)}
+.card-title{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card-title-icon{font-size:18px;flex-shrink:0}
+.card-hint{font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5}
 
-/* ===== DATE DIVIDER ===== */
-.date-divider{font-size:11px;color:var(--text-muted);padding:16px 0 8px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:10px}
-.date-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.06)}
-.date-divider .pick-count{font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:20px}
+/* ===== TOOL GRID (2-col) ===== */
+.tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.tool-grid-full{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:20px}
 
-/* ===== PICK CARDS ===== */
-.picks-list{display:grid;gap:10px;padding-bottom:20px}
-.pick-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);overflow:hidden;position:relative;cursor:pointer;transition:all 0.25s;box-shadow:var(--shadow-card)}
-.pick-card:hover{box-shadow:var(--shadow-card-hover);transform:translateY(-2px)}
-.pick-card.expanded{border-color:rgba(59,130,246,0.3);box-shadow:var(--shadow-expanded);transform:none}
-.pick-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
-.pick-card[data-sport="nba"]::before{background:var(--nba)}
-.pick-card[data-sport="nfl"]::before{background:var(--nfl)}
-.pick-card[data-sport="soccer"]::before,.pick-card[data-sport="football"]::before{background:var(--soccer)}
-.pick-card[data-sport="nhl"]::before{background:var(--nhl)}
-.pick-card[data-sport="mlb"]::before{background:var(--mlb)}
-.pick-card[data-sport="ncaab"]::before{background:var(--ncaab)}
+/* ===== INPUT STYLES ===== */
+.input-mono{width:100%;padding:10px 14px;font-size:15px;font-family:'SF Mono','Fira Code',monospace;letter-spacing:2px;text-transform:uppercase;border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-xs);background:var(--bg);color:var(--text);outline:none;transition:border-color 0.2s,box-shadow 0.2s}
+.input-mono:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,0.15)}
+.input-std{width:100%;padding:10px 14px;font-size:14px;font-family:inherit;border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-xs);background:var(--bg);color:var(--text);outline:none;transition:border-color 0.2s,box-shadow 0.2s}
+.input-std:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,0.15)}
+.input-num{width:100%;padding:8px 10px;font-size:14px;font-weight:700;border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-xs);background:var(--bg);color:var(--text);outline:none;font-family:inherit;transition:border-color 0.2s,box-shadow 0.2s}
+.input-num:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(59,130,246,0.15)}
+.input-label{font-size:10px;text-transform:uppercase;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;display:block;margin-bottom:4px}
 
-.pick-header{display:flex;align-items:center;gap:12px;padding:16px 18px 16px 22px}
-.pick-info{flex:1;min-width:0}
-.pick-teams{font-size:15px;font-weight:700;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pick-teams .vs{color:var(--text-muted);font-weight:400;font-size:12px;margin:0 5px}
-.pick-meta{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:11px;color:var(--text-muted)}
-.sport-badge{font-size:9px;font-weight:700;padding:3px 8px;border-radius:var(--radius-xs);text-transform:uppercase;letter-spacing:0.5px}
-.pick-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
-.rec-pill{font-size:10px;font-weight:700;padding:5px 12px;border-radius:20px;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;border:1px solid}
-.rec-pill.side-home{background:rgba(59,130,246,0.1);color:var(--home);border-color:rgba(59,130,246,0.25)}
-.rec-pill.side-away{background:rgba(239,68,68,0.1);color:var(--away);border-color:rgba(239,68,68,0.25)}
-.rec-pill.side-draw{background:rgba(168,85,247,0.1);color:var(--draw);border-color:rgba(168,85,247,0.25)}
-.rec-pill.side-over{background:rgba(34,197,94,0.1);color:var(--over);border-color:rgba(34,197,94,0.25)}
-.rec-pill.side-under{background:rgba(245,158,11,0.1);color:var(--under);border-color:rgba(245,158,11,0.25)}
-.pick-odds{font-size:11px;color:var(--text-dim);font-weight:600;font-variant-numeric:tabular-nums}
+/* ===== BUTTON STYLES ===== */
+.btn-primary{padding:10px 20px;font-size:13px;font-weight:700;border:none;border-radius:var(--radius-xs);background:var(--accent);color:#fff;cursor:pointer;font-family:inherit;transition:all 0.2s;box-shadow:0 2px 8px rgba(59,130,246,0.25)}
+.btn-primary:hover{background:#4f8ff7;box-shadow:0 4px 12px rgba(59,130,246,0.35);transform:translateY(-1px)}
+.btn-primary:active{transform:translateY(0)}
+.btn-danger{padding:10px 14px;font-size:12px;font-weight:700;border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-xs);background:rgba(239,68,68,0.08);color:var(--danger);cursor:pointer;font-family:inherit;transition:all 0.2s}
+.btn-danger:hover{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.5)}
+.btn-success{padding:10px 20px;font-size:13px;font-weight:700;border:none;border-radius:var(--radius-xs);background:var(--success);color:#fff;cursor:pointer;font-family:inherit;transition:all 0.2s;box-shadow:0 2px 8px rgba(34,197,94,0.25)}
+.btn-success:hover{background:#2dd46a;box-shadow:0 4px 12px rgba(34,197,94,0.35);transform:translateY(-1px)}
+.btn-outline{padding:7px 14px;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-xs);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit;transition:all 0.2s}
+.btn-outline:hover{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.2);color:var(--text)}
 
-/* Pick analysis */
-.pick-analysis{padding:0 18px 14px 22px;font-size:12px;line-height:1.65;color:var(--text-dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.pick-card.expanded .pick-analysis{-webkit-line-clamp:unset;display:block}
+/* ===== GENERATE BUTTONS (pills) ===== */
+.gen-pill{flex:1;min-width:64px;padding:10px 6px;font-size:13px;font-weight:700;border-radius:20px;cursor:pointer;font-family:inherit;transition:all 0.25s;border:1px solid;position:relative;overflow:hidden}
+.gen-pill::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity 0.25s;border-radius:20px}
+.gen-pill:hover::before{opacity:1}
+.gen-pill:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.3)}
+.gen-pill:active{transform:translateY(0)}
+.gen-pill-safe{border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.06);color:var(--success)}
+.gen-pill-safe::before{background:linear-gradient(135deg,rgba(34,197,94,0.12),rgba(34,197,94,0.04))}
+.gen-pill-mid{border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.06);color:var(--amber)}
+.gen-pill-mid::before{background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04))}
+.gen-pill-risky{border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.06);color:var(--danger)}
+.gen-pill-risky::before{background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04))}
 
-/* Score breakdown bars */
-.score-breakdown-bars{padding:0 18px 14px 22px;display:none}
-.pick-card.expanded .score-breakdown-bars{display:block}
-.breakdown-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
-.breakdown-label{font-size:10px;font-weight:600;color:var(--text-muted);width:72px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.3px}
-.breakdown-bar-track{flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;max-width:200px}
-.breakdown-bar-fill{height:100%;border-radius:3px;transition:width 0.5s ease}
-.breakdown-score{font-size:10px;color:var(--text-dim);font-weight:600;font-variant-numeric:tabular-nums;width:40px;text-align:right}
+/* ===== FLEX ROW ===== */
+.flex-row{display:flex;gap:8px;align-items:center}
+.flex-row-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.flex-1{flex:1;min-width:0}
+.ml-auto{margin-left:auto}
 
-/* Score breakdown inline (compact for collapsed) */
-.score-breakdown{display:flex;align-items:center;gap:8px;padding:0 18px 14px 22px;flex-wrap:wrap}
-.pick-card.expanded .score-breakdown{display:none}
-.score-dot{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--text-muted);font-weight:500;position:relative}
-.score-dot .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.score-dot .tooltip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--elevated);color:var(--text);font-size:10px;font-weight:500;padding:4px 8px;border-radius:4px;white-space:nowrap;pointer-events:none;z-index:10;border:1px solid rgba(255,255,255,0.1)}
-.score-dot .tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--elevated)}
-.score-dot:hover .tooltip{display:block}
-
-/* Pick expanded sources */
-.pick-detail{max-height:0;overflow:hidden;transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1)}
-.pick-card.expanded .pick-detail{max-height:1000px}
-.pick-sources-table{width:100%;border-collapse:collapse;font-size:11px}
-.pick-sources-table th{text-align:left;padding:10px 14px 10px 22px;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;border-top:1px solid rgba(255,255,255,0.06);background:var(--elevated)}
-.pick-sources-table td{padding:10px 14px 10px 22px;border-top:1px solid rgba(255,255,255,0.04);color:var(--text-dim)}
-.pick-sources-table .src-name{font-weight:600;color:var(--text)}
-
-/* Source chips */
-.source-chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
-.source-chip{font-size:9px;color:var(--text-muted);background:var(--elevated);padding:2px 7px;border-radius:4px;font-weight:500}
-
-/* Side pills */
-.side-pill{display:inline-flex;font-size:10px;font-weight:700;padding:3px 8px;border-radius:var(--radius-xs);text-transform:uppercase;letter-spacing:0.3px}
-.side-home{background:rgba(59,130,246,0.1);color:var(--home)}
-.side-away{background:rgba(239,68,68,0.1);color:var(--away)}
-.side-draw{background:rgba(168,85,247,0.1);color:var(--draw)}
-.side-over{background:rgba(34,197,94,0.1);color:var(--over)}
-.side-under{background:rgba(245,158,11,0.1);color:var(--under)}
-.side-yes{background:rgba(34,197,94,0.1);color:var(--yes)}
-.side-no{background:rgba(239,68,68,0.1);color:var(--no)}
-.conf-pill{display:inline-flex;font-size:10px;font-weight:600;padding:3px 8px;border-radius:var(--radius-xs)}
-.conf-best_bet{background:var(--amber-soft);color:var(--amber)}
-.conf-high{background:rgba(34,197,94,0.1);color:var(--success)}
-.conf-medium{background:rgba(59,130,246,0.1);color:var(--accent)}
-.conf-low{background:rgba(255,255,255,0.04);color:var(--text-muted)}
-
-/* ===== VALUE BET CARDS ===== */
-.value-cards{display:grid;gap:10px;padding-bottom:20px}
-.value-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:18px 20px;cursor:pointer;transition:all 0.25s}
-.value-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-card-hover);border-color:rgba(34,197,94,0.15)}
-.value-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.value-card-match{font-size:14px;font-weight:700;letter-spacing:-0.2px}
-.value-card-match .vs{color:var(--text-muted);font-weight:400;font-size:11px;margin:0 4px}
-.value-card-ev{font-size:18px;font-weight:800;color:var(--success);font-variant-numeric:tabular-nums}
-.value-card-pills{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.value-metrics{display:flex;gap:16px;margin-bottom:12px}
-.value-metric{display:flex;flex-direction:column;gap:2px}
-.value-metric-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
-.value-metric-val{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text)}
-.value-card-analysis{font-size:11px;line-height:1.6;color:var(--text-dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.value-card.expanded .value-card-analysis{-webkit-line-clamp:unset;display:block}
-.value-card-odds{font-size:12px;color:var(--text-dim);font-weight:600;margin-top:8px;font-variant-numeric:tabular-nums}
-
-/* ===== OVER/UNDER CARDS ===== */
+/* ===== O/U CARDS (used by code cards) ===== */
 .ou-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:14px 18px;cursor:pointer;transition:all 0.25s}
 .ou-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-card-hover);border-color:rgba(59,130,246,0.15)}
 .ou-card.expanded{border-color:rgba(59,130,246,0.3)}
-.ou-card-head{display:flex;align-items:center;gap:12px}
-.ou-card-match{flex:1;min-width:0}
-.ou-card-match-name{font-size:14px;font-weight:700;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ou-card-match-name .vs{color:var(--text-muted);font-weight:400;font-size:11px;margin:0 4px}
-.ou-card-meta{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:11px;color:var(--text-muted)}
-.ou-consensus{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
-.ou-consensus-side{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px}
-.ou-consensus-side.over{color:#22c55e}
-.ou-consensus-side.under{color:#3b82f6}
-.ou-consensus-side.split{color:var(--text-muted)}
-.ou-consensus-count{font-size:10px;color:var(--text-dim);font-weight:600}
-.ou-line{font-size:20px;font-weight:800;color:var(--amber);flex-shrink:0;min-width:48px;text-align:center;font-variant-numeric:tabular-nums}
-.ou-bar-wrap{margin-top:10px;display:flex;align-items:center;gap:8px}
-.ou-bar-label{font-size:10px;font-weight:700;width:44px;text-align:center;flex-shrink:0}
-.ou-bar-label.over{color:#22c55e}
-.ou-bar-label.under{color:#3b82f6}
-.ou-bar-track{flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;display:flex}
-.ou-bar-fill-over{height:100%;background:#22c55e;border-radius:4px 0 0 4px;transition:width 0.4s ease}
-.ou-bar-fill-under{height:100%;background:#3b82f6;border-radius:0 4px 4px 0;transition:width 0.4s ease}
-.ou-sources{margin-top:10px;display:none;flex-wrap:wrap;gap:4px}
-.ou-card.expanded .ou-sources{display:flex}
-.ou-source-chip{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03)}
-.ou-source-chip.over{color:#22c55e;border-color:rgba(34,197,94,0.2)}
-.ou-source-chip.under{color:#3b82f6;border-color:rgba(59,130,246,0.2)}
 
-/* ===== BEST OVER/UNDER ROW ===== */
-.ou-best-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px}
-.ou-best-col{min-width:0}
-.ou-best-header{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.ou-best-header.over{color:#22c55e}
-.ou-best-header.under{color:#3b82f6}
-.ou-best-list{display:grid;gap:8px}
-.ou-best-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);padding:12px 14px;transition:all 0.2s;cursor:default}
-.ou-best-card.over{border-left:3px solid #22c55e}
-.ou-best-card.under{border-left:3px solid #3b82f6}
-.ou-best-card:hover{border-color:rgba(255,255,255,0.1);box-shadow:var(--shadow-card)}
-.ou-best-rank{font-size:10px;font-weight:800;color:var(--text-muted);margin-bottom:4px}
-.ou-best-match{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.2px}
-.ou-best-meta{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
-.ou-best-line{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
-.ou-best-line.over{color:#22c55e}
-.ou-best-line.under{color:#3b82f6}
-.ou-best-consensus{font-size:10px;color:var(--text-dim);font-weight:600}
-.ou-best-sources{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
-.ou-best-src{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--text-dim);font-weight:600}
-@media(max-width:600px){
-  .ou-best-row{grid-template-columns:1fr}
-  .hc-best-row{grid-template-columns:1fr}
-}
+/* ===== PICKS LIST (used by code lists) ===== */
+.picks-list{display:grid;gap:10px;padding-bottom:20px}
 
-/* ===== HANDICAP CARDS ===== */
-.hc-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:14px 18px;cursor:pointer;transition:all 0.25s}
-.hc-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-card-hover);border-color:rgba(59,130,246,0.15)}
-.hc-card.expanded{border-color:rgba(59,130,246,0.3)}
-.hc-card-head{display:flex;align-items:center;gap:12px}
-.hc-card-match{flex:1;min-width:0}
-.hc-card-match-name{font-size:14px;font-weight:700;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hc-card-match-name .vs{color:var(--text-muted);font-weight:400;font-size:11px;margin:0 4px}
-.hc-card-meta{display:flex;align-items:center;gap:8px;margin-top:3px;font-size:11px;color:var(--text-muted)}
-.hc-consensus{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
-.hc-consensus-side{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px}
-.hc-consensus-side.home{color:var(--home)}
-.hc-consensus-side.away{color:var(--away)}
-.hc-consensus-side.split{color:var(--text-muted)}
-.hc-consensus-count{font-size:10px;color:var(--text-dim);font-weight:600}
-.hc-spread{font-size:20px;font-weight:800;color:var(--accent);flex-shrink:0;min-width:48px;text-align:center;font-variant-numeric:tabular-nums}
-.hc-bar-wrap{margin-top:10px;display:flex;align-items:center;gap:8px}
-.hc-bar-label{font-size:10px;font-weight:700;width:50px;text-align:center;flex-shrink:0}
-.hc-bar-label.home{color:var(--home)}
-.hc-bar-label.away{color:var(--away)}
-.hc-bar-track{flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;display:flex}
-.hc-bar-fill-home{height:100%;background:var(--home);border-radius:4px 0 0 4px;transition:width 0.4s ease}
-.hc-bar-fill-away{height:100%;background:var(--away);border-radius:0 4px 4px 0;transition:width 0.4s ease}
-.hc-sources{margin-top:10px;display:none;flex-wrap:wrap;gap:4px}
-.hc-card.expanded .hc-sources{display:flex}
-.hc-source-chip{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03)}
-.hc-source-chip.home{color:var(--home);border-color:rgba(59,130,246,0.2)}
-.hc-source-chip.away{color:var(--away);border-color:rgba(239,68,68,0.2)}
-
-/* Best handicap picks row */
-.hc-best-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:8px}
-.hc-best-col{min-width:0}
-.hc-best-header{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.hc-best-header.home{color:var(--home)}
-.hc-best-header.away{color:var(--away)}
-.hc-best-list{display:grid;gap:8px}
-.hc-best-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);padding:12px 14px;transition:all 0.2s;cursor:default}
-.hc-best-card.home{border-left:3px solid var(--home)}
-.hc-best-card.away{border-left:3px solid var(--away)}
-.hc-best-card:hover{border-color:rgba(255,255,255,0.1);box-shadow:var(--shadow-card)}
-.hc-best-rank{font-size:10px;font-weight:800;color:var(--text-muted);margin-bottom:4px}
-.hc-best-match{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.2px}
-.hc-best-meta{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
-.hc-best-spread{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums}
-.hc-best-spread.home{color:var(--home)}
-.hc-best-spread.away{color:var(--away)}
-.hc-best-consensus{font-size:10px;color:var(--text-dim);font-weight:600}
-.hc-best-sources{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
-.hc-best-src{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.04);color:var(--text-dim);font-weight:600}
-
-/* ===== MATCH CARDS ===== */
-.matches-list{display:grid;gap:6px;padding-bottom:20px}
-.match-card{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);cursor:pointer;transition:all 0.2s;overflow:hidden}
-.match-card:hover{box-shadow:var(--shadow-card);border-color:rgba(255,255,255,0.08);transform:translateY(-1px)}
-.match-card.expanded{border-color:rgba(59,130,246,0.3);background:rgba(59,130,246,0.03);box-shadow:var(--shadow-expanded);transform:none}
-.match-card-header{display:flex;align-items:center;gap:10px;padding:12px 14px}
-.sport-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.match-time-col{font-size:11px;color:var(--text-muted);width:52px;flex-shrink:0;font-variant-numeric:tabular-nums;font-weight:600}
-.match-teams-col{flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.1px}
-.match-teams-col .vs{color:var(--text-muted);font-weight:400;font-size:11px;margin:0 3px}
-.match-picks-count{font-size:10px;color:var(--accent);background:var(--accent-soft);padding:3px 9px;border-radius:20px;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
-.match-chevron{color:var(--text-muted);font-size:10px;transition:transform 0.2s;flex-shrink:0}
-.match-card.expanded .match-chevron{transform:rotate(90deg);color:var(--accent)}
-.match-tips{display:flex;gap:5px;padding:0 14px 10px 84px;flex-wrap:wrap}
-.match-tip{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:3px 8px;border-radius:var(--radius-xs);text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap}
-
-/* Match expanded detail */
-.match-detail-wrap{overflow:hidden}
-.match-detail{max-height:0;overflow:hidden;transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1)}
-.match-card.expanded + .match-detail-wrap .match-detail{max-height:2000px}
-.predictions-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;background:var(--surface);border-radius:0 0 var(--radius-sm) var(--radius-sm)}
-.predictions-table th{text-align:left;padding:10px 12px;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;border-bottom:1px solid rgba(255,255,255,0.06);background:var(--elevated)}
-.predictions-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text-dim)}
-.predictions-table tbody tr:hover{background:rgba(59,130,246,0.04)}
-.value-text{font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
-
-/* ===== BOTTOM SECTION GRID ===== */
-
-
-/* ===== FETCH ALL BUTTON ===== */
-.fetch-spinning svg{animation:spin 1s linear infinite}
-@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-
-/* ===== SOURCES TAB ===== */
-.sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
-.source-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);padding:14px 16px;transition:all 0.2s}
-.source-card:hover{border-color:rgba(255,255,255,0.1);box-shadow:var(--shadow-card)}
-.source-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.source-card-name{font-size:13px;font-weight:700;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.source-status{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.3px;flex-shrink:0}
-.source-status.working{background:rgba(34,197,94,0.1);color:#22c55e;border:1px solid rgba(34,197,94,0.2)}
-.source-status.dead{background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.2)}
-.source-card-stats{display:flex;gap:16px;margin-bottom:6px}
-.source-stat{display:flex;flex-direction:column;gap:1px}
-.source-stat-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
-.source-stat-val{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text)}
-.source-card-meta{font-size:10px;color:var(--text-muted)}
+/* ===== BADGE COUNT ===== */
+.badge-count{font-size:11px;color:var(--accent);background:var(--accent-soft);padding:3px 10px;border-radius:20px;font-weight:600;font-variant-numeric:tabular-nums}
 
 /* ===== SKELETON LOADING ===== */
 .skeleton{position:relative;overflow:hidden;background:var(--elevated);border-radius:var(--radius-sm)}
 .skeleton::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);animation:shimmer 1.5s infinite}
 @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 .skel-pick{height:90px;margin-bottom:10px;border-radius:var(--radius)}
-.skel-match{height:64px;margin-bottom:6px;border-radius:var(--radius-sm)}
-.skel-stat{display:inline-block;width:40px;height:28px;border-radius:4px;vertical-align:middle}
-.skel-top{height:200px;flex:0 0 270px;border-radius:var(--radius)}
 
 /* ===== EMPTY STATE ===== */
 .empty{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px}
 
 /* ===== SECTION TITLE ===== */
-.section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.section-title h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text)}
+.section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-title h2{font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text)}
 .section-title .badge-count{font-size:11px;color:var(--accent);background:var(--accent-soft);padding:3px 10px;border-radius:20px;font-weight:600;font-variant-numeric:tabular-nums}
 
+/* ===== COMPARE VS LABEL ===== */
+.vs-label{color:var(--text-muted);font-size:12px;font-weight:700;flex-shrink:0}
+
+/* ===== STICKY GENERATE BAR ===== */
+.generate-bar{display:none;position:sticky;top:var(--header-h);z-index:50;padding:10px 18px;background:rgba(59,130,246,0.1);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius-sm);margin-bottom:16px;align-items:center;gap:12px}
+
+/* ===== COLLAPSIBLE SECTIONS ===== */
+.collapsible{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;transition:border-color 0.3s}
+.collapsible:hover{border-color:rgba(59,130,246,0.12)}
+.collapsible-header{display:flex;align-items:center;gap:8px;padding:12px 20px;cursor:pointer;user-select:none;transition:background 0.2s}
+.collapsible-header:hover{background:rgba(255,255,255,0.02)}
+.collapsible-header .card-title-icon{font-size:16px;flex-shrink:0}
+.collapsible-header span.ch-label{font-size:13px;font-weight:700;color:var(--text)}
+.collapsible-header .ch-hint{font-size:11px;color:var(--text-muted);margin-left:auto}
+.collapsible-header .ch-arrow{font-size:10px;color:var(--text-muted);transition:transform 0.3s;margin-left:8px}
+.collapsible.open .ch-arrow{transform:rotate(180deg)}
+.collapsible-body{max-height:0;overflow:hidden;transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1)}
+.collapsible.open .collapsible-body{max-height:2000px}
+.collapsible-inner{padding:0 20px 20px}
+
+/* ===== GENERATE LOADING ===== */
+@keyframes genSpin{to{transform:rotate(360deg)}}
+@keyframes genFadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.gen-loading{padding:20px;border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);background:linear-gradient(135deg,rgba(59,130,246,0.04),rgba(139,92,246,0.04));margin-bottom:12px;animation:genFadeIn 0.3s ease-out}
+.gen-loading-header{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px}
+.gen-loading-spinner{width:20px;height:20px;border:2.5px solid rgba(59,130,246,0.15);border-top-color:var(--accent);border-radius:50%;animation:genSpin 0.8s linear infinite;flex-shrink:0}
+.gen-loading-text{font-size:14px;font-weight:700;color:var(--accent)}
+.gen-loading-steps{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.gen-step{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);transition:all 0.3s}
+.gen-step.active{color:var(--accent);border-color:rgba(59,130,246,0.3);background:rgba(59,130,246,0.06)}
+.gen-step.done{color:var(--success);border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.06)}
+.gen-step-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* ===== GEN OPTIONS TOGGLE ===== */
+.gen-options{max-height:0;overflow:hidden;transition:max-height 0.3s ease}
+.gen-options.open{max-height:200px}
+.gen-options-toggle{font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;margin-top:6px;display:inline-block}
+.gen-options-toggle:hover{text-decoration:underline}
+
+/* ===== TOAST NOTIFICATIONS ===== */
+.toast{padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;pointer-events:auto;animation:toastIn 0.3s ease-out,toastOut 0.3s ease-in 2.7s forwards;box-shadow:0 4px 16px rgba(0,0,0,0.3)}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateY(-10px)}}
+.toast-success{background:var(--success)}
+.toast-info{background:var(--accent)}
+.toast-warn{background:var(--amber);color:#000}
+
 /* ===== RESPONSIVE ===== */
-@media(max-width:1024px){
-}
 @media(max-width:768px){
   .header{padding:0 16px;height:50px}
   .header-inner{gap:8px}
   .logo h1{font-size:15px}
-  .sport-chips{gap:4px}
   .chip{padding:5px 10px;font-size:11px}
-  .date-input{width:110px;font-size:11px}
   .container{padding:0 16px 40px}
-  .hero-stats{padding:14px 12px;flex-wrap:wrap;gap:4px}
-  .stat-item{padding:8px 16px}
-  .stat-item .stat-val{font-size:22px}
-  .stat-item:not(:last-child)::after{display:none}
-  .top-card{flex:0 0 240px}
-  .pick-header{gap:10px;padding:14px 14px 14px 18px}
-  .score-ring{width:40px;height:40px;font-size:14px}
-  .pick-teams{font-size:13px}
-  .pick-analysis{padding:0 14px 10px 18px;font-size:11px}
-  .score-breakdown{padding:0 14px 10px 18px}
-  .score-breakdown-bars{padding:0 14px 10px 18px}
-  .match-card-header{padding:8px 12px;gap:8px}
-  .match-tips{padding-left:70px}
-  .tab-btn{padding:10px 16px;font-size:12px}
-  #panel-booking-codes > div:first-child{grid-template-columns:1fr !important}
+  .tab-btn{padding:8px 16px;font-size:12px}
+  .tool-grid{grid-template-columns:1fr}
+  .section-card{padding:16px}
+  .card-title{font-size:13px}
+  .gen-pill{min-width:44px;padding:8px 2px;font-size:11px}
+  .btn-primary,.btn-success,.btn-danger{padding:8px 14px;font-size:12px}
+  .action-bar{flex-direction:column;gap:10px;padding:12px 16px}
+  .action-bar-stats{justify-content:center}
+  .ab-quick-btn{width:100%;text-align:center}
+  .flex-row{flex-wrap:wrap}
+  .input-mono{font-size:14px;padding:10px 12px}
+  .collapsible-header{padding:10px 16px}
+  .collapsible-inner{padding:0 16px 16px}
+  #market-filter-chips .chip{font-size:9px;padding:3px 8px}
 }
 @media(max-width:480px){
-  .header-right .date-input{display:none}
-  .stat-item{padding:6px 10px}
-  .analyst-link span{display:none}
-  .carousel-nav{display:none}
-  .top-card{flex:0 0 220px;padding:14px}
+  .ab-stat{font-size:11px}
+  .ab-quick-btn{font-size:13px;padding:10px 20px}
 }
 </style>
 </head>
@@ -448,26 +242,21 @@ body{min-height:100vh;overflow-x:hidden}
   <div class="header-inner">
     <div class="logo">
       <svg width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="32" height="32" rx="8" fill="rgba(59,130,246,0.15)"/>
-        <path d="M7 22L13 12L18 17L25 7" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M21 7H25V11" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M7 25H25" stroke="rgba(59,130,246,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#8b5cf6"/>
+          </linearGradient>
+        </defs>
+        <rect width="32" height="32" rx="8" fill="rgba(99,102,241,0.12)"/>
+        <path d="M9 20L14 11L18 16L24 8" stroke="url(#logo-grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="24" cy="8" r="2.5" fill="#8b5cf6"/>
+        <path d="M8 24H24" stroke="rgba(139,92,246,0.25)" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
-      <h1>EdgeScore</h1>
+      <h1>BetPulse</h1>
     </div>
-    <div class="sport-chips" id="sport-chips">
-      <button class="chip active" data-sport="">All</button>
-      <button class="chip" data-sport="nba">NBA</button>
-      <button class="chip" data-sport="nfl">NFL</button>
-      <button class="chip" data-sport="nhl">NHL</button>
-      <button class="chip" data-sport="mlb">MLB</button>
-      <button class="chip" data-sport="ncaab">NCAAB</button>
-      <button class="chip" data-sport="football">Soccer</button>
-    </div>
+    <div class="header-spacer"></div>
     <div class="header-right">
-      <button class="analyst-link" id="fetch-all-btn" title="Fetch all sources now"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg><span>Fetch All</span></button>
-      <a href="/analyst" class="analyst-link"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 5.5-4 7l-1 4H10l-1-4c-2-1.5-4-4-4-7a7 7 0 0 1 7-7z"/><line x1="10" y1="22" x2="14" y2="22"/></svg><span>Analyst</span></a>
-      <input type="date" class="date-input" id="date-filter" title="Filter by date">
       <div class="health" id="health">
         <div class="health-dot"></div>
         <span>Live</span>
@@ -477,195 +266,164 @@ body{min-height:100vh;overflow-x:hidden}
 </div>
 
 <div class="container">
-  <!-- HERO STATS -->
-  <div class="hero-stats" id="stats-bar">
-    <div class="stat-item" id="si-preds">
-      <span class="stat-val" id="stat-preds"><span class="skeleton skel-stat"></span></span>
-      <span class="stat-label">Predictions</span>
-    </div>
-    <div class="stat-item" id="si-sources">
-      <span class="stat-val" id="stat-sources"><span class="skeleton skel-stat"></span></span>
-      <span class="stat-label">Active Sources</span>
-    </div>
-    <div class="stat-item" id="si-matches">
-      <span class="stat-val" id="stat-matches"><span class="skeleton skel-stat"></span></span>
-      <span class="stat-label">Matches</span>
-    </div>
-    <div class="stat-item" id="si-sports">
-      <span class="stat-val" id="stat-sports"><span class="skeleton skel-stat"></span></span>
-      <span class="stat-label">Sports</span>
-    </div>
-  </div>
 
-  <!-- TOP PICKS CAROUSEL -->
-  <div class="carousel-section">
-    <div class="carousel-header">
-      <h2>Today's Best Picks <span class="badge-count" id="top5-count">--</span></h2>
-      <div class="carousel-nav">
-        <button class="carousel-btn" id="carousel-prev" title="Previous">&#8249;</button>
-        <button class="carousel-btn" id="carousel-next" title="Next">&#8250;</button>
-      </div>
+  <!-- ACTION BAR -->
+  <div class="action-bar" id="action-bar">
+    <div class="action-bar-stats">
+      <span class="ab-stat" id="ab-codes"><span class="ab-num">--</span> codes</span>
+      <span class="ab-divider"></span>
+      <span class="ab-stat" id="ab-pool"><span class="ab-num">--</span> games</span>
+      <span class="ab-divider"></span>
+      <span class="ab-stat" id="ab-consensus"><span class="ab-num">--</span> consensus</span>
     </div>
-    <div class="carousel-track" id="top5-grid">
-      <div class="skeleton skel-top"></div>
-      <div class="skeleton skel-top"></div>
-      <div class="skeleton skel-top"></div>
-      <div class="skeleton skel-top"></div>
-      <div class="skeleton skel-top"></div>
-    </div>
+    <button class="ab-quick-btn" id="ab-quick-gen">Generate x5 Code</button>
   </div>
 
   <!-- TABBED INTERFACE -->
   <div class="tabs-container">
     <div class="tabs-header" id="tabs-header">
-      <button class="tab-btn active" data-tab="all-picks">All Picks</button>
-      <button class="tab-btn" data-tab="over-under">Over/Under</button>
-      <button class="tab-btn" data-tab="handicap">1H Handicap</button>
-      <button class="tab-btn" data-tab="value-bets">Value Bets</button>
-      <button class="tab-btn" data-tab="booking-codes">Sportybet</button>
-      <button class="tab-btn" data-tab="all-codes">All Codes</button>
-      <button class="tab-btn" data-tab="matches">Matches</button>
-      <button class="tab-btn" data-tab="sources">Sources</button>
-    </div>
-
-    <!-- TAB: ALL PICKS -->
-    <div class="tab-panel active" id="panel-all-picks">
-      <div class="conf-filters" id="conf-filters">
-        <button class="conf-chip active" data-min="0">All</button>
-        <button class="conf-chip" data-min="80">Best Bets 80+</button>
-        <button class="conf-chip" data-min="65">High+ 65+</button>
-        <button class="conf-chip" data-min="50">Medium+ 50+</button>
-      </div>
-      <div class="section-title">
-        <h2>Scored Predictions</h2>
-        <span class="badge-count" id="picks-count">--</span>
-      </div>
-      <div class="picks-list" id="picks-list">
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-      </div>
-    </div>
-
-    <!-- TAB: OVER/UNDER -->
-    <div class="tab-panel" id="panel-over-under">
-      <div class="ou-best-row">
-        <div class="ou-best-col">
-          <div class="ou-best-header over">Best Overs <span class="badge-count" id="ou-best-over-count">--</span></div>
-          <div class="ou-best-list" id="ou-best-over"></div>
-        </div>
-        <div class="ou-best-col">
-          <div class="ou-best-header under">Best Unders <span class="badge-count" id="ou-best-under-count">--</span></div>
-          <div class="ou-best-list" id="ou-best-under"></div>
-        </div>
-      </div>
-      <div class="section-title" style="margin-top:16px">
-        <h2>All Over/Under Predictions</h2>
-        <span class="badge-count" id="ou-count">--</span>
-      </div>
-      <div class="picks-list" id="ou-list">
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-      </div>
-    </div>
-
-    <!-- TAB: 1ST HALF HANDICAP -->
-    <div class="tab-panel" id="panel-handicap">
-      <div style="margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);display:flex;align-items:center;gap:12px">
-        <span style="font-size:22px">&#9917;</span>
-        <div>
-          <div style="font-size:14px;font-weight:700">1st Half - Asian Handicap</div>
-          <div style="font-size:11px;color:var(--text-dim)">Soccer only. Poisson model with real FH stats from top 5 leagues. Shows H1, H1.5, H2 lines per match. Primary pick targets best odds with 60%+ probability.</div>
-        </div>
-      </div>
-      <div class="hc-best-row" id="hc-top-picks">
-        <div class="hc-best-col">
-          <div class="hc-best-header" style="color:var(--success)">Safest Picks <span class="badge-count" id="hc-safe-count">--</span></div>
-          <div class="hc-best-list" id="hc-safe-list"></div>
-        </div>
-        <div class="hc-best-col">
-          <div class="hc-best-header" style="color:var(--amber)">Best Value <span class="badge-count" id="hc-value-count">--</span></div>
-          <div class="hc-best-list" id="hc-value-list"></div>
-        </div>
-      </div>
-      <div class="section-title" style="margin-top:16px">
-        <h2>All 1st Half Handicap Picks</h2>
-        <span class="badge-count" id="hc-count">--</span>
-      </div>
-      <div class="picks-list" id="hc-list">
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-      </div>
-    </div>
-
-    <!-- TAB: VALUE BETS -->
-    <div class="tab-panel" id="panel-value-bets">
-      <div class="section-title">
-        <h2>Positive Expected Value</h2>
-        <span class="badge-count" id="value-count">--</span>
-      </div>
-      <div class="value-cards" id="value-list">
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-      </div>
+      <button class="tab-btn active" data-tab="booking-codes">Sportybet</button>
+      <button class="tab-btn" data-tab="history">History</button>
     </div>
 
     <!-- TAB: BOOKING CODES -->
-    <div class="tab-panel" id="panel-booking-codes">
+    <div class="tab-panel active" id="panel-booking-codes">
 
-      <!-- ROW 1: LOAD CODE + QUICK GENERATE (side by side) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+      <!-- ROW 1: Check a Code + Generate (side by side) -->
+      <div class="tool-grid">
 
-        <!-- LEFT: Load Code -->
-        <div style="background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:16px">
-          <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-            <span style="font-size:16px">&#128269;</span> Check a Code
+        <!-- LEFT: Check a Code -->
+        <div class="section-card">
+          <div class="card-title">
+            <span class="card-title-icon">&#128269;</span> Check a Code
           </div>
-          <div style="display:flex;gap:6px">
-            <input type="text" id="load-code-input" placeholder="e.g. Z4PMH3" maxlength="8" style="flex:1;padding:8px 12px;font-size:15px;font-family:monospace;letter-spacing:2px;text-transform:uppercase;border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-xs);background:var(--bg);color:var(--text);outline:none" />
-            <button id="load-code-btn" style="padding:8px 16px;font-size:12px;font-weight:700;border:none;border-radius:var(--radius-xs);background:var(--accent);color:#fff;cursor:pointer;font-family:inherit">Load</button>
+          <div class="flex-row">
+            <input type="text" id="load-code-input" placeholder="e.g. Z4PMH3" maxlength="8" class="input-mono flex-1" />
+            <button id="load-code-btn" class="btn-primary">Load</button>
           </div>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Validates against Sportybet API and shows all selections</div>
+          <div class="card-hint">Validates against Sportybet API and shows all selections</div>
         </div>
 
         <!-- RIGHT: Quick Generate -->
-        <div style="background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:16px" id="auto-gen-section">
-          <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-            <span style="font-size:16px">&#9889;</span> Generate Safe Code
-            <span class="badge-count" id="pool-count" style="margin-left:auto">--</span>
+        <div class="section-card" id="auto-gen-section">
+          <div class="card-title">
+            <span class="card-title-icon">&#9889;</span> Generate Safe Code
+            <span class="badge-count ml-auto" id="pool-count">--</span>
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap" id="auto-gen-btns">
-            <button class="auto-gen-btn" data-target="2" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(34,197,94,0.25);border-radius:var(--radius-xs);background:rgba(34,197,94,0.06);color:var(--success);cursor:pointer;font-family:inherit">x2</button>
-            <button class="auto-gen-btn" data-target="3" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(34,197,94,0.25);border-radius:var(--radius-xs);background:rgba(34,197,94,0.06);color:var(--success);cursor:pointer;font-family:inherit">x3</button>
-            <button class="auto-gen-btn" data-target="5" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius-xs);background:rgba(245,158,11,0.06);color:var(--amber);cursor:pointer;font-family:inherit">x5</button>
-            <button class="auto-gen-btn" data-target="10" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(245,158,11,0.25);border-radius:var(--radius-xs);background:rgba(245,158,11,0.06);color:var(--amber);cursor:pointer;font-family:inherit">x10</button>
-            <button class="auto-gen-btn" data-target="20" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius-xs);background:rgba(239,68,68,0.06);color:var(--danger);cursor:pointer;font-family:inherit">x20</button>
-            <button class="auto-gen-btn" data-target="50" style="flex:1;min-width:60px;padding:8px 4px;font-size:12px;font-weight:700;border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius-xs);background:rgba(239,68,68,0.06);color:var(--danger);cursor:pointer;font-family:inherit">x50</button>
+          <div class="flex-row" style="margin-top:4px">
+            <input type="number" id="custom-odds-input" placeholder="Custom odds e.g. 7.5" min="1.5" max="500" step="0.5" class="input-num flex-1" style="font-size:13px" />
+            <button id="custom-odds-btn" class="btn-primary" style="padding:7px 16px">Generate</button>
           </div>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Picks safest games by market type, league quality & odds</div>
+          <span class="gen-options-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'Less options':'More options'">More options</span>
+          <div class="gen-options" id="gen-options-wrap">
+            <div class="flex-row-wrap" style="margin-top:8px" id="auto-gen-btns">
+              <button class="auto-gen-btn gen-pill gen-pill-safe" data-target="2">x2</button>
+              <button class="auto-gen-btn gen-pill gen-pill-safe" data-target="3">x3</button>
+              <button class="auto-gen-btn gen-pill gen-pill-mid" data-target="5">x5</button>
+              <button class="auto-gen-btn gen-pill gen-pill-mid" data-target="10">x10</button>
+              <button class="auto-gen-btn gen-pill gen-pill-risky" data-target="20">x20</button>
+              <button class="auto-gen-btn gen-pill gen-pill-risky" data-target="50">x50</button>
+            </div>
+            <div class="flex-row-wrap" style="margin-top:8px;gap:4px" id="market-filter-chips">
+              <span style="font-size:10px;color:var(--text-muted);font-weight:600;margin-right:2px">Market:</span>
+              <button class="chip active" data-mf="" style="font-size:10px;padding:4px 10px">All</button>
+              <button class="chip" data-mf="over/under" style="font-size:10px;padding:4px 10px">Over/Under</button>
+              <button class="chip" data-mf="gg" style="font-size:10px;padding:4px 10px">GG/NG</button>
+              <button class="chip" data-mf="1x2" style="font-size:10px;padding:4px 10px">1X2</button>
+              <button class="chip" data-mf="double chance" style="font-size:10px;padding:4px 10px">Double Chance</button>
+              <button class="chip" data-mf="handicap" style="font-size:10px;padding:4px 10px">Handicap</button>
+            </div>
+          </div>
+          <div class="card-hint">3 strategies: Safe, Value, High-Risk. Filter by market, enter any odds or pick a preset.</div>
         </div>
       </div>
 
-      <!-- RESULTS AREA (loaded code / generated codes) -->
-      <div id="loaded-code-result" style="display:none;margin-bottom:14px"></div>
-      <div id="auto-gen-results" style="margin-bottom:14px"></div>
-      <div id="generated-code-result" style="display:none;margin-bottom:14px"></div>
+      <!-- RESULTS AREA (right below generate, immediately visible) -->
+      <div id="loaded-code-result" style="display:none;margin-bottom:16px"></div>
+      <div id="auto-gen-results" style="margin-bottom:16px"></div>
+      <div id="auto-gen-clear-wrap" style="display:none;text-align:right;margin:-10px 0 14px">
+        <button id="auto-gen-clear" class="btn-outline" style="font-size:11px;padding:5px 14px;color:var(--danger);border-color:rgba(239,68,68,0.2)">Clear generated codes</button>
+      </div>
+      <div id="generated-code-result" style="display:none;margin-bottom:16px"></div>
 
-      <!-- STICKY SELECTION BAR -->
-      <div id="generate-bar" style="display:none;position:sticky;top:var(--header-h);z-index:50;padding:8px 16px;background:rgba(59,130,246,0.1);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius-sm);margin-bottom:14px;align-items:center;gap:10px">
-        <span style="font-size:12px;font-weight:700;color:var(--accent)" id="gen-count">0 selected</span>
-        <span style="font-size:11px;color:var(--text-dim)" id="gen-odds">Total: --</span>
-        <div style="flex:1"></div>
-        <button id="gen-clear-btn" style="padding:5px 12px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-xs);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit">Clear</button>
-        <button id="gen-code-btn" style="padding:6px 16px;font-size:12px;font-weight:700;border:none;border-radius:var(--radius-xs);background:var(--accent);color:#fff;cursor:pointer;font-family:inherit">Generate Code</button>
+      <!-- COLLAPSIBLE: Live Tracker -->
+      <div class="collapsible" id="col-tracker">
+        <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="card-title-icon">&#128225;</span>
+          <span class="ch-label">Live Code Tracker</span>
+          <span id="tracker-status" class="ch-hint"></span>
+          <span class="ch-arrow">&#9660;</span>
+        </div>
+        <div class="collapsible-body"><div class="collapsible-inner">
+          <div class="flex-row" style="margin-bottom:10px">
+            <input type="text" id="tracker-input" placeholder="Enter codes: ABC123, DEF456, GHI789" class="input-mono flex-1" style="font-size:13px;letter-spacing:1px" />
+            <button id="tracker-start-btn" class="btn-primary">Track</button>
+            <button id="tracker-stop-btn" class="btn-danger" style="display:none">Stop</button>
+          </div>
+          <div id="tracker-summary" style="display:none;margin-bottom:10px"></div>
+          <div id="tracker-cards"></div>
+        </div></div>
       </div>
 
-      <!-- SCRAPED CODES LIST -->
+      <!-- COLLAPSIBLE: Bankroll Calculator -->
+      <div class="collapsible" id="col-bankroll">
+        <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="card-title-icon">&#128176;</span>
+          <span class="ch-label">Bankroll Strategy</span>
+          <span class="ch-hint">Calculate optimal stakes</span>
+          <span class="ch-arrow">&#9660;</span>
+        </div>
+        <div class="collapsible-body"><div class="collapsible-inner">
+          <div class="flex-row-wrap" style="margin-bottom:12px;gap:10px">
+            <div style="flex:1;min-width:80px">
+              <label class="input-label">Bankroll</label>
+              <input type="number" id="br-bankroll" value="3000" min="100" step="100" class="input-num" oninput="updateBankroll()" />
+            </div>
+            <div style="flex:1;min-width:60px">
+              <label class="input-label">Codes</label>
+              <input type="number" id="br-codes" value="3" min="1" max="10" class="input-num" oninput="updateBankroll()" />
+            </div>
+            <div style="flex:1;min-width:60px">
+              <label class="input-label">Target Odds</label>
+              <input type="number" id="br-odds" value="5" min="1.5" max="100" step="0.5" class="input-num" oninput="updateBankroll()" />
+            </div>
+          </div>
+          <div id="br-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px"></div>
+        </div></div>
+      </div>
+
+      <!-- COLLAPSIBLE: Compare Codes -->
+      <div class="collapsible" id="col-compare">
+        <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="card-title-icon">&#128260;</span>
+          <span class="ch-label">Compare Codes</span>
+          <span class="ch-hint">Find repeated matches</span>
+          <span class="ch-arrow">&#9660;</span>
+        </div>
+        <div class="collapsible-body"><div class="collapsible-inner">
+          <div class="flex-row-wrap">
+            <input type="text" id="compare-code-a" placeholder="Code A" maxlength="8" class="input-mono" style="flex:1;min-width:80px" />
+            <span class="vs-label">vs</span>
+            <input type="text" id="compare-code-b" placeholder="Code B" maxlength="8" class="input-mono" style="flex:1;min-width:80px" />
+            <button id="compare-codes-btn" class="btn-primary">Compare</button>
+          </div>
+          <div id="compare-result" style="display:none;margin-top:12px"></div>
+        </div></div>
+      </div>
+
+      <!-- STICKY SELECTION BAR -->
+      <div id="generate-bar" class="generate-bar">
+        <span style="font-size:12px;font-weight:700;color:var(--accent)" id="gen-count">0 selected</span>
+        <span style="font-size:11px;color:var(--text-dim)" id="gen-odds">Total: --</span>
+        <div class="header-spacer"></div>
+        <button id="gen-clear-btn" class="btn-outline">Clear</button>
+        <button id="gen-code-btn" class="btn-primary">Generate Code</button>
+      </div>
+
+      <!-- CODES LIST -->
       <div class="section-title">
-        <h2>Scraped Codes</h2>
+        <h2>Available Codes</h2>
+        <span id="codes-updated" style="font-size:10px;color:var(--text-muted);font-weight:500"></span>
         <span class="badge-count" id="codes-count">--</span>
       </div>
       <div class="picks-list" id="codes-list">
@@ -675,93 +433,37 @@ body{min-height:100vh;overflow-x:hidden}
       </div>
     </div>
 
-    <!-- TAB: ALL CODES -->
-    <div class="tab-panel" id="panel-all-codes">
-      <!-- CONVERT INPUT -->
-      <div style="background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:16px;margin-bottom:14px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">&#128260;</span> Convert to Sportybet
-        </div>
-        <div style="display:flex;gap:6px">
-          <input type="text" id="convert-code-input" placeholder="Paste Bet9ja, 1xBet, etc. code..." maxlength="12" style="flex:1;padding:8px 12px;font-size:14px;font-family:monospace;letter-spacing:1px;text-transform:uppercase;border:1px solid rgba(255,255,255,0.1);border-radius:var(--radius-xs);background:var(--bg);color:var(--text);outline:none" />
-          <button id="convert-code-btn" style="padding:8px 16px;font-size:12px;font-weight:700;border:none;border-radius:var(--radius-xs);background:var(--success);color:#fff;cursor:pointer;font-family:inherit">Convert</button>
-        </div>
-        <div style="font-size:10px;color:var(--text-muted);margin-top:6px">Checks if the code works on Sportybet (many codes share universal match IDs)</div>
-        <div id="convert-result" style="display:none;margin-top:10px"></div>
+    <!-- TAB: HISTORY -->
+    <div class="tab-panel" id="panel-history">
+      <div id="history-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:16px"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap" id="history-filters">
+        <button class="chip active" data-hf="all">All</button>
+        <button class="chip" data-hf="won" style="color:var(--success);border-color:rgba(34,197,94,0.3)">Won</button>
+        <button class="chip" data-hf="lost" style="color:var(--danger);border-color:rgba(239,68,68,0.3)">Lost</button>
+        <button class="chip" data-hf="pending" style="color:var(--text-dim)">Pending</button>
       </div>
-      <!-- PLATFORM FILTERS -->
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;flex-wrap:wrap;overflow-x:auto" id="platform-filters">
-        <button class="chip active" data-platform="" style="font-size:11px;padding:5px 12px">All</button>
-      </div>
-      <!-- CODES LIST -->
-      <div class="section-title">
-        <h2>All Platform Codes</h2>
-        <span class="badge-count" id="all-codes-count">--</span>
-      </div>
-      <div class="picks-list" id="all-codes-list">
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
+      <div id="history-list"></div>
+      <div style="text-align:center;margin-top:16px">
+        <button id="history-clear-btn" class="btn-outline" style="font-size:11px;padding:6px 16px;color:var(--danger);border-color:rgba(239,68,68,0.2)">Clear History</button>
       </div>
     </div>
 
-    <!-- TAB: MATCHES -->
-    <div class="tab-panel" id="panel-matches">
-      <div class="section-title">
-        <h2>Upcoming Matches</h2>
-        <span class="badge-count" id="matches-count">--</span>
-      </div>
-      <div class="matches-list" id="matches-list">
-        <div class="skeleton skel-match"></div>
-        <div class="skeleton skel-match"></div>
-        <div class="skeleton skel-match"></div>
-        <div class="skeleton skel-match"></div>
-        <div class="skeleton skel-match"></div>
-      </div>
-    </div>
-
-    <!-- TAB: SOURCES -->
-    <div class="tab-panel" id="panel-sources">
-      <div class="section-title">
-        <h2>Adapter Status</h2>
-        <span class="badge-count" id="sources-tab-count">--</span>
-      </div>
-      <div class="sources-filter" style="display:flex;gap:6px;margin-bottom:16px">
-        <button class="conf-chip active" data-src-filter="all">All</button>
-        <button class="conf-chip" data-src-filter="working">Working</button>
-        <button class="conf-chip" data-src-filter="dead">Dead</button>
-      </div>
-      <div class="sources-grid" id="sources-grid">
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-        <div class="skeleton skel-pick"></div>
-      </div>
-    </div>
   </div>
 
 
 </div>
 
+<div id="toast-container" style="position:fixed;bottom:24px;right:24px;z-index:1000;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
+
 <script>
 // ===== STATE =====
 const S = {
-  sport: '',
-  date: '',
-  matchPredictions: {},
-  lastStatsSig: '',
-  lastMatchesSig: '',
-  lastPicksSig: '',
-  activeTab: 'all-picks',
-  ouLoaded: false,
-  hcLoaded: false,
+  activeTab: 'booking-codes',
   codesLoaded: false,
-  allCodesLoaded: false,
-  allCodesData: [],
 };
 
 const API = '';
-const POLL_MS = 30000;
-let confMinScore = 0;
+const POLL_MS = 60000;
 
 // ===== SPORT CONFIG =====
 const SPORTS = {
@@ -786,6 +488,15 @@ async function api(path) {
 const _escDiv = document.createElement('div');
 function esc(s) { if (!s) return ''; _escDiv.textContent = s; return _escDiv.innerHTML; }
 
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
 // ===== DATE HELPERS =====
 function toDateStr(d) {
   if (!d) return '';
@@ -806,64 +517,6 @@ function formatShortTime(t) {
   return t.replace(/:00$/, '');
 }
 
-// ===== SCORE TIER =====
-function scoreTier(s) {
-  if (s >= 80) return 'green';
-  if (s >= 65) return 'lime';
-  if (s >= 50) return 'amber';
-  return 'red';
-}
-function tierColor(s) {
-  if (s >= 80) return '#22c55e';
-  if (s >= 65) return '#84cc16';
-  if (s >= 50) return '#f59e0b';
-  return '#ef4444';
-}
-
-// ===== SCORE RING HTML =====
-function scoreRingHTML(score, sizeClass) {
-  const color = tierColor(score);
-  const pct = Math.min(score, 100);
-  return `<div class="score-ring ${sizeClass || ''}">
-    <div class="score-ring-bg"></div>
-    <div class="score-ring-fill" style="background:conic-gradient(${color} calc(${pct}%),transparent 0)"></div>
-    <span class="score-ring-val" style="color:${color}">${score}</span>
-  </div>`;
-}
-
-// ===== SPORT CHIP HANDLERS =====
-function applyChipStyle(btn, sport) {
-  if (btn.classList.contains('active')) {
-    btn.style.background = '#fff';
-    btn.style.borderColor = '#fff';
-    btn.style.color = sport ? sportConf(sport).color : '#0b0f19';
-  } else {
-    btn.style.background = '';
-    btn.style.borderColor = '';
-    btn.style.color = '';
-  }
-}
-
-document.querySelectorAll('#sport-chips .chip').forEach(btn => {
-  btn.onclick = () => {
-    S.sport = btn.dataset.sport;
-    document.querySelectorAll('#sport-chips .chip').forEach(b => {
-      b.classList.remove('active');
-      applyChipStyle(b, b.dataset.sport);
-    });
-    btn.classList.add('active');
-    applyChipStyle(btn, btn.dataset.sport);
-    loadAll();
-  };
-  applyChipStyle(btn, btn.dataset.sport);
-});
-
-// ===== DATE FILTER =====
-document.getElementById('date-filter').addEventListener('change', e => {
-  S.date = e.target.value;
-  loadAll();
-});
-
 // ===== TABS =====
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.onclick = () => {
@@ -873,638 +526,31 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     S.activeTab = btn.dataset.tab;
     document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
     // lazy load tabs on first switch
-    if (btn.dataset.tab === 'value-bets' && !S.valueBetsLoaded) {
-      loadValueBets();
-    }
-    if (btn.dataset.tab === 'over-under' && !S.ouLoaded) {
-      loadOverUnder();
-    }
-    if (btn.dataset.tab === 'handicap' && !S.hcLoaded) {
-      loadHandicap();
-    }
-    if (btn.dataset.tab === 'all-codes' && !S.allCodesLoaded) {
-      loadAllCodes();
-    }
     if (btn.dataset.tab === 'booking-codes' && !S.codesLoaded) {
       loadBookingCodes();
     }
-    if (btn.dataset.tab === 'sources') {
-      loadSources();
+    if (btn.dataset.tab === 'history') {
+      renderHistory();
+      refreshHistoryStatuses();
     }
   };
 });
-
-// ===== CONFIDENCE FILTER =====
-document.querySelectorAll('#conf-filters .conf-chip').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('#conf-filters .conf-chip').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    confMinScore = parseInt(btn.dataset.min || '0', 10);
-    applyConfFilter();
-  };
-});
-
-function applyConfFilter() {
-  document.querySelectorAll('.pick-card').forEach(card => {
-    const score = parseInt(card.dataset.score || '0', 10);
-    card.style.display = score >= confMinScore ? '' : 'none';
-  });
-}
-
-// ===== CAROUSEL NAV =====
-document.getElementById('carousel-prev').onclick = () => {
-  const track = document.getElementById('top5-grid');
-  track.scrollBy({ left: -284, behavior: 'smooth' });
-};
-document.getElementById('carousel-next').onclick = () => {
-  const track = document.getElementById('top5-grid');
-  track.scrollBy({ left: 284, behavior: 'smooth' });
-};
-
-// ===== STATS =====
-async function loadStats() {
-  const s = await api('/predictions/stats');
-  const sig = JSON.stringify(s);
-  const changed = S.lastStatsSig && sig !== S.lastStatsSig;
-  S.lastStatsSig = sig;
-
-  animateValue('stat-preds', s.total_predictions || 0);
-  animateValue('stat-sources', s.active_sources || 0);
-  animateValue('stat-matches', s.total_matches || 0);
-  animateValue('stat-sports', (s.bySport || []).length || 0);
-
-  if (changed) {
-    document.querySelectorAll('.stat-item').forEach(el => {
-      el.classList.remove('updated');
-      void el.offsetWidth;
-      el.classList.add('updated');
-    });
-  }
-  return changed;
-}
-
-
-function animateValue(id, target) {
-  const el = document.getElementById(id);
-  const current = parseInt(el.textContent) || 0;
-  if (current === target) { el.textContent = target.toLocaleString(); return; }
-  const diff = target - current;
-  const steps = Math.min(Math.abs(diff), 20);
-  const stepTime = 300 / steps;
-  let i = 0;
-  const timer = setInterval(() => {
-    i++;
-    const progress = i / steps;
-    const val = Math.round(current + diff * progress);
-    el.textContent = val.toLocaleString();
-    if (i >= steps) clearInterval(timer);
-  }, stepTime);
-}
-
-// ===== BREAKDOWN BARS COLORS =====
-const BREAKDOWN_COLORS = {
-  sourceAgreement: '#3b82f6',
-  confidence: '#f59e0b',
-  margin: '#22c55e',
-  value: '#a855f7',
-  sourceAccuracy: '#e879f9',
-  alignment: '#06b6d4',
-  form: '#ea580c',
-  h2h: '#ef4444',
-  homeAdvantage: '#84cc16'
-};
-const BREAKDOWN_MAXES = {
-  sourceAgreement: 20,
-  confidence: 30,
-  margin: 25,
-  value: 20,
-  sourceAccuracy: 15,
-  alignment: 10,
-  form: 10,
-  h2h: 5,
-  homeAdvantage: 5
-};
-const BREAKDOWN_LABELS = {
-  sourceAgreement: 'Sources',
-  confidence: 'Confidence',
-  margin: 'Margin',
-  value: 'Value',
-  sourceAccuracy: 'Accuracy',
-  alignment: 'Alignment',
-  form: 'Form',
-  h2h: 'H2H',
-  homeAdvantage: 'Home Adv'
-};
-
-function breakdownBarsHTML(bd) {
-  if (!bd) return '';
-  const keys = ['sourceAgreement','confidence','margin','value','sourceAccuracy','alignment','form','h2h','homeAdvantage'];
-  // These keys only show when > 0 (0 means no data available, not a real score)
-  const hideWhenZero = new Set(['form','h2h','homeAdvantage','alignment']);
-  let html = '';
-  for (const key of keys) {
-    const val = bd[key];
-    if (val == null) continue;
-    if (val === 0 && hideWhenZero.has(key)) continue;
-    const max = BREAKDOWN_MAXES[key] || 20;
-    const pct = Math.min((val / max) * 100, 100);
-    const color = BREAKDOWN_COLORS[key];
-    const label = BREAKDOWN_LABELS[key];
-    html += `<div class="breakdown-row">
-      <span class="breakdown-label">${label}</span>
-      <div class="breakdown-bar-track"><div class="breakdown-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-      <span class="breakdown-score">${val}/${max}</span>
-    </div>`;
-  }
-  return html;
-}
-
-function breakdownBarsFromPick(p) {
-  const bd = {
-    sourceAgreement: p.sourceAgreement,
-    confidence: p.confidenceScore,
-    margin: p.marginScore,
-    value: p.valueScore,
-    sourceAccuracy: p.sourceAccuracy,
-    alignment: p.alignmentScore,
-  };
-  if (p.formScore) bd.form = p.formScore;
-  if (p.h2hScore) bd.h2h = p.h2hScore;
-  if (p.homeAdvantage) bd.homeAdvantage = p.homeAdvantage;
-  return breakdownBarsHTML(bd);
-}
-
-// ===== TOP 5 PICKS (CAROUSEL) =====
-async function loadTop5() {
-  const grid = document.getElementById('top5-grid');
-  const params = new URLSearchParams();
-  if (S.sport) params.set('sport', S.sport);
-  if (S.date) params.set('date', S.date);
-  params.set('limit', '5');
-  const res = await api('/predictions/top-picks?' + params.toString());
-  const picks = res.data || [];
-
-  document.getElementById('top5-count').textContent = picks.length ? `Top ${picks.length}` : '--';
-
-  if (!picks.length) {
-    grid.innerHTML = '<div class="empty" style="flex:1;min-width:260px">No top picks available yet.</div>';
-    return;
-  }
-
-  grid.innerHTML = '';
-  for (const p of picks) {
-    grid.appendChild(createTopCard(p));
-  }
-}
-
-function createTopCard(p) {
-  const card = document.createElement('div');
-  card.className = 'top-card';
-  card.dataset.sport = p.sport;
-
-  const conf = sportConf(p.sport);
-  const bd = p.breakdown;
-  const evBadge = p.ev ? `<span class="ev-badge">+${(p.ev * 100).toFixed(0)}% EV</span>` : '';
-
-  card.innerHTML = `
-    <div class="top-card-rank">#${p.rank}</div>
-    <div class="top-card-head">
-      ${scoreRingHTML(p.score)}
-      <div class="top-card-info">
-        <div class="top-card-match">${esc(p.match)}</div>
-        <div class="top-card-meta">
-          <span class="sport-badge" style="background:${conf.bg};color:${conf.color}">${conf.label}</span>
-          <span style="font-size:11px;color:var(--text-muted)">${formatDate(p.date)}</span>
-        </div>
-      </div>
-    </div>
-    <div class="top-card-pills">
-      <span class="rec-pill side-${p.pick}">${p.pick}</span>
-      ${evBadge}
-    </div>
-    <div class="top-card-analysis">${esc(p.analysis)}</div>
-    <div class="top-card-detail">
-      <div class="top-card-sources">
-        ${breakdownBarsHTML(bd)}
-      </div>
-    </div>
-  `;
-
-  card.onclick = () => card.classList.toggle('expanded');
-  return card;
-}
-
-// ===== BEST PICKS =====
-async function loadPicks() {
-  const grid = document.getElementById('picks-list');
-  const params = new URLSearchParams();
-  if (S.sport) params.set('sport', S.sport);
-  if (S.date) params.set('date', S.date);
-  const res = await api('/predictions/best-multis?' + params.toString());
-  const filtered = (res.data || []).filter(d => d.picks.length > 0);
-
-  const filteredTotal = filtered.reduce((n, d) => n + d.picks.length, 0);
-  document.getElementById('picks-count').textContent = `${filteredTotal} picks`;
-
-  const sig = JSON.stringify(filtered.map(d => d.date + d.picks.map(p => p.matchId + p.score).join()));
-  if (S.lastPicksSig && sig === S.lastPicksSig) return false;
-  S.lastPicksSig = sig;
-
-  if (!filtered.length) {
-    grid.innerHTML = '<div class="empty">No analyzed picks available yet.</div>';
-    return true;
-  }
-
-  grid.innerHTML = '';
-  for (const day of filtered) {
-    const divider = document.createElement('div');
-    divider.className = 'date-divider';
-    divider.innerHTML = `${formatDate(day.date)} <span class="pick-count">${day.picks.length}</span>`;
-    grid.appendChild(divider);
-
-    for (const p of day.picks) {
-      grid.appendChild(createPickCard(p));
-    }
-  }
-  applyConfFilter();
-  return true;
-}
-
-function createPickCard(p) {
-  const card = document.createElement('div');
-  card.className = 'pick-card';
-  card.dataset.sport = p.sport;
-  card.dataset.score = p.score;
-
-  const conf = sportConf(p.sport);
-  const teamName = p.recommendation === 'home' ? p.homeTeam : p.recommendation === 'away' ? p.awayTeam : 'Draw';
-  const pickLabel = p.pickType === 'moneyline' ? teamName + ' ML'
-    : p.pickType === 'spread' ? teamName + ' Spread'
-    : p.pickType.replace('_', ' ');
-  const oddsText = p.bestOdds ? `${p.bestOdds.toFixed(2)}x` : '';
-  const probText = p.impliedProb ? `${p.impliedProb}%` : '';
-  const evBadge = p.ev ? `<span class="ev-badge">+${(p.ev * 100).toFixed(0)}% EV</span>` : '';
-
-  card.innerHTML = `
-    <div class="pick-header">
-      ${scoreRingHTML(p.score)}
-      <div class="pick-info">
-        <div class="pick-teams">${esc(p.homeTeam)}<span class="vs">vs</span>${esc(p.awayTeam)}</div>
-        <div class="pick-meta">
-          <span class="sport-badge" style="background:${conf.bg};color:${conf.color}">${conf.label}</span>
-          ${p.gameTime ? '<span>' + esc(formatShortTime(p.gameTime)) + '</span>' : ''}
-          ${oddsText ? '<span>' + oddsText + '</span>' : ''}
-          ${probText ? '<span>' + probText + ' implied</span>' : ''}
-        </div>
-      </div>
-      <div class="pick-right">
-        <span class="rec-pill side-${p.recommendation}">${esc(pickLabel)}</span>
-        ${evBadge}
-        ${oddsText ? `<span class="pick-odds">${oddsText}</span>` : ''}
-      </div>
-    </div>
-    ${p.analysis ? `<div class="pick-analysis">${esc(p.analysis)}</div>` : ''}
-    <div class="score-breakdown">
-      <span class="score-dot"><span class="dot" style="background:#3b82f6"></span>${p.sourceAgreement}<span class="tooltip">Sources: ${p.sourceAgreement}/20</span></span>
-      <span class="score-dot"><span class="dot" style="background:#f59e0b"></span>${p.confidenceScore}<span class="tooltip">Confidence: ${p.confidenceScore}/30</span></span>
-      <span class="score-dot"><span class="dot" style="background:#22c55e"></span>${p.marginScore}<span class="tooltip">Margin: ${p.marginScore}/25</span></span>
-      <span class="score-dot"><span class="dot" style="background:#a855f7"></span>${p.valueScore}<span class="tooltip">Value: ${p.valueScore}/20</span></span>
-      <span class="score-dot"><span class="dot" style="background:#e879f9"></span>${p.sourceAccuracy}<span class="tooltip">Accuracy: ${p.sourceAccuracy}/15</span></span>
-      ${p.alignmentScore ? `<span class="score-dot"><span class="dot" style="background:#06b6d4"></span>${p.alignmentScore}<span class="tooltip">Alignment: ${p.alignmentScore}/10</span></span>` : ''}
-      ${p.formScore ? `<span class="score-dot"><span class="dot" style="background:#ea580c"></span>${p.formScore}<span class="tooltip">Form: ${p.formScore}/10</span></span>` : ''}
-      ${p.h2hScore ? `<span class="score-dot"><span class="dot" style="background:#ef4444"></span>${p.h2hScore}<span class="tooltip">H2H: ${p.h2hScore}/5</span></span>` : ''}
-      ${p.homeAdvantage ? `<span class="score-dot"><span class="dot" style="background:#84cc16"></span>${p.homeAdvantage}<span class="tooltip">Home Adv: ${p.homeAdvantage}/5</span></span>` : ''}
-    </div>
-    <div class="score-breakdown-bars">
-      ${breakdownBarsFromPick(p)}
-    </div>
-    <div class="pick-detail">
-      ${p.sources && p.sources.length ? `<div style="padding:8px 22px 14px;display:flex;flex-wrap:wrap;gap:4px">${p.sources.map(s => `<span class="source-chip">${esc(s.name)}${s.detail ? ' · ' + esc(s.detail) : ''}</span>`).join('')}</div>` : ''}
-    </div>
-  `;
-
-  card.onclick = () => {
-    card.classList.toggle('expanded');
-  };
-
-  return card;
-}
-
-// ===== OVER/UNDER =====
-async function loadOverUnder() {
-  S.ouLoaded = true;
-  const grid = document.getElementById('ou-list');
-  const params = new URLSearchParams();
-  if (S.sport) params.set('sport', S.sport);
-  if (S.date) params.set('date', S.date);
-
-  try {
-    const res = await api('/predictions/over-under?' + params.toString());
-    const items = res.data || [];
-
-    document.getElementById('ou-count').textContent = items.length ? `${items.length} matches` : '--';
-
-    // Populate best overs & best unders
-    populateBestOU(items);
-
-    if (!items.length) {
-      grid.innerHTML = '<div class="empty">No over/under predictions found for this date/sport.</div>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    for (const m of items) {
-      grid.appendChild(createOUCard(m));
-    }
-  } catch {
-    grid.innerHTML = '<div class="empty">Unable to load over/under predictions.</div>';
-  }
-}
-
-function populateBestOU(items) {
-  const overGrid = document.getElementById('ou-best-over');
-  const underGrid = document.getElementById('ou-best-under');
-
-  // Rank: prefer higher source count, then higher consensus %, non-split only
-  const rank = (arr) => arr
-    .filter(m => m.consensus !== 'split' && m.total >= 2)
-    .sort((a, b) => {
-      const aPct = a.consensusCount / a.total;
-      const bPct = b.consensusCount / b.total;
-      if (b.total !== a.total) return b.total - a.total;
-      return bPct - aPct;
-    });
-
-  const bestOvers = rank(items.filter(m => m.consensus === 'over')).slice(0, 5);
-  const bestUnders = rank(items.filter(m => m.consensus === 'under')).slice(0, 5);
-
-  document.getElementById('ou-best-over-count').textContent = bestOvers.length ? `Top ${bestOvers.length}` : '--';
-  document.getElementById('ou-best-under-count').textContent = bestUnders.length ? `Top ${bestUnders.length}` : '--';
-
-  overGrid.innerHTML = bestOvers.length
-    ? bestOvers.map((m, i) => createBestOUCardHTML(m, i + 1, 'over')).join('')
-    : '<div class="empty" style="font-size:12px">No strong over picks yet.</div>';
-
-  underGrid.innerHTML = bestUnders.length
-    ? bestUnders.map((m, i) => createBestOUCardHTML(m, i + 1, 'under')).join('')
-    : '<div class="empty" style="font-size:12px">No strong under picks yet.</div>';
-}
-
-function createBestOUCardHTML(m, rank, side) {
-  const conf = sportConf(m.sport);
-  const sources = m.sources.filter(s => s.side === side);
-  const lineText = m.line != null ? (side === 'over' ? 'O ' : 'U ') + m.line : side;
-  return `
-    <div class="ou-best-card ${side}">
-      <div class="ou-best-rank">#${rank}</div>
-      <div class="ou-best-match">${esc(m.match)}</div>
-      <div class="ou-best-meta">
-        <span class="sport-badge" style="background:${conf.bg};color:${conf.color};font-size:9px;padding:2px 6px">${conf.label}</span>
-        <span class="ou-best-line ${side}">${lineText}</span>
-        <span class="ou-best-consensus">${m.consensusCount}/${m.total} sources agree</span>
-      </div>
-      <div class="ou-best-sources">
-        ${sources.map(s => `<span class="ou-best-src">${esc(s.source)}${s.value != null ? ' · ' + s.value : ''}</span>`).join('')}
-      </div>
-    </div>
-  `;
-}
-
-function createOUCard(m) {
-  const card = document.createElement('div');
-  card.className = 'ou-card';
-  card.dataset.sport = m.sport;
-
-  const conf = sportConf(m.sport);
-  const overPct = m.total > 0 ? Math.round((m.overCount / m.total) * 100) : 50;
-  const underPct = 100 - overPct;
-  const lineText = m.line != null ? m.line : '--';
-
-  card.innerHTML = `
-    <div class="ou-card-head">
-      <div class="ou-card-match">
-        <div class="ou-card-match-name">${esc(m.match)}</div>
-        <div class="ou-card-meta">
-          <span class="sport-badge" style="background:${conf.bg};color:${conf.color}">${conf.label}</span>
-          <span>${formatDate(m.date)}</span>
-          ${m.gameTime ? '<span>' + esc(formatShortTime(m.gameTime)) + '</span>' : ''}
-        </div>
-      </div>
-      <div class="ou-line">${lineText}</div>
-      <div class="ou-consensus">
-        <span class="ou-consensus-side ${m.consensus}">${m.consensus}</span>
-        <span class="ou-consensus-count">${m.consensusCount}/${m.total} sources</span>
-      </div>
-    </div>
-    <div class="ou-bar-wrap">
-      <span class="ou-bar-label over">Over ${m.overCount}</span>
-      <div class="ou-bar-track">
-        <div class="ou-bar-fill-over" style="width:${overPct}%"></div>
-        <div class="ou-bar-fill-under" style="width:${underPct}%"></div>
-      </div>
-      <span class="ou-bar-label under">Under ${m.underCount}</span>
-    </div>
-    <div class="ou-sources">
-      ${m.sources.map(s => `<span class="ou-source-chip ${s.side}">${esc(s.source)} · ${s.side}${s.value != null ? ' ' + s.value : ''}</span>`).join('')}
-    </div>
-  `;
-
-  card.onclick = () => card.classList.toggle('expanded');
-  return card;
-}
-
-// ===== 1ST HALF HANDICAP =====
-async function loadHandicap() {
-  S.hcLoaded = true;
-  const grid = document.getElementById('hc-list');
-  const params = new URLSearchParams();
-  if (S.date) params.set('date', S.date);
-
-  try {
-    const res = await api('/predictions/handicap-ai?' + params.toString());
-    const items = res.data || [];
-
-    document.getElementById('hc-count').textContent = items.length ? `${items.length} picks` : '--';
-
-    populateHCTopPicks(items);
-
-    if (!items.length) {
-      grid.innerHTML = '<div class="empty">No 1st half handicap picks found. Soccer matches with sufficient data needed.</div>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    for (const m of items) {
-      grid.appendChild(createHCCard(m));
-    }
-  } catch {
-    grid.innerHTML = '<div class="empty">Unable to load handicap predictions.</div>';
-  }
-}
-
-function populateHCTopPicks(items) {
-  const safeGrid = document.getElementById('hc-safe-list');
-  const valueGrid = document.getElementById('hc-value-list');
-
-  // Safest = highest win probability (H1 or H1.5 picks with 75%+)
-  const safest = items.filter(m => m.winProb >= 75 && m.handicap <= 1.5).slice(0, 5);
-  // Best value = best odds with 65%+ win prob, any line
-  const value = [...items]
-    .filter(m => m.impliedOdds >= 1.15 && m.winProb >= 65)
-    .sort((a, b) => b.impliedOdds - a.impliedOdds)
-    .slice(0, 5);
-
-  document.getElementById('hc-safe-count').textContent = safest.length ? `Top ${safest.length}` : '--';
-  document.getElementById('hc-value-count').textContent = value.length ? `Top ${value.length}` : '--';
-
-  safeGrid.innerHTML = safest.length
-    ? safest.map((m, i) => createHCTopCardHTML(m, i + 1)).join('')
-    : '<div class="empty" style="font-size:12px">No picks above 75% probability yet.</div>';
-
-  valueGrid.innerHTML = value.length
-    ? value.map((m, i) => createHCTopCardHTML(m, i + 1)).join('')
-    : '<div class="empty" style="font-size:12px">No value picks found yet.</div>';
-}
-
-function hcPickColor(prob) {
-  if (prob >= 90) return 'var(--success)';
-  if (prob >= 80) return 'var(--accent)';
-  if (prob >= 75) return 'var(--amber)';
-  return 'var(--text-dim)';
-}
-
-function createHCTopCardHTML(m, rank) {
-  const pickCol = m.pickSide === 'away' ? 'var(--away)' : 'var(--home)';
-  return `
-    <div class="hc-best-card ${m.pickSide}" style="border-left-color:${pickCol}">
-      <div class="hc-best-rank" style="display:flex;justify-content:space-between;align-items:center">
-        <span>#${rank}</span>
-        <span style="color:${hcPickColor(m.winProb)};font-size:13px;font-weight:800">${m.winProb}%</span>
-      </div>
-      <div class="hc-best-match">${esc(m.homeTeam)} vs ${esc(m.awayTeam)}</div>
-      <div class="hc-best-meta" style="margin-top:6px">
-        <span style="background:rgba(34,197,94,0.1);color:var(--success);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;border:1px solid rgba(34,197,94,0.2)">${esc(m.pick)}</span>
-        <span style="font-size:10px;color:var(--text-dim);font-weight:600">@${m.impliedOdds}</span>
-        <span style="font-size:9px;color:var(--text-muted)">1st Half</span>
-      </div>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-dim)">
-        FH Score: ${m.likelyFHScore} (${(m.likelyFHProb * 100).toFixed(0)}%) · xG: ${m.fhHomeGoals.toFixed(2)} - ${m.fhAwayGoals.toFixed(2)}
-      </div>
-      ${m.lines && m.lines.length > 1 ? `<div style="display:flex;gap:4px;margin-top:6px">${m.lines.map(l => '<span class="hc-best-src" style="color:' + (l.handicap === m.handicap ? 'var(--accent)' : 'var(--text-muted)') + '">H' + l.handicap + ' @' + l.impliedOdds + ' (' + l.winProb + '%)</span>').join('')}</div>` : ''}
-      <div class="hc-best-sources" style="margin-top:4px">
-        ${m.factors.homeFHStats ? `<span class="hc-best-src">${esc(m.factors.homeFHStats.name)}: FH ${m.factors.homeFHStats.fhScoredHome}/${m.factors.homeFHStats.fhConcededHome}</span>` : m.factors.homeForm ? `<span class="hc-best-src">${esc(m.homeTeam)}: ${m.factors.homeForm.form} · ${m.factors.homeForm.avgScored} gpg</span>` : ''}
-        ${m.factors.awayFHStats ? `<span class="hc-best-src">${esc(m.factors.awayFHStats.name)}: FH ${m.factors.awayFHStats.fhScoredAway}/${m.factors.awayFHStats.fhConcededAway}</span>` : m.factors.awayForm ? `<span class="hc-best-src">${esc(m.awayTeam)}: ${m.factors.awayForm.form} · ${m.factors.awayForm.avgScored} gpg</span>` : ''}
-      </div>
-    </div>
-  `;
-}
-
-function createHCCard(m) {
-  const card = document.createElement('div');
-  card.className = 'hc-card';
-
-  const pickCol = m.pickSide === 'away' ? 'var(--away)' : 'var(--home)';
-  const probCol = hcPickColor(m.winProb);
-
-  // Build factors detail for expanded view
-  let factorsHTML = '';
-  if (m.factors.homeForm) {
-    const hf = m.factors.homeForm;
-    factorsHTML += `<div class="hc-source-chip home">${esc(m.homeTeam)}: ${hf.form} · ${hf.avgScored} gpg · ${hf.avgConceded} conceded · ${hf.winRate}% WR</div>`;
-  }
-  if (m.factors.awayForm) {
-    const af = m.factors.awayForm;
-    factorsHTML += `<div class="hc-source-chip away">${esc(m.awayTeam)}: ${af.form} · ${af.avgScored} gpg · ${af.avgConceded} conceded · ${af.winRate}% WR</div>`;
-  }
-  if (m.factors.h2h) {
-    factorsHTML += `<div class="hc-source-chip" style="color:var(--text-dim)">H2H (last ${m.factors.h2h.total}): Home ${m.factors.h2h.homeWins} - Draw ${m.factors.h2h.draws} - Away ${m.factors.h2h.awayWins}</div>`;
-  }
-  if (m.factors.homeSplit) {
-    factorsHTML += `<div class="hc-source-chip home">${esc(m.homeTeam)} home: ${m.factors.homeSplit.winPct}% WR (${m.factors.homeSplit.wins}/${m.factors.homeSplit.total})</div>`;
-  }
-  if (m.factors.awaySplit) {
-    factorsHTML += `<div class="hc-source-chip away">${esc(m.awayTeam)} away: ${m.factors.awaySplit.winPct}% WR (${m.factors.awaySplit.wins}/${m.factors.awaySplit.total})</div>`;
-  }
-  if (m.factors.adapterMoneyline) {
-    const ml = m.factors.adapterMoneyline;
-    const mlTeam = ml.side === 'home' ? m.homeTeam : m.awayTeam;
-    factorsHTML += `<div class="hc-source-chip" style="color:var(--amber);border-color:rgba(245,158,11,0.2)">ML: ${ml.count}/${ml.total} pick ${esc(mlTeam)}</div>`;
-  }
-  if (m.factors.adapterOverUnder) {
-    const ou = m.factors.adapterOverUnder;
-    factorsHTML += `<div class="hc-source-chip" style="color:var(--amber);border-color:rgba(245,158,11,0.2)">O/U: ${ou.line || '?'} (${ou.side})</div>`;
-  }
-  if (m.factors.homeFHStats) {
-    const s = m.factors.homeFHStats;
-    factorsHTML += `<div class="hc-source-chip" style="color:var(--success);border-color:rgba(34,197,94,0.2)">&#9917; ${esc(s.name)} FH: ${s.fhScoredHome} scored · ${s.fhConcededHome} conceded (home) · ${s.league}</div>`;
-  }
-  if (m.factors.awayFHStats) {
-    const s = m.factors.awayFHStats;
-    factorsHTML += `<div class="hc-source-chip" style="color:var(--success);border-color:rgba(34,197,94,0.2)">&#9917; ${esc(s.name)} FH: ${s.fhScoredAway} scored · ${s.fhConcededAway} conceded (away) · ${s.league}</div>`;
-  }
-
-  card.innerHTML = `
-    <div class="hc-card-head">
-      <div class="hc-card-match">
-        <div class="hc-card-match-name">${esc(m.homeTeam)} <span class="vs">vs</span> ${esc(m.awayTeam)}</div>
-        <div class="hc-card-meta">
-          <span>${formatDate(m.date)}</span>
-          ${m.gameTime ? '<span>' + esc(formatShortTime(m.gameTime)) + '</span>' : ''}
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0">
-        <span style="background:rgba(34,197,94,0.1);color:${pickCol};font-size:12px;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid rgba(34,197,94,0.2);white-space:nowrap">${esc(m.pick)}</span>
-        <span style="font-size:9px;color:var(--text-muted)">1st Half - Handicap</span>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:52px">
-        <span style="font-size:20px;font-weight:800;color:${probCol}">${m.winProb}%</span>
-        <span style="font-size:10px;color:var(--text-dim);font-weight:600">@${m.impliedOdds}</span>
-      </div>
-    </div>
-    <div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--text-dim)">
-      <span>FH xG: <b style="color:var(--text)">${m.fhHomeGoals.toFixed(2)} - ${m.fhAwayGoals.toFixed(2)}</b></span>
-      <span>Likely: <b style="color:var(--text)">${m.likelyFHScore}</b> (${(m.likelyFHProb * 100).toFixed(0)}%)</span>
-      <span>Push: <b>${m.pushProb}%</b></span>
-      <span>Loss: <b style="color:var(--danger)">${m.lossProb}%</b></span>
-    </div>
-    ${m.lines && m.lines.length > 1 ? `
-    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
-      ${m.lines.map(l => {
-        const isActive = l.handicap === m.handicap;
-        const bg = isActive ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.04)';
-        const border = isActive ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)';
-        const col = l.winProb >= 80 ? 'var(--success)' : l.winProb >= 65 ? 'var(--accent)' : 'var(--amber)';
-        return '<div style="display:flex;flex-direction:column;align-items:center;padding:6px 12px;border-radius:8px;background:' + bg + ';border:1px solid ' + border + ';min-width:80px">' +
-          '<span style="font-size:11px;font-weight:700;color:' + col + '">' + esc(l.pick) + '</span>' +
-          '<span style="font-size:14px;font-weight:800;color:var(--text);margin-top:2px">@' + l.impliedOdds + '</span>' +
-          '<span style="font-size:9px;color:var(--text-dim)">' + l.winProb + '% win · ' + l.lossProb + '% loss</span>' +
-        '</div>';
-      }).join('')}
-    </div>` : ''}
-    ${m.analysis ? `<div style="margin-top:8px;font-size:11px;color:var(--text-dim);line-height:1.5;display:none" class="hc-analysis">${esc(m.analysis)}</div>` : ''}
-    <div class="hc-sources">
-      ${factorsHTML}
-    </div>
-  `;
-
-  card.onclick = () => {
-    card.classList.toggle('expanded');
-    const analysis = card.querySelector('.hc-analysis');
-    if (analysis) analysis.style.display = card.classList.contains('expanded') ? 'block' : 'none';
-  };
-  return card;
-}
 
 // ===== BOOKING CODES =====
 async function loadBookingCodes() {
   S.codesLoaded = true;
   const grid = document.getElementById('codes-list');
 
+  grid.innerHTML = '<div style="padding:20px;text-align:center"><div class="gen-loading-spinner" style="margin:0 auto 12px;width:28px;height:28px"></div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Loading codes...</div><div id="load-sources-status" style="font-size:11px;color:var(--text-muted);line-height:1.8">Fetching latest codes from multiple regions...</div></div>';
+
   try {
     const res = await api('/predictions/booking-codes');
     const codes = res.data || [];
 
     document.getElementById('codes-count').textContent = codes.length ? `${codes.length} codes` : '--';
+    const abCodes = document.getElementById('ab-codes');
+    if (abCodes) abCodes.innerHTML = '<span class="ab-num">' + codes.length + '</span> codes';
+    document.getElementById('codes-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
 
     if (!codes.length) {
       grid.innerHTML = '<div class="empty">No booking codes found. Sites may be updating — try again in a few minutes.</div>';
@@ -1514,8 +560,15 @@ async function loadBookingCodes() {
     grid.innerHTML = '';
     for (const c of codes) {
       grid.appendChild(createCodeCard(c));
-      addToGamePool(c.selections);
+      recordConsensus(c.selections, c.code);  // track consensus across ALL codes
+      addToGamePool(c.selections);             // only pending games enter the pool
     }
+
+    const conPicks = gamePool.filter(g => getConsensus(g) >= 2).length;
+    const abCon = document.getElementById('ab-consensus');
+    if (abCon) abCon.innerHTML = '<span class="ab-num">' + conPicks + '</span> consensus';
+
+    showToast(codes.length + ' codes loaded', 'success');
   } catch {
     grid.innerHTML = '<div class="empty">Unable to load booking codes.</div>';
   }
@@ -1538,6 +591,21 @@ function buildSelectionsHTML(selections, expanded) {
       <span style="color:${color};font-weight:700;flex-shrink:0;min-width:70px">${esc(s.pick)}</span>
       <span style="font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0;min-width:40px;text-align:right;color:var(--amber)">@${s.odds}</span>
       ${s.score ? `<span style="color:var(--text-muted);flex-shrink:0;min-width:30px;text-align:center;font-weight:600">${s.score}</span>` : '<span style="flex-shrink:0;min-width:30px"></span>'}
+      ${(() => {
+        let badges = '';
+        // Sharp money badge
+        const mv = oddsMovement(s);
+        if (mv.isSharpMoney) badges += '<span style="font-size:8px;font-weight:700;color:var(--success);background:rgba(34,197,94,0.12);padding:1px 4px;border-radius:3px;flex-shrink:0">&#9889; Sharp ' + mv.pctChange + '%</span> ';
+        else if (mv.dropped) badges += '<span style="font-size:8px;font-weight:600;color:var(--text-dim);background:rgba(255,255,255,0.05);padding:1px 4px;border-radius:3px;flex-shrink:0">&#8595; ' + mv.pctChange + '%</span> ';
+        // Trap badges
+        const tr = detectTraps(s);
+        badges += tr.map(t => {
+          const col = t.severity === 'high' ? 'var(--danger)' : t.severity === 'medium' ? 'var(--amber)' : 'var(--text-muted)';
+          const bg = t.severity === 'high' ? 'rgba(239,68,68,0.1)' : t.severity === 'medium' ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.05)';
+          return '<span style="font-size:8px;font-weight:700;color:' + col + ';background:' + bg + ';padding:1px 4px;border-radius:3px;flex-shrink:0">&#9888; ' + esc(t.label) + '</span>';
+        }).join(' ');
+        return badges;
+      })()}
     </div>`;
   }).join('');
 
@@ -1617,205 +685,514 @@ function createCodeCard(c) {
       copyBtn.textContent = 'OK!';
       copyBtn.style.background = 'rgba(34,197,94,0.2)';
       setTimeout(() => { copyBtn.textContent = 'COPY'; copyBtn.style.background = ''; }, 1500);
+      showToast('Code copied!', 'success');
     });
   };
 
   return card;
 }
 
-// ===== ALL-PLATFORM CODES =====
-const PLATFORM_COLORS = {
-  sportybet:'#22c55e', bet9ja:'#e63946', '1xbet':'#3b82f6', betway:'#8b5cf6',
-  msport:'#f59e0b', betpawa:'#06b6d4', betwinner:'#ec4899', betika:'#14b8a6',
-  '22bet':'#f97316', hollywoodbet:'#a855f7', megapari:'#6366f1', melbet:'#0ea5e9',
-  linebet:'#84cc16', bangbet:'#ef4444', merrybet:'#10b981', sportpesa:'#3b82f6',
-  soccabet:'#22c55e', helabet:'#f59e0b', paripesa:'#8b5cf6', odibet:'#06b6d4',
-  betbaba:'#ec4899',
-};
+// ===== LIVE CODE TRACKER =====
+let trackerInterval = null;
+let trackedCodes = JSON.parse(localStorage.getItem('trackedCodes') || '[]');
 
-async function loadAllCodes() {
-  S.allCodesLoaded = true;
-  const grid = document.getElementById('all-codes-list');
-  try {
-    const res = await api('/predictions/all-codes');
-    S.allCodesData = res.data || [];
-    const platforms = res.platforms || [];
-
-    document.getElementById('all-codes-count').textContent = S.allCodesData.length ? S.allCodesData.length + ' codes' : '--';
-
-    // Build platform filter chips
-    const filterDiv = document.getElementById('platform-filters');
-    filterDiv.innerHTML = '<button class="chip active" data-platform="" style="font-size:11px;padding:5px 12px">All (' + S.allCodesData.length + ')</button>';
-    // Count per platform
-    const platCounts = {};
-    for (const c of S.allCodesData) { platCounts[c.platform] = (platCounts[c.platform] || 0) + 1; }
-    // Sort platforms by count descending
-    const sorted = Object.entries(platCounts).sort((a, b) => b[1] - a[1]);
-    for (const [plat, count] of sorted) {
-      const color = PLATFORM_COLORS[plat] || 'var(--text-dim)';
-      filterDiv.innerHTML += `<button class="chip" data-platform="${esc(plat)}" style="font-size:11px;padding:5px 12px;color:${color};border-color:${color}40">${esc(plat)} (${count})</button>`;
-    }
-
-    // Attach filter clicks
-    filterDiv.querySelectorAll('.chip').forEach(btn => {
-      btn.onclick = () => {
-        filterDiv.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderAllCodes(btn.dataset.platform);
-      };
-    });
-
-    renderAllCodes('');
-  } catch {
-    grid.innerHTML = '<div class="empty">Unable to load codes.</div>';
-  }
+// Restore tracked codes into input on load
+if (trackedCodes.length) {
+  document.getElementById('tracker-input').value = trackedCodes.join(', ');
 }
 
-function renderAllCodes(platformFilter) {
-  const grid = document.getElementById('all-codes-list');
-  const filtered = platformFilter
-    ? S.allCodesData.filter(c => c.platform === platformFilter)
-    : S.allCodesData;
+async function fetchTrackerData(codes) {
+  try {
+    const res = await fetch('/predictions/track-codes?codes=' + encodeURIComponent(codes.join(',')));
+    const json = await res.json();
+    return json.data || [];
+  } catch { return []; }
+}
 
-  document.getElementById('all-codes-count').textContent = filtered.length + ' codes';
+function renderTracker(data) {
+  const cards = document.getElementById('tracker-cards');
+  const summary = document.getElementById('tracker-summary');
+  const statusEl = document.getElementById('tracker-status');
 
-  if (!filtered.length) {
-    grid.innerHTML = '<div class="empty">No codes found for this platform.</div>';
+  if (!data.length) {
+    cards.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:10px">No data</div>';
     return;
   }
 
-  grid.innerHTML = '';
-  for (const c of filtered) {
-    grid.appendChild(createAllCodeCard(c));
-  }
-}
+  const alive = data.filter(d => d.valid && !d.isDead).length;
+  const dead = data.filter(d => d.isDead).length;
+  const allWon = data.filter(d => d.valid && d.pendingCount === 0 && d.lostCount === 0 && d.wonCount > 0).length;
+  const totalCodes = data.filter(d => d.valid).length;
 
-function createAllCodeCard(c) {
-  const card = document.createElement('div');
-  card.style.cssText = 'background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:6px;transition:all 0.2s';
-
-  const color = PLATFORM_COLORS[c.platform] || 'var(--text-dim)';
-  const oddsText = c.totalOdds ? c.totalOdds.toLocaleString(undefined, {maximumFractionDigits:2}) : '';
-  const isSporty = c.platform === 'sportybet';
-  const hasSportyEquiv = c.sportyCode && c.sportyCode !== c.code;
-
-  // Sportybet equivalent badge
-  let sportyBadge = '';
-  if (hasSportyEquiv) {
-    sportyBadge = `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(34,197,94,0.08);color:var(--success);border:1px solid rgba(34,197,94,0.2);cursor:pointer;user-select:all" class="sporty-equiv" title="Click to copy Sportybet code">Sporty: ${esc(c.sportyCode)}</span>`;
-  } else if (!isSporty) {
-    sportyBadge = `<button class="try-convert-btn" data-code="${esc(c.code)}" style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(59,130,246,0.08);color:var(--accent);border:1px solid rgba(59,130,246,0.2);cursor:pointer;font-family:inherit">Try Sportybet</button>`;
-  }
-
-  card.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;background:${color}18;color:${color};border:1px solid ${color}30;text-transform:uppercase;letter-spacing:0.5px;flex-shrink:0;min-width:60px;text-align:center">${esc(c.platform)}</span>
-      <span style="font-size:16px;font-weight:800;font-family:monospace;letter-spacing:1.5px;color:var(--text);user-select:all;flex-shrink:0">${esc(c.code)}</span>
-      <button class="copy-btn" style="font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--text-dim);cursor:pointer;font-family:inherit;font-weight:700;flex-shrink:0">COPY</button>
-      ${sportyBadge}
-      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;font-size:11px;color:var(--text-dim);justify-content:flex-end">
-        ${c.events ? `<span>${c.events}g</span>` : ''}
-        ${oddsText ? `<span style="color:var(--amber);font-weight:700">@${oddsText}</span>` : ''}
-        ${c.postedAgo ? `<span style="color:var(--text-muted)">${esc(c.postedAgo)}</span>` : ''}
-      </div>
-    </div>
-    ${c.convertedFrom ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Converted from ${esc(c.convertedFrom.platform)}: ${esc(c.convertedFrom.code)}</div>` : ''}
+  summary.style.display = 'flex';
+  summary.style.cssText += 'gap:12px;font-size:12px;flex-wrap:wrap;padding:8px 12px;border-radius:var(--radius-xs);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)';
+  summary.innerHTML = `
+    <span style="font-weight:700;color:var(--success)">${alive} alive</span>
+    ${dead > 0 ? `<span style="font-weight:700;color:var(--danger)">${dead} dead</span>` : ''}
+    ${allWon > 0 ? `<span style="font-weight:700;color:var(--success)">${allWon} fully won</span>` : ''}
+    <span style="color:var(--text-muted)">${totalCodes} codes tracked</span>
   `;
 
-  // Copy main code
-  card.querySelector('.copy-btn').onclick = (e) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(c.code).then(() => {
-      e.target.textContent = 'OK!';
-      e.target.style.color = 'var(--success)';
-      setTimeout(() => { e.target.textContent = 'COPY'; e.target.style.color = ''; }, 1500);
-    });
-  };
+  statusEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
 
-  // Copy Sportybet equivalent
-  const sportyEquiv = card.querySelector('.sporty-equiv');
-  if (sportyEquiv) {
-    sportyEquiv.onclick = (e) => {
-      e.stopPropagation();
-      navigator.clipboard.writeText(c.sportyCode).then(() => {
-        sportyEquiv.textContent = 'Copied!';
-        setTimeout(() => { sportyEquiv.textContent = 'Sporty: ' + c.sportyCode; }, 1500);
-      });
-    };
+  cards.innerHTML = '';
+  for (const d of data) {
+    const card = document.createElement('div');
+    const total = d.selections.length || 1;
+    const wonPct = Math.round((d.wonCount / total) * 100);
+    const lostPct = Math.round((d.lostCount / total) * 100);
+    const pendPct = 100 - wonPct - lostPct;
+
+    let borderCol = 'rgba(255,255,255,0.08)';
+    let bgCol = 'transparent';
+    if (d.isDead) { borderCol = 'rgba(239,68,68,0.3)'; bgCol = 'rgba(239,68,68,0.03)'; }
+    else if (d.pendingCount === 0 && d.wonCount > 0) { borderCol = 'rgba(34,197,94,0.3)'; bgCol = 'rgba(34,197,94,0.03)'; }
+
+    const adviceColor = d.isDead ? 'var(--danger)' :
+      d.cashoutAdvice?.includes('cashout') ? 'var(--amber)' :
+      d.cashoutAdvice?.includes('won') ? 'var(--success)' : 'var(--text-dim)';
+
+    card.style.cssText = 'border:1px solid ' + borderCol + ';border-radius:var(--radius-sm);background:' + bgCol + ';padding:12px;margin-bottom:8px';
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:20px;font-weight:800;font-family:monospace;letter-spacing:2px;color:${d.isDead ? 'var(--danger)' : d.pendingCount === 0 ? 'var(--success)' : 'var(--text)'};user-select:all">${esc(d.code)}</span>
+        ${d.isDead ? '<span style="font-size:10px;font-weight:800;color:#fff;background:var(--danger);padding:2px 8px;border-radius:4px">DEAD</span>' : ''}
+        ${!d.isDead && d.pendingCount === 0 && d.wonCount > 0 ? '<span style="font-size:10px;font-weight:800;color:#fff;background:var(--success);padding:2px 8px;border-radius:4px">WON</span>' : ''}
+        <span style="font-size:12px;font-weight:700;color:var(--amber)">@${d.totalOdds}</span>
+        <span style="font-size:11px;color:var(--text-dim)">${d.selections.length} games</span>
+        <span style="font-size:11px;font-weight:700;color:${adviceColor};margin-left:auto">${esc(d.cashoutAdvice || '')}</span>
+      </div>
+      <!-- Progress bar -->
+      <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,0.08);margin-bottom:8px">
+        <div style="width:${wonPct}%;background:var(--success);transition:width 0.5s"></div>
+        <div style="width:${lostPct}%;background:var(--danger);transition:width 0.5s"></div>
+        <div style="width:${pendPct}%;background:rgba(255,255,255,0.15);transition:width 0.5s"></div>
+      </div>
+      <div style="display:flex;gap:12px;font-size:11px;margin-bottom:6px">
+        <span style="color:var(--success);font-weight:700">${d.wonCount} won</span>
+        <span style="color:var(--danger);font-weight:700">${d.lostCount} lost</span>
+        <span style="color:var(--text-dim);font-weight:700">${d.pendingCount} pending</span>
+      </div>
+      ${d.valid ? buildSelectionsHTML(d.selections, d.selections.length <= 12) : '<div style="font-size:11px;color:var(--danger)">Code not recognized</div>'}
+    `;
+    cards.appendChild(card);
   }
-
-  // Try convert button
-  const tryBtn = card.querySelector('.try-convert-btn');
-  if (tryBtn) {
-    tryBtn.onclick = async (e) => {
-      e.stopPropagation();
-      tryBtn.textContent = '...';
-      tryBtn.disabled = true;
-      try {
-        const res = await fetch('/predictions/convert-code/' + encodeURIComponent(c.code));
-        const data = await res.json();
-        if (data.converted) {
-          tryBtn.textContent = 'Works on Sporty!';
-          tryBtn.style.color = 'var(--success)';
-          tryBtn.style.borderColor = 'rgba(34,197,94,0.3)';
-          tryBtn.style.background = 'rgba(34,197,94,0.08)';
-        } else {
-          tryBtn.textContent = 'Not on Sporty';
-          tryBtn.style.color = 'var(--danger)';
-          tryBtn.style.borderColor = 'rgba(239,68,68,0.2)';
-        }
-      } catch {
-        tryBtn.textContent = 'Error';
-        tryBtn.style.color = 'var(--danger)';
-      }
-    };
-  }
-
-  return card;
 }
 
-// ===== CODE CONVERTER =====
-document.getElementById('convert-code-btn').onclick = async () => {
-  const input = document.getElementById('convert-code-input');
-  const resultDiv = document.getElementById('convert-result');
-  const code = input.value.trim().toUpperCase();
-  if (!code || code.length < 4) return;
+function startTracker() {
+  const input = document.getElementById('tracker-input').value.trim().toUpperCase();
+  if (!input) return;
+  const codes = input.split(/[,\s]+/).filter(c => c.length >= 5 && c.length <= 8);
+  if (!codes.length) return;
 
+  trackedCodes = codes;
+  localStorage.setItem('trackedCodes', JSON.stringify(codes));
+
+  document.getElementById('tracker-start-btn').style.display = 'none';
+  document.getElementById('tracker-stop-btn').style.display = '';
+  document.getElementById('tracker-status').textContent = 'Loading...';
+  showToast('Tracking ' + trackedCodes.length + ' codes', 'info');
+
+  // Fetch immediately, then poll every 60s
+  const poll = async () => {
+    const data = await fetchTrackerData(trackedCodes);
+    renderTracker(data);
+  };
+  poll();
+  trackerInterval = setInterval(poll, 60000);
+}
+
+function stopTracker() {
+  if (trackerInterval) { clearInterval(trackerInterval); trackerInterval = null; }
+  document.getElementById('tracker-start-btn').style.display = '';
+  document.getElementById('tracker-stop-btn').style.display = 'none';
+  document.getElementById('tracker-status').textContent = 'Stopped';
+}
+
+document.getElementById('tracker-start-btn').onclick = startTracker;
+document.getElementById('tracker-stop-btn').onclick = stopTracker;
+document.getElementById('tracker-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') startTracker();
+});
+
+// Auto-start if tracked codes exist from previous session
+if (trackedCodes.length) {
+  setTimeout(startTracker, 2000);
+}
+
+// ===== BANKROLL CALCULATOR =====
+function updateBankroll() {
+  const bankroll = parseFloat(document.getElementById('br-bankroll').value) || 0;
+  const numCodes = parseInt(document.getElementById('br-codes').value) || 1;
+  const targetOdds = parseFloat(document.getElementById('br-odds').value) || 2;
+  const div = document.getElementById('br-results');
+
+  const stakeEach = Math.round(bankroll / numCodes);
+  const returnEach = Math.round(stakeEach * targetOdds);
+  const codesNeeded = Math.ceil(numCodes / targetOdds);
+  const breakEvenPct = Math.round((1 / targetOdds) * 100);
+  const profitIf1Wins = returnEach - bankroll;
+  const profitIfAllWin = (returnEach * numCodes) - bankroll;
+  const riskColor = breakEvenPct < 30 ? 'var(--success)' : breakEvenPct < 50 ? 'var(--amber)' : 'var(--danger)';
+  const riskLabel = breakEvenPct < 30 ? 'Low risk' : breakEvenPct < 50 ? 'Medium risk' : 'High risk';
+
+  const stat = (label, value, color) => `
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-xs);padding:8px 10px;text-align:center">
+      <div style="font-size:9px;text-transform:uppercase;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">${label}</div>
+      <div style="font-size:16px;font-weight:800;color:${color || 'var(--text)'}">${value}</div>
+    </div>`;
+
+  div.innerHTML =
+    stat('Stake each', 'GH₵' + stakeEach.toLocaleString(), 'var(--text)') +
+    stat('Return each', 'GH₵' + returnEach.toLocaleString(), 'var(--success)') +
+    stat('Need to win', codesNeeded + '/' + numCodes + ' codes', 'var(--accent)') +
+    stat('Break-even', breakEvenPct + '% win rate', riskColor) +
+    stat('Profit (1 win)', (profitIf1Wins >= 0 ? '+' : '') + 'GH₵' + profitIf1Wins.toLocaleString(), profitIf1Wins >= 0 ? 'var(--success)' : 'var(--danger)') +
+    stat('Profit (all win)', '+GH₵' + profitIfAllWin.toLocaleString(), 'var(--success)') +
+    stat('Risk level', riskLabel, riskColor);
+}
+updateBankroll(); // initialize on page load
+
+// ===== CODE HISTORY =====
+let codeHistory = [];
+try { codeHistory = JSON.parse(localStorage.getItem('codeHistory') || '[]'); } catch { codeHistory = []; }
+function saveCHistory() {
+  // Cap at 200 entries
+  if (codeHistory.length > 200) codeHistory = codeHistory.slice(-200);
+  try { localStorage.setItem('codeHistory', JSON.stringify(codeHistory)); } catch {}
+}
+
+let historyFilter = 'all';
+
+function renderHistory() {
+  const statsDiv = document.getElementById('history-stats');
+  const listDiv = document.getElementById('history-list');
+
+  const won = codeHistory.filter(c => c.status === 'won').length;
+  const lost = codeHistory.filter(c => c.status === 'lost').length;
+  const pending = codeHistory.filter(c => c.status === 'pending').length;
+  const total = codeHistory.length;
+  const decided = won + lost;
+  const winRate = decided > 0 ? Math.round((won / decided) * 100) : 0;
+  // ROI: assume unit stake, return = actualOdds if won, 0 if lost
+  const totalStaked = decided;
+  const totalReturns = codeHistory.filter(c => c.status === 'won').reduce((s, c) => s + (c.actualOdds || 0), 0);
+  const roi = totalStaked > 0 ? Math.round(((totalReturns / totalStaked) - 1) * 100) : 0;
+  // Streak
+  const settled = codeHistory.filter(c => c.status === 'won' || c.status === 'lost').reverse();
+  let streak = '';
+  if (settled.length > 0) {
+    const first = settled[0].status;
+    let count = 0;
+    for (const c of settled) { if (c.status === first) count++; else break; }
+    streak = count + (first === 'won' ? 'W' : 'L');
+  }
+
+  const stat = (label, value, color) => `<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-xs);padding:8px 10px;text-align:center">
+    <div style="font-size:9px;text-transform:uppercase;color:var(--text-muted);font-weight:700;letter-spacing:0.5px;margin-bottom:3px">${label}</div>
+    <div style="font-size:16px;font-weight:800;color:${color || 'var(--text)'}">${value}</div>
+  </div>`;
+
+  statsDiv.innerHTML = stat('Total', total, 'var(--text)') +
+    stat('Won', won, 'var(--success)') +
+    stat('Lost', lost, 'var(--danger)') +
+    stat('Pending', pending, 'var(--text-dim)') +
+    stat('Win Rate', winRate + '%', winRate >= 50 ? 'var(--success)' : winRate > 0 ? 'var(--amber)' : 'var(--text-dim)') +
+    stat('ROI', (roi >= 0 ? '+' : '') + roi + '%', roi >= 0 ? 'var(--success)' : 'var(--danger)') +
+    (streak ? stat('Streak', streak, streak.endsWith('W') ? 'var(--success)' : 'var(--danger)') : '');
+
+  // Filter
+  const filtered = historyFilter === 'all' ? codeHistory : codeHistory.filter(c => c.status === historyFilter);
+
+  if (filtered.length === 0) {
+    listDiv.innerHTML = '<div class="empty">' + (total === 0 ? 'No codes generated yet. Use the generator above!' : 'No codes match this filter.') + '</div>';
+    return;
+  }
+
+  listDiv.innerHTML = [...filtered].reverse().map(c => {
+    const stratBadge = { safe: { color: 'var(--success)', label: 'SAFE' }, value: { color: 'var(--accent)', label: 'VALUE' }, 'high-risk': { color: '#a855f7', label: 'HIGH-RISK' } };
+    const sb = stratBadge[c.strategy] || { color: 'var(--text-dim)', label: c.strategy || '?' };
+    const statusColor = c.status === 'won' ? 'var(--success)' : c.status === 'lost' ? 'var(--danger)' : 'var(--text-dim)';
+    const statusLabel = c.status === 'won' ? 'WON' : c.status === 'lost' ? 'LOST' : 'PENDING';
+    const ago = c.createdAt ? timeAgoShort(c.createdAt) : '';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius-xs);margin-bottom:6px;flex-wrap:wrap">
+      <span style="font-size:16px;font-weight:800;font-family:monospace;letter-spacing:2px;color:${statusColor};user-select:all;min-width:80px">${esc(c.code)}</span>
+      <span style="font-size:9px;font-weight:700;color:${sb.color};background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:3px">${sb.label}</span>
+      <span style="font-size:12px;font-weight:700;color:var(--amber)">@${(c.actualOdds || 0).toFixed(1)}</span>
+      <span style="font-size:10px;color:var(--text-dim)">${c.gamesCount || '?'}g</span>
+      <span style="font-size:10px;color:var(--text-muted)">${ago}</span>
+      <span style="margin-left:auto;font-size:10px;font-weight:800;color:${statusColor};background:${c.status === 'won' ? 'rgba(34,197,94,0.1)' : c.status === 'lost' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)'};padding:3px 8px;border-radius:4px">${statusLabel}</span>
+      ${c.wonCount !== undefined ? `<span style="font-size:9px;color:var(--text-muted)">${c.wonCount}W ${c.lostCount}L ${c.pendingCount}P</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function timeAgoShort(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  return Math.floor(hrs / 24) + 'd ago';
+}
+
+async function refreshHistoryStatuses() {
+  const pending = codeHistory.filter(c =>
+    c.status === 'pending' &&
+    (!c.lastChecked || Date.now() - new Date(c.lastChecked).getTime() > 300000) &&
+    new Date(c.createdAt).getTime() > Date.now() - 3 * 86400000
+  );
+  if (pending.length === 0) return;
+
+  // Batch in groups of 10
+  for (let i = 0; i < pending.length; i += 10) {
+    const batch = pending.slice(i, i + 10);
+    const codes = batch.map(c => c.code).join(',');
+    try {
+      const res = await fetch('/predictions/track-codes?codes=' + encodeURIComponent(codes));
+      const data = await res.json();
+      for (const tracked of (data.data || [])) {
+        const entry = codeHistory.find(c => c.code === tracked.code);
+        if (!entry) continue;
+        entry.wonCount = tracked.wonCount;
+        entry.lostCount = tracked.lostCount;
+        entry.pendingCount = tracked.pendingCount;
+        entry.lastChecked = new Date().toISOString();
+        if (tracked.isDead) entry.status = 'lost';
+        else if (tracked.pendingCount === 0 && tracked.wonCount > 0) entry.status = 'won';
+      }
+    } catch {}
+  }
+  saveCHistory();
+  renderHistory();
+}
+
+// History filter clicks
+document.querySelectorAll('#history-filters .chip').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#history-filters .chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    historyFilter = btn.dataset.hf;
+    renderHistory();
+  };
+});
+
+// Clear history
+document.getElementById('history-clear-btn').onclick = () => {
+  if (confirm('Clear all code history?')) {
+    codeHistory = [];
+    saveCHistory();
+    renderHistory();
+  }
+};
+
+// ===== COMPARE CODES =====
+document.getElementById('compare-codes-btn').onclick = async () => {
+  const codeA = document.getElementById('compare-code-a').value.trim().toUpperCase();
+  const codeB = document.getElementById('compare-code-b').value.trim().toUpperCase();
+  const resultDiv = document.getElementById('compare-result');
   resultDiv.style.display = 'block';
-  resultDiv.innerHTML = '<span style="color:var(--text-dim);font-size:12px">Checking ' + esc(code) + ' on Sportybet...</span>';
+
+  if (!codeA || !codeB || codeA.length < 4 || codeB.length < 4) {
+    resultDiv.innerHTML = '<span style="color:var(--danger);font-size:12px">Enter two valid codes</span>';
+    return;
+  }
+  if (codeA === codeB) {
+    resultDiv.innerHTML = '<span style="color:var(--amber);font-size:12px">Same code entered twice</span>';
+    return;
+  }
+
+  resultDiv.innerHTML = '<span style="color:var(--text-dim);font-size:12px">Loading both codes from Sportybet...</span>';
 
   try {
-    const res = await fetch('/predictions/convert-code/' + encodeURIComponent(code));
-    const data = await res.json();
+    const [resA, resB] = await Promise.all([
+      fetch('/predictions/load-code/' + encodeURIComponent(codeA)),
+      fetch('/predictions/load-code/' + encodeURIComponent(codeB)),
+    ]);
+    const dataA = await resA.json();
+    const dataB = await resB.json();
 
-    if (data.converted) {
-      resultDiv.innerHTML = `
-        <div style="padding:10px;border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-xs);background:rgba(34,197,94,0.05)">
-          <span style="color:var(--success);font-weight:700">&#10003; Works on Sportybet!</span>
-          <span style="font-size:18px;font-weight:800;font-family:monospace;letter-spacing:2px;color:var(--success);margin-left:10px;user-select:all">${esc(code)}</span>
-          <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" style="margin-left:8px;padding:3px 10px;font-size:10px;font-weight:700;border:1px solid rgba(34,197,94,0.3);border-radius:4px;background:rgba(34,197,94,0.1);color:var(--success);cursor:pointer;font-family:inherit">Copy</button>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:4px">This code loads directly on Sportybet. Paste it in the Sportybet app.</div>
-        </div>
-      `;
-    } else {
-      resultDiv.innerHTML = `
-        <div style="padding:10px;border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-xs);background:rgba(239,68,68,0.03)">
-          <span style="color:var(--danger);font-weight:700">&#10060; Not recognized on Sportybet</span>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Try <a href="https://convertbetcodes.com" target="_blank" rel="noopener" style="color:var(--accent)">convertbetcodes.com</a> for manual conversion, or check the code list below for pre-converted Sportybet equivalents.</div>
-        </div>
-      `;
+    if (!dataA.data?.outcomes || !dataB.data?.outcomes) {
+      resultDiv.innerHTML = '<span style="color:var(--danger);font-size:12px">One or both codes not recognized on Sportybet</span>';
+      return;
     }
+
+    const outcomesA = dataA.data.outcomes;
+    const outcomesB = dataB.data.outcomes;
+
+    // Find overlapping eventIds
+    const eventsA = new Map();
+    for (const o of outcomesA) {
+      const market = o.markets?.[0];
+      eventsA.set(o.eventId, {
+        home: o.homeTeamName,
+        away: o.awayTeamName,
+        market: market?.desc || '?',
+        pick: market?.outcomes?.[0]?.desc || '?',
+        odds: market?.outcomes?.[0]?.odds || '?',
+      });
+    }
+
+    const overlaps = [];
+    const onlyB = [];
+    for (const o of outcomesB) {
+      const market = o.markets?.[0];
+      const bInfo = {
+        home: o.homeTeamName,
+        away: o.awayTeamName,
+        market: market?.desc || '?',
+        pick: market?.outcomes?.[0]?.desc || '?',
+        odds: market?.outcomes?.[0]?.odds || '?',
+      };
+
+      if (eventsA.has(o.eventId)) {
+        const aInfo = eventsA.get(o.eventId);
+        const samePick = aInfo.pick === bInfo.pick && aInfo.market === bInfo.market;
+        overlaps.push({ ...bInfo, aInfo, samePick });
+      } else {
+        onlyB.push(bInfo);
+      }
+    }
+
+    const onlyA = outcomesA.filter(o => !outcomesB.some(b => b.eventId === o.eventId));
+
+    // Build result HTML
+    let html = '';
+
+    if (overlaps.length === 0) {
+      html += `<div style="padding:10px;border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-xs);background:rgba(34,197,94,0.05)">
+        <span style="color:var(--success);font-weight:700">&#10003; No repeated matches!</span>
+        <span style="font-size:11px;color:var(--text-dim);margin-left:6px">Safe to stake both codes</span>
+      </div>`;
+    } else {
+      html += `<div style="padding:10px;border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-xs);background:rgba(239,68,68,0.05);margin-bottom:8px">
+        <span style="color:var(--danger);font-weight:700">&#9888; ${overlaps.length} repeated match${overlaps.length > 1 ? 'es' : ''} found</span>
+        <span style="font-size:11px;color:var(--text-dim);margin-left:6px">If ${overlaps.length === 1 ? 'this game' : 'any of these games'} loses, BOTH codes lose</span>
+      </div>`;
+
+      for (const o of overlaps) {
+        const pickColor = o.samePick ? 'var(--danger)' : 'var(--amber)';
+        const pickLabel = o.samePick ? 'Same pick' : 'Different picks';
+        html += `<div style="padding:8px 10px;border:1px solid rgba(239,68,68,0.15);border-radius:var(--radius-xs);background:rgba(239,68,68,0.02);margin-bottom:4px;font-size:12px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:700">${esc(o.home)} vs ${esc(o.away)}</span>
+            <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(239,68,68,0.1);color:${pickColor};font-weight:700">${pickLabel}</span>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:4px;font-size:11px;color:var(--text-dim)">
+            <span><b style="color:var(--accent)">${esc(codeA)}:</b> ${esc(o.aInfo.market)} — ${esc(o.aInfo.pick)} @${o.aInfo.odds}</span>
+            <span><b style="color:var(--accent)">${esc(codeB)}:</b> ${esc(o.market)} — ${esc(o.pick)} @${o.odds}</span>
+          </div>
+        </div>`;
+      }
+    }
+
+    // Summary stats
+    html += `<div style="display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--text-dim)">
+      <span><b style="color:var(--accent)">${esc(codeA)}:</b> ${outcomesA.length} games</span>
+      <span><b style="color:var(--accent)">${esc(codeB)}:</b> ${outcomesB.length} games</span>
+      <span>Overlap: <b style="color:${overlaps.length > 0 ? 'var(--danger)' : 'var(--success)'}">${overlaps.length}</b></span>
+      <span>Unique: <b>${onlyA.length + onlyB.length}</b></span>
+    </div>`;
+
+    resultDiv.innerHTML = html;
   } catch {
     resultDiv.innerHTML = '<span style="color:var(--danger);font-size:12px">Connection error</span>';
   }
 };
-document.getElementById('convert-code-input').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') document.getElementById('convert-code-btn').click();
+// Enter key support for compare inputs
+document.getElementById('compare-code-a').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('compare-codes-btn').click();
+});
+document.getElementById('compare-code-b').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('compare-codes-btn').click();
 });
 
-// ===== GAME POOL & AUTO-GENERATE =====
-// Global pool of all available pending selections from all codes
+// ===== GAME POOL & CONSENSUS ENGINE =====
 let gamePool = [];
+
+// Consensus map
+const consensusMap = new Map();
+let totalCodesLoaded = 0;
+
+// ===== ODDS MOVEMENT DETECTION =====
+// Track odds snapshots to detect sharp money (odds dropping = money flowing in)
+let oddsHistory = {};
+try { oddsHistory = JSON.parse(localStorage.getItem('oddsHistory') || '{}'); } catch { oddsHistory = {}; }
+
+// Clean entries older than 24h on load
+const ODH_TTL = 24 * 60 * 60 * 1000;
+const odhNow = Date.now();
+for (const k of Object.keys(oddsHistory)) {
+  const snaps = oddsHistory[k];
+  if (Array.isArray(snaps)) {
+    oddsHistory[k] = snaps.filter(s => odhNow - s.t < ODH_TTL);
+    if (oddsHistory[k].length === 0) delete oddsHistory[k];
+  } else delete oddsHistory[k];
+}
+
+let odhSaveTimer = null;
+function saveOddsHistory() {
+  if (odhSaveTimer) return;
+  odhSaveTimer = setTimeout(() => {
+    try { localStorage.setItem('oddsHistory', JSON.stringify(oddsHistory)); } catch {}
+    odhSaveTimer = null;
+  }, 1000);
+}
+
+function recordOdds(s) {
+  if (!s.eventId || !s.odds || s.odds <= 1) return;
+  const key = s.eventId + ':' + (s.marketId || '') + ':' + (s.outcomeId || '');
+  if (!oddsHistory[key]) oddsHistory[key] = [];
+  const snaps = oddsHistory[key];
+  // Don't record duplicate odds within 5 minutes
+  const last = snaps[snaps.length - 1];
+  if (last && Math.abs(last.o - s.odds) < 0.001 && odhNow - last.t < 300000) return;
+  snaps.push({ o: s.odds, t: Date.now() });
+  if (snaps.length > 10) snaps.shift(); // keep last 10
+}
+
+/** Check if odds have dropped (sharp money indicator) */
+function oddsMovement(g) {
+  const key = g.eventId + ':' + (g.marketId || '') + ':' + (g.outcomeId || '');
+  const snaps = oddsHistory[key];
+  if (!snaps || snaps.length < 2) return { dropped: false, pctChange: 0, isSharpMoney: false };
+  const oldest = snaps[0].o;
+  const newest = snaps[snaps.length - 1].o;
+  const pctChange = ((newest - oldest) / oldest) * 100;
+  // Odds dropped (negative change) = money coming in on this side
+  return {
+    dropped: pctChange < -2,
+    pctChange: Math.round(pctChange * 10) / 10,
+    isSharpMoney: pctChange <= -5,
+  };
+}
+
+/**
+ * Record a code's selections into the consensus map.
+ * Call this for EVERY code loaded (including ones with ended games).
+ */
+function recordConsensus(selections, codeId) {
+  if (!selections) return;
+  totalCodesLoaded++;
+  for (const s of selections) {
+    if (!s.eventId) continue;
+    const key = s.eventId + ':' + (s.marketId || '') + ':' + (s.outcomeId || '');
+    if (!consensusMap.has(key)) {
+      consensusMap.set(key, { count: 0, sources: new Set(), eventId: s.eventId });
+    }
+    const entry = consensusMap.get(key);
+    if (!entry.sources.has(codeId)) {
+      entry.sources.add(codeId);
+      entry.count++;
+    }
+  }
+}
+
+/** Get consensus count for a specific pick */
+function getConsensus(g) {
+  const key = g.eventId + ':' + (g.marketId || '') + ':' + (g.outcomeId || '');
+  return consensusMap.get(key)?.count || 0;
+}
 
 function addToGamePool(selections) {
   if (!selections) return;
@@ -1833,15 +1210,99 @@ function addToGamePool(selections) {
       const d = new Date(s.estimateStartTime);
       matchDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
+    recordOdds(s); // track odds for movement detection
     gamePool.push({ ...s, _key: key, matchDate });
   }
+  saveOddsHistory();
   // Sort pool by safety score (highest = safest first)
   gamePool.sort((a, b) => safetyScore(b) - safetyScore(a));
-  // Update pool count — show today's games separately
+  // Update pool count
   const now = new Date();
   const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   const todayCount = gamePool.filter(g => !g.matchDate || g.matchDate === todayStr).length;
   document.getElementById('pool-count').textContent = gamePool.length > 0 ? todayCount + ' today / ' + gamePool.length + ' total' : 'load codes first';
+  const abPool = document.getElementById('ab-pool');
+  if (abPool) abPool.innerHTML = '<span class="ab-num">' + todayCount + '</span> games today';
+}
+
+// ===== ANTI-TRAP DETECTION =====
+// Flag picks that look safe but historically produce upsets
+
+const DERBY_PAIRS = new Set([
+  // England
+  'arsenal|tottenham', 'liverpool|everton', 'manchester united|manchester city',
+  'chelsea|tottenham', 'chelsea|arsenal', 'liverpool|manchester united',
+  'aston villa|birmingham', 'newcastle|sunderland', 'west ham|millwall',
+  'nottingham forest|derby', 'sheffield united|sheffield wednesday',
+  'wolves|west brom', 'leeds|manchester united', 'crystal palace|brighton',
+  // Spain
+  'real madrid|barcelona', 'atletico madrid|real madrid', 'real betis|sevilla',
+  'valencia|villarreal', 'athletic bilbao|real sociedad',
+  // Italy
+  'ac milan|inter', 'juventus|inter', 'juventus|ac milan', 'roma|lazio',
+  'napoli|juventus', 'genoa|sampdoria', 'fiorentina|juventus',
+  // Germany
+  'borussia dortmund|bayern munich', 'borussia dortmund|schalke',
+  'hamburg|werder bremen', 'bayern munich|1860 munich',
+  // France
+  'psg|marseille', 'lyon|saint-etienne', 'monaco|psg',
+  // Turkey
+  'galatasaray|fenerbahce', 'besiktas|galatasaray', 'besiktas|fenerbahce',
+  // South America
+  'boca juniors|river plate', 'flamengo|fluminense', 'corinthians|palmeiras',
+  'nacional|penarol', 'racing|independiente',
+  // Africa
+  'al ahly|zamalek', 'kaizer chiefs|orlando pirates', 'esperance|club africain',
+  'wydad|raja', 'enyimba|rangers',
+  // Scotland / Netherlands / Portugal
+  'celtic|rangers', 'ajax|feyenoord', 'psv|ajax', 'benfica|porto', 'benfica|sporting',
+  // Greece
+  'olympiacos|panathinaikos', 'aek athens|olympiacos',
+]);
+
+function normalizePair(home, away) {
+  const a = (home || '').toLowerCase().replace(/\s*(fc|sc|cf|afc|united|city)\s*/g, ' ').trim();
+  const b = (away || '').toLowerCase().replace(/\s*(fc|sc|cf|afc|united|city)\s*/g, ' ').trim();
+  return [a, b].sort().join('|');
+}
+
+/**
+ * Detect trap patterns in a selection.
+ * Returns array of { type, severity, label } warnings.
+ */
+function detectTraps(s) {
+  const traps = [];
+
+  // 1. Derby match — unpredictable regardless of form
+  const pair = normalizePair(s.homeTeam, s.awayTeam);
+  for (const derby of DERBY_PAIRS) {
+    const [dA, dB] = derby.split('|');
+    if (pair.includes(dA) && pair.includes(dB)) {
+      traps.push({ type: 'derby', severity: 'high', label: 'Derby' });
+      break;
+    }
+  }
+
+  // 2. Trap odds — heavy favorite in 1X2 market at very low odds
+  const mkt = (s.market || '').toLowerCase();
+  if ((mkt === '1x2' || mkt === 'match winner') && s.odds && s.odds <= 1.15) {
+    traps.push({ type: 'trap-odds', severity: 'medium', label: 'Trap odds' });
+  }
+
+  // 3. Late night match (local time 22:00-04:00) — less predictable
+  if (s.estimateStartTime) {
+    const hour = new Date(s.estimateStartTime).getHours();
+    if (hour >= 22 || hour <= 4) {
+      traps.push({ type: 'late', severity: 'low', label: 'Late match' });
+    }
+  }
+
+  // 4. Correct score market — extremely risky despite any odds
+  if (mkt.includes('correct score')) {
+    traps.push({ type: 'correct-score', severity: 'high', label: 'Correct score' });
+  }
+
+  return traps;
 }
 
 // ===== SAFETY SCORING =====
@@ -1862,106 +1323,287 @@ const MID_LEAGUES = new Set([
 function safetyScore(g) {
   let score = 50; // base
 
-  // 1. MARKET TYPE (biggest factor — some markets are inherently safer)
+  // 1. MARKET TYPE (30 pts max — the single biggest predictor of safety)
   const mkt = (g.market || '').toLowerCase();
   const pick = (g.pick || '').toLowerCase();
 
-  if (mkt.includes('over/under') || mkt.includes('total goals')) {
-    if (pick.includes('under 5.5') || pick.includes('under 6.5')) score += 25;
-    else if (pick.includes('under 4.5')) score += 22;
-    else if (pick.includes('under 3.5')) score += 18;
-    else if (pick.includes('under 2.5')) score += 10;
-    else if (pick.includes('over 0.5')) score += 20;
-    else if (pick.includes('over 1.5')) score += 12;
-    else if (pick.includes('over 2.5')) score += 5;
-    else score += 8; // other O/U
-  } else if (mkt.includes('double chance')) {
-    score += 15; // two outcomes covered out of three
-  } else if (mkt.includes('1st half') && mkt.includes('handicap')) {
-    if (pick.includes('0:2') || pick.includes('2:0')) score += 18; // +2 FH handicap
-    else if (pick.includes('0:1') || pick.includes('1:0')) score += 8;
+  if (mkt.includes('over/under') || mkt.includes('total goals') || mkt.includes('total')) {
+    if (pick.includes('under 5.5') || pick.includes('under 6.5')) score += 20;
+    else if (pick.includes('under 4.5')) score += 17;
+    else if (pick.includes('under 3.5')) score += 13;
+    else if (pick.includes('under 2.5')) score += 6;
+    else if (pick.includes('over 0.5')) score += 18;
+    else if (pick.includes('over 1.5')) score += 10;
+    else if (pick.includes('over 2.5')) score += 3;
     else score += 5;
+  } else if (mkt.includes('double chance')) {
+    score += 15;
+  } else if (mkt.includes('1st half') && mkt.includes('handicap')) {
+    if (pick.includes('0:2') || pick.includes('2:0')) score += 14;
+    else if (pick.includes('0:1') || pick.includes('1:0')) score += 7;
+    else score += 4;
   } else if (mkt.includes('handicap')) {
     score += 5;
   } else if (mkt === '1x2') {
-    score += 0; // riskiest common market
+    score += 0;
   } else if (mkt.includes('both teams') || mkt.includes('btts') || mkt.includes('gg')) {
     score += 3;
   } else if (mkt.includes('correct score')) {
-    score -= 15; // very risky
+    score -= 20;
   } else {
     score += 2;
   }
 
-  // 2. LEAGUE QUALITY (known leagues are more predictable)
+  // 2. LEAGUE QUALITY (20 pts max — top leagues are more predictable, less prone to upsets)
   const league = (g.league || '').toLowerCase();
   const leagueName = league.split(' - ').pop() || league;
-  if ([...TOP_LEAGUES].some(l => leagueName.includes(l))) score += 10;
-  else if ([...MID_LEAGUES].some(l => leagueName.includes(l))) score += 5;
-  else score -= 5; // unknown/obscure league = less predictable
+  if ([...TOP_LEAGUES].some(l => leagueName.includes(l))) score += 12;
+  else if ([...MID_LEAGUES].some(l => leagueName.includes(l))) score += 6;
+  // no penalty for other leagues — they're fine, just no bonus
 
-  // 3. ODDS (lower = generally safer, but diminishing returns)
+  // 3. ODDS — mild signal, NOT the main factor
+  // Only penalize extremes; the market type + league matter more
   const odds = g.odds || 1;
-  if (odds <= 1.05) score += 15;
-  else if (odds <= 1.10) score += 12;
-  else if (odds <= 1.20) score += 8;
-  else if (odds <= 1.30) score += 5;
-  else if (odds <= 1.50) score += 2;
-  else if (odds > 2.0) score -= 10;
-  else if (odds > 1.5) score -= 3;
+  if (odds <= 1.05) score += 5;       // almost certain, small bonus
+  else if (odds <= 1.20) score += 3;
+  else if (odds <= 1.50) score += 0;   // neutral zone
+  else if (odds > 3.0) score -= 10;    // long shot
+  else if (odds > 2.0) score -= 5;
+  else if (odds > 1.5) score -= 1;
 
-  // 4. MATCH STATUS (in-progress games where we can see the state are informative)
+  // 4. MATCH STATUS
   const status = (g.matchStatus || '').toLowerCase();
-  if (status.includes('ht') || status.includes('half')) score += 3; // at halftime
-  if (status === 'not start') score += 0; // neutral
+  if (status.includes('ht') || status.includes('half')) score += 5;
+
+  // 5. ANTI-TRAP — penalize known trap patterns
+  const traps = detectTraps(g);
+  for (const t of traps) {
+    if (t.severity === 'high') score -= 15;
+    else if (t.severity === 'medium') score -= 8;
+    else score -= 4;
+  }
+
+  // 6. CONSENSUS — THE MOST POWERFUL SIGNAL
+  // If multiple independent codes all picked the same outcome, it's crowd wisdom.
+  // This is the single strongest predictor because it aggregates many analysts.
+  const consensus = getConsensus(g);
+  if (consensus >= 5) score += 30;       // 5+ sources agree — very strong signal
+  else if (consensus >= 4) score += 24;
+  else if (consensus >= 3) score += 18;  // 3 sources — solid agreement
+  else if (consensus >= 2) score += 10;  // 2 sources — moderate signal
+  // consensus === 1 means only 1 code picked this — no bonus
+
+  // 7. SHARP MONEY — odds dropping means professional bettors are backing this
+  const movement = oddsMovement(g);
+  if (movement.isSharpMoney) score += 12;
+  else if (movement.dropped) score += 5;
 
   return Math.max(0, Math.min(100, score));
 }
 
-function pickSafestGames(targetOdds) {
+/**
+ * Pick multiple non-overlapping sets of games for the same target odds.
+ * Each set uses completely different matches so you can spread risk.
+ * @param {number} targetOdds - target total odds per code
+ * @param {number} count - how many different codes to generate (default 3)
+ * @param {Set} [globalExclude] - eventIds to exclude across all sets
+ * @returns {Array<Array>} array of picked-game arrays
+ */
+function pickMultipleSets(targetOdds, count = 3, globalExclude = new Set()) {
   if (!gamePool.length) return [];
 
-  // Only pick from today's games
+  // For high-odds targets (50+), expand window to 3 days since we need more games
   const today = new Date();
-  const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-  const todayGames = gamePool.filter(g => !g.matchDate || g.matchDate === todayStr);
+  const maxDays = targetOdds >= 50 ? 3 : 1;
+  const allowedDates = new Set();
+  for (let d = 0; d < maxDays; d++) {
+    const dt = new Date(today);
+    dt.setDate(dt.getDate() + d);
+    allowedDates.add(dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'));
+  }
+  let todayGames = gamePool.filter(g => !g.matchDate || allowedDates.has(g.matchDate));
 
-  // Score all games and sort by safety (highest first)
+  // Apply market filter if set
+  if (selectedMarketFilter) {
+    const mf = selectedMarketFilter.toLowerCase();
+    todayGames = todayGames.filter(g => {
+      const mkt = (g.market || '').toLowerCase();
+      if (mf === 'gg') return mkt.includes('both teams') || mkt.includes('btts') || mkt.includes('gg') || mkt.includes('ng');
+      if (mf === 'over/under') return mkt.includes('over/under') || mkt.includes('total');
+      if (mf === '1x2') return mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2');
+      if (mf === 'double chance') return mkt.includes('double chance');
+      if (mf === 'handicap') return mkt.includes('handicap');
+      return true;
+    });
+  }
+
+  // Score all games
   const scored = todayGames.map(g => ({ ...g, _safety: safetyScore(g) }));
   scored.sort((a, b) => b._safety - a._safety);
 
-  // Greedy pick: take safest games until total odds >= target
-  const picked = [];
-  let total = 1;
-  for (const g of scored) {
-    if (total >= targetOdds) break;
-    picked.push(g);
-    total *= g.odds;
-  }
+  const allSets = [];
+  const usedAcrossSets = new Set(globalExclude); // tracks events used across ALL sets
 
-  // Fine-tune: if we overshot, check if removing the last game is closer to target
-  if (picked.length > 1) {
-    const withoutLast = total / picked[picked.length - 1].odds;
-    if (withoutLast >= targetOdds * 0.75 && Math.abs(withoutLast - targetOdds) < Math.abs(total - targetOdds)) {
-      picked.pop();
+  for (let setIdx = 0; setIdx < count; setIdx++) {
+    const picked = [];
+    const usedInThisSet = new Set();
+    let total = 1;
+
+    for (const g of scored) {
+      if (total >= targetOdds) break;
+      if (usedInThisSet.has(g.eventId)) continue;  // no dupes within this code
+      if (usedAcrossSets.has(g.eventId)) continue;  // no dupes across codes
+      usedInThisSet.add(g.eventId);
+      picked.push(g);
+      total *= g.odds;
     }
+
+    // Fine-tune overshoot
+    if (picked.length > 1) {
+      const withoutLast = total / picked[picked.length - 1].odds;
+      if (withoutLast >= targetOdds * 0.75 && Math.abs(withoutLast - targetOdds) < Math.abs(total - targetOdds)) {
+        const removed = picked.pop();
+        usedInThisSet.delete(removed.eventId);
+      }
+    }
+
+    if (picked.length === 0) break; // no more games available
+
+    // Mark these events as used for subsequent sets
+    for (const g of picked) usedAcrossSets.add(g.eventId);
+    allSets.push(picked);
   }
 
-  return picked;
+  return allSets;
+}
+
+/**
+ * Pick 3 diversified strategy sets:
+ * A (Safe): highest safety score, consensus >= 2 preferred
+ * B (Value): odds 1.3-2.5, consensus >= 2, sorted by consensus
+ * C (High-Risk): odds 1.5-4.0, sorted by odds descending (fewer games, bigger swings)
+ */
+function pickDiversifiedSets(targetOdds) {
+  if (!gamePool.length) return [];
+
+  const today = new Date();
+  const maxDays = targetOdds >= 50 ? 3 : 1;
+  const allowedDates = new Set();
+  for (let d = 0; d < maxDays; d++) {
+    const dt = new Date(today);
+    dt.setDate(dt.getDate() + d);
+    allowedDates.add(dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'));
+  }
+  let available = gamePool.filter(g => !g.matchDate || allowedDates.has(g.matchDate));
+
+  // Apply market filter if set
+  if (selectedMarketFilter) {
+    const mf = selectedMarketFilter.toLowerCase();
+    available = available.filter(g => {
+      const mkt = (g.market || '').toLowerCase();
+      if (mf === 'gg') return mkt.includes('both teams') || mkt.includes('btts') || mkt.includes('gg') || mkt.includes('ng');
+      if (mf === 'over/under') return mkt.includes('over/under') || mkt.includes('total');
+      if (mf === '1x2') return mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2');
+      if (mf === 'double chance') return mkt.includes('double chance');
+      if (mf === 'handicap') return mkt.includes('handicap');
+      return true;
+    });
+  }
+
+  const scored = available.map(g => ({ ...g, _safety: safetyScore(g), _consensus: getConsensus(g) }));
+
+  const usedAcrossSets = new Set();
+  const allSets = [];
+
+  function pickSet(pool) {
+    const picked = [];
+    const usedInSet = new Set();
+    let total = 1;
+    for (const g of pool) {
+      if (total >= targetOdds) break;
+      if (usedInSet.has(g.eventId) || usedAcrossSets.has(g.eventId)) continue;
+      usedInSet.add(g.eventId);
+      picked.push(g);
+      total *= g.odds;
+    }
+    // Fine-tune overshoot
+    if (picked.length > 1) {
+      const withoutLast = total / picked[picked.length - 1].odds;
+      if (withoutLast >= targetOdds * 0.75 && Math.abs(withoutLast - targetOdds) < Math.abs(total - targetOdds)) {
+        const removed = picked.pop();
+        usedInSet.delete(removed.eventId);
+      }
+    }
+    if (picked.length > 0) {
+      for (const g of picked) usedAcrossSets.add(g.eventId);
+    }
+    return picked;
+  }
+
+  // Strategy A: SAFE — highest safety, prefer consensus
+  const safePool = [...scored].sort((a, b) => b._safety - a._safety);
+  const setA = pickSet(safePool);
+  if (setA.length) { setA._strategy = 'safe'; allSets.push(setA); }
+
+  // Strategy B: VALUE — moderate odds with consensus backing
+  const valuePool = scored
+    .filter(g => g.odds >= 1.3 && g.odds <= 2.5 && g._consensus >= 2)
+    .sort((a, b) => b._consensus - a._consensus || b._safety - a._safety);
+  let setB = pickSet(valuePool);
+  // Fallback to general if not enough value picks
+  if (setB.length === 0) {
+    const fallback = [...scored].sort((a, b) => b._safety - a._safety);
+    setB = pickSet(fallback);
+  }
+  if (setB.length) { setB._strategy = 'value'; allSets.push(setB); }
+
+  // Strategy C: HIGH-RISK — higher odds, fewer games, bigger payoff
+  const riskPool = scored
+    .filter(g => g.odds >= 1.5 && g.odds <= 4.0)
+    .sort((a, b) => b.odds - a.odds || b._consensus - a._consensus);
+  let setC = pickSet(riskPool);
+  if (setC.length === 0) {
+    const fallback = [...scored].sort((a, b) => b.odds - a.odds);
+    setC = pickSet(fallback);
+  }
+  if (setC.length) { setC._strategy = 'high-risk'; allSets.push(setC); }
+
+  return allSets;
+}
+
+// Backward-compat: single set picker
+function pickSafestGames(targetOdds) {
+  const sets = pickMultipleSets(targetOdds, 1);
+  return sets[0] || [];
 }
 
 async function generateSafeCode(targetOdds, btn) {
-  const picked = pickSafestGames(targetOdds);
-  if (picked.length === 0) return;
+  const sets = pickDiversifiedSets(targetOdds);
+  if (sets.length === 0) return;
 
   const resultsDiv = document.getElementById('auto-gen-results');
-  const actualOdds = picked.reduce((acc, g) => acc * g.odds, 1);
 
-  // Show loading
   btn.disabled = true;
   btn.textContent = 'Generating...';
 
-  try {
+  // Show loading indicator with progress steps
+  const loadingEl = document.createElement('div');
+  loadingEl.className = 'gen-loading';
+  const stratNames = ['Safe', 'Value', 'High-Risk'];
+  loadingEl.innerHTML = `
+    <div class="gen-loading-header">
+      <div class="gen-loading-spinner"></div>
+      <div class="gen-loading-text">Generating ${sets.length} codes...</div>
+    </div>
+    <div class="gen-loading-steps">
+      ${sets.map((_, i) => `<div class="gen-step active" id="gen-step-${i}"><span class="gen-step-dot"></span>${stratNames[i] || 'Code ' + (i+1)}</div>`).join('')}
+    </div>
+  `;
+  resultsDiv.prepend(loadingEl);
+  loadingEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Create all codes — update progress as each completes
+  const results = await Promise.allSettled(sets.map(async (picked, idx) => {
     const selections = picked.map(g => ({
       eventId: g.eventId,
       marketId: g.marketId,
@@ -1976,46 +1618,140 @@ async function generateSafeCode(targetOdds, btn) {
       body: JSON.stringify({ selections }),
     });
     const data = await res.json();
+    // Update progress step
+    const step = document.getElementById('gen-step-' + idx);
+    if (step) { step.classList.remove('active'); step.classList.add('done'); step.querySelector('.gen-step-dot').innerHTML = '&#10003;'; }
+    return { data, picked, idx };
+  }));
+
+  // Build a grouped container for all codes at this odds level
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);background:rgba(59,130,246,0.02);padding:14px;margin-bottom:14px';
+
+  const successCodes = [];
+  const codeCards = [];
+
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    const { data, picked, idx } = r.value;
 
     if (data.bizCode === 10000 && data.data?.shareCode) {
       const code = data.data.shareCode;
-      const card = document.createElement('div');
-      card.style.cssText = 'border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);background:rgba(34,197,94,0.03);padding:14px;margin-bottom:10px';
+      successCodes.push(code);
+      const actualOdds = picked.reduce((acc, g) => acc * g.odds, 1);
       const avgSafety = Math.round(picked.reduce((s, g) => s + (g._safety || safetyScore(g)), 0) / picked.length);
       const safetyColor = avgSafety >= 75 ? 'var(--success)' : avgSafety >= 55 ? 'var(--accent)' : 'var(--amber)';
+      const strategy = picked._strategy || ['safe','value','high-risk'][idx] || 'safe';
 
+      // Save to history
+      codeHistory.push({
+        code, strategy, targetOdds, actualOdds: Math.round(actualOdds * 100) / 100,
+        gamesCount: picked.length, createdAt: new Date().toISOString(),
+        status: 'pending', wonCount: 0, lostCount: 0, pendingCount: picked.length, lastChecked: null,
+      });
+      saveCHistory();
+      const stratLabels = { safe: 'SAFE', value: 'VALUE', 'high-risk': 'HIGH-RISK' };
+      const stratColors = { safe: { border: 'rgba(34,197,94,0.3)', bg: 'rgba(34,197,94,0.03)', text: 'var(--success)' }, value: { border: 'rgba(59,130,246,0.3)', bg: 'rgba(59,130,246,0.03)', text: 'var(--accent)' }, 'high-risk': { border: 'rgba(168,85,247,0.3)', bg: 'rgba(168,85,247,0.03)', text: '#a855f7' } };
+      const label = stratLabels[strategy] || 'CODE';
+      const sc = stratColors[strategy] || stratColors.safe;
+      const borderColor = sc.border;
+      const bgColor = sc.bg;
+      const labelColor = sc.text;
+
+      const card = document.createElement('div');
+      card.style.cssText = 'border:1px solid ' + borderColor + ';border-radius:var(--radius-sm);background:' + bgColor + ';padding:12px';
       card.innerHTML = `
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
-          <span style="font-size:24px;font-weight:800;font-family:monospace;letter-spacing:3px;color:var(--success);user-select:all">${esc(code)}</span>
-          <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)})" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid rgba(34,197,94,0.4);border-radius:5px;background:rgba(34,197,94,0.1);color:var(--success);cursor:pointer;font-family:inherit">Copy</button>
-          <span style="font-size:15px;font-weight:800;color:var(--amber)">@${actualOdds.toFixed(2)}</span>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:800;color:${labelColor};background:${bgColor};border:1px solid ${borderColor};padding:2px 8px;border-radius:4px">CODE ${label}</span>
+          <span style="font-size:22px;font-weight:800;font-family:monospace;letter-spacing:3px;color:${labelColor};user-select:all">${esc(code)}</span>
+          <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" style="padding:4px 10px;font-size:10px;font-weight:700;border:1px solid ${borderColor};border-radius:4px;background:${bgColor};color:${labelColor};cursor:pointer;font-family:inherit">Copy</button>
+          <span style="font-size:14px;font-weight:800;color:var(--amber)">@${actualOdds.toFixed(2)}</span>
           <span style="font-size:11px;color:var(--text-dim)">${picked.length} games</span>
           <span style="font-size:11px;font-weight:700;color:${safetyColor}">Safety: ${avgSafety}/100</span>
+          ${(() => {
+            const conPicks = picked.filter(g => getConsensus(g) >= 2).length;
+            if (conPicks === 0) return '';
+            const pct = Math.round((conPicks / picked.length) * 100);
+            return '<span style="font-size:10px;font-weight:700;color:#f59e0b" title="' + conPicks + '/' + picked.length + ' picks backed by 2+ sources">' + pct + '% consensus</span>';
+          })()}
         </div>
-        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;font-size:10px">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;font-size:10px">
           ${picked.map(g => {
             const s = g._safety || safetyScore(g);
             const c = s >= 75 ? 'var(--success)' : s >= 55 ? 'var(--accent)' : 'var(--amber)';
-            return '<span style="padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)"><span style="color:' + c + ';font-weight:700">' + s + '</span> ' + esc(g.pick) + ' @' + g.odds + '</span>';
+            const con = getConsensus(g);
+            const conBadge = con >= 2 ? '<span style="color:#f59e0b;font-weight:800" title="' + con + ' sources agree">' + con + 'x</span> ' : '';
+            return '<span style="padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06)">' + conBadge + '<span style="color:' + c + ';font-weight:700">' + s + '</span> ' + esc(g.pick) + ' @' + g.odds + '</span>';
           }).join('')}
         </div>
-        ${buildSelectionsHTML(picked, picked.length <= 15)}
+        ${buildSelectionsHTML(picked, picked.length <= 10)}
       `;
-      resultsDiv.prepend(card);
-    } else {
-      resultsDiv.innerHTML = '<div style="padding:10px;color:var(--danger);font-size:12px">Failed: ' + (data.message || 'Unknown error') + '</div>' + resultsDiv.innerHTML;
+      codeCards.push(card);
     }
-  } catch {
-    resultsDiv.innerHTML = '<div style="padding:10px;color:var(--danger);font-size:12px">Failed to generate code.</div>' + resultsDiv.innerHTML;
   }
 
+  if (successCodes.length > 0) {
+    // Header with copy-all button
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap';
+    const allCodesStr = successCodes.join(', ');
+    header.innerHTML = `
+      <span style="font-size:13px;font-weight:800;color:var(--text)">x${targetOdds} Odds</span>
+      <span style="font-size:11px;color:var(--text-dim)">${successCodes.length} strategies — Safe, Value, High-Risk</span>
+      <button onclick="navigator.clipboard.writeText('${allCodesStr}').then(()=>{this.textContent='All copied!';setTimeout(()=>this.textContent='Copy all',1500)})" style="margin-left:auto;padding:4px 12px;font-size:10px;font-weight:700;border:1px solid rgba(59,130,246,0.3);border-radius:4px;background:rgba(59,130,246,0.08);color:var(--accent);cursor:pointer;font-family:inherit">Copy all</button>
+    `;
+    wrapper.appendChild(header);
+
+    for (const card of codeCards) {
+      card.style.marginBottom = '8px';
+      wrapper.appendChild(card);
+    }
+    resultsDiv.prepend(wrapper);
+    document.getElementById('auto-gen-clear-wrap').style.display = '';
+
+    // Scroll into view so user sees the result immediately
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast(successCodes.length + ' codes generated!', 'success');
+  } else {
+    resultsDiv.innerHTML = '<div style="padding:10px;color:var(--danger);font-size:12px">Failed to generate codes.</div>' + resultsDiv.innerHTML;
+  }
+
+  // Remove loading indicator
+  loadingEl.remove();
+
   btn.disabled = false;
-  btn.textContent = '~' + targetOdds + ' odds';
+  btn.textContent = 'x' + targetOdds;
 }
 
 // Attach click handlers to auto-gen buttons
 document.querySelectorAll('.auto-gen-btn').forEach(btn => {
   btn.onclick = () => generateSafeCode(parseInt(btn.dataset.target), btn);
+});
+
+// Clear generated codes
+document.getElementById('auto-gen-clear').onclick = () => {
+  document.getElementById('auto-gen-results').innerHTML = '';
+  document.getElementById('auto-gen-clear-wrap').style.display = 'none';
+};
+
+// Market filter for code generation
+let selectedMarketFilter = '';
+document.querySelectorAll('#market-filter-chips .chip').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#market-filter-chips .chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedMarketFilter = btn.dataset.mf;
+  };
+});
+
+// Custom odds generate
+document.getElementById('custom-odds-btn').onclick = () => {
+  const val = parseFloat(document.getElementById('custom-odds-input').value);
+  if (!val || val < 1.5) return;
+  generateSafeCode(val, document.getElementById('custom-odds-btn'));
+};
+document.getElementById('custom-odds-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('custom-odds-btn').click();
 });
 
 // ===== SELECTION & CODE GENERATION =====
@@ -2081,6 +1817,17 @@ document.getElementById('gen-code-btn').onclick = async () => {
 
   if (!selections.length) return;
 
+  // Calculate total odds from the checked rows
+  let manualTotalOdds = 1;
+  checks.forEach(chk => {
+    const row = chk.closest('.sel-row');
+    const oddsSpan = row?.querySelector('[style*="color:var(--amber)"]');
+    if (oddsSpan) {
+      const odds = parseFloat(oddsSpan.textContent.replace('@', ''));
+      if (odds > 0) manualTotalOdds *= odds;
+    }
+  });
+
   const resultDiv = document.getElementById('generated-code-result');
   resultDiv.style.display = 'block';
   resultDiv.innerHTML = '<div style="padding:12px;color:var(--text-dim);font-size:12px">Generating code with ' + selections.length + ' selections...</div>';
@@ -2096,6 +1843,13 @@ document.getElementById('gen-code-btn').onclick = async () => {
     if (data.bizCode === 10000 && data.data?.shareCode) {
       const code = data.data.shareCode;
       const url = data.data.shareURL || '';
+      // Save to history
+      codeHistory.push({
+        code, strategy: 'manual', targetOdds: null, actualOdds: Math.round(manualTotalOdds * 100) / 100,
+        gamesCount: selections.length, createdAt: new Date().toISOString(),
+        status: 'pending', wonCount: 0, lostCount: 0, pendingCount: selections.length, lastChecked: null,
+      });
+      saveCHistory();
       resultDiv.innerHTML = `
         <div style="border:2px solid rgba(34,197,94,0.5);border-radius:var(--radius-sm);background:rgba(34,197,94,0.05);padding:16px;text-align:center">
           <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">YOUR NEW BOOKING CODE</div>
@@ -2220,253 +1974,6 @@ document.getElementById('load-code-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') document.getElementById('load-code-btn').click();
 });
 
-// ===== VALUE BETS =====
-async function loadValueBets() {
-  S.valueBetsLoaded = true;
-  const grid = document.getElementById('value-list');
-  const params = new URLSearchParams();
-  if (S.sport) params.set('sport', S.sport);
-  if (S.date) params.set('date', S.date);
-  params.set('limit', '50');
-
-  try {
-    const res = await api('/predictions/value-bets?' + params.toString());
-    const picks = res.data || [];
-
-    document.getElementById('value-count').textContent = picks.length ? `${picks.length} bets` : '--';
-
-    if (!picks.length) {
-      grid.innerHTML = '<div class="empty">No value bets found for this date/sport combination.</div>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    for (const p of picks) {
-      grid.appendChild(createValueCard(p));
-    }
-  } catch {
-    grid.innerHTML = '<div class="empty">Unable to load value bets.</div>';
-  }
-}
-
-function createValueCard(p) {
-  const card = document.createElement('div');
-  card.className = 'value-card';
-
-  const conf = sportConf(p.sport);
-  const evPct = p.ev != null ? (p.ev * 100).toFixed(0) : (p.edge != null ? p.edge.toFixed(0) : '?');
-  const estProb = p.estimatedProb != null ? (p.estimatedProb * 100).toFixed(1) + '%' : (p.implied_prob || '--');
-  const marketProb = p.marketProb != null ? (p.marketProb * 100).toFixed(1) + '%' : (p.market_prob || '--');
-  const edge = p.edge != null ? p.edge.toFixed(1) + '%' : '--';
-  const matchName = p.match || ((p.homeTeam || p.home_team || '') + ' vs ' + (p.awayTeam || p.away_team || ''));
-  const side = p.pick || p.side || p.recommendation || '';
-  const pickType = p.pickType || p.pick_type || '';
-  const oddsVal = p.bestOdds || p.best_odds || p.odds;
-  const analysis = p.analysis || p.reason || '';
-
-  card.innerHTML = `
-    <div class="value-card-head">
-      <div>
-        <div class="value-card-match">${esc(matchName)}</div>
-      </div>
-      <div class="value-card-ev">+${evPct}%</div>
-    </div>
-    <div class="value-card-pills">
-      <span class="sport-badge" style="background:${conf.bg};color:${conf.color}">${conf.label}</span>
-      ${side ? `<span class="rec-pill side-${side}">${esc(side)}</span>` : ''}
-      ${pickType ? `<span style="font-size:10px;color:var(--text-muted);text-transform:uppercase">${esc(pickType.replace('_',' '))}</span>` : ''}
-    </div>
-    <div class="value-metrics">
-      <div class="value-metric">
-        <span class="value-metric-label">Est. Prob</span>
-        <span class="value-metric-val">${estProb}</span>
-      </div>
-      <div class="value-metric">
-        <span class="value-metric-label">Market Prob</span>
-        <span class="value-metric-val">${marketProb}</span>
-      </div>
-      <div class="value-metric">
-        <span class="value-metric-label">Edge</span>
-        <span class="value-metric-val" style="color:var(--success)">${edge}</span>
-      </div>
-    </div>
-    ${analysis ? `<div class="value-card-analysis">${esc(analysis)}</div>` : ''}
-    ${oddsVal ? `<div class="value-card-odds">Best Odds: ${Number(oddsVal).toFixed(2)}x</div>` : ''}
-  `;
-
-  card.onclick = () => card.classList.toggle('expanded');
-  return card;
-}
-
-// ===== MATCHES =====
-async function loadMatches(silent = false) {
-  const grid = document.getElementById('matches-list');
-  if (!silent && !grid.querySelector('.match-card')) {
-    grid.innerHTML = '<div class="skeleton skel-match"></div>'.repeat(5);
-  }
-
-  const params = new URLSearchParams();
-  if (S.sport) params.set('sport', S.sport);
-  if (S.date) params.set('date', S.date);
-
-  const res = await api('/predictions/matches?' + params.toString());
-  const matches = res.data || [];
-  const sig = JSON.stringify(matches.map(m => m.id + ':' + m.prediction_count));
-  const changed = S.lastMatchesSig && sig !== S.lastMatchesSig;
-  S.lastMatchesSig = sig;
-
-  if (silent && !changed) return false;
-
-  document.getElementById('matches-count').textContent = `${matches.length} matches`;
-
-  if (!matches.length) {
-    grid.innerHTML = '<div class="empty">No matches found.</div>';
-    return changed;
-  }
-
-  const expandedId = grid.querySelector('.match-card.expanded')?.dataset.matchId;
-
-  grid.innerHTML = '';
-  let lastDate = '';
-  for (const m of matches) {
-    const dateStr = formatDate(toDateStr(m.game_date));
-    if (dateStr !== lastDate) {
-      lastDate = dateStr;
-      const divider = document.createElement('div');
-      divider.className = 'date-divider';
-      divider.textContent = dateStr;
-      grid.appendChild(divider);
-    }
-    const { row, detailWrap } = createMatchRow(m);
-    grid.appendChild(row);
-    grid.appendChild(detailWrap);
-  }
-
-  if (expandedId) {
-    const row = grid.querySelector(`.match-card[data-match-id="${expandedId}"]`);
-    if (row) toggleMatchRow(row, expandedId);
-  }
-
-  return changed;
-}
-
-function summarizeTips(tips, homeAbbr, awayAbbr) {
-  if (!tips || !tips.length) return [];
-  const priority = ['moneyline', 'over_under', 'prop', 'spread'];
-  const byType = {};
-  for (const t of tips) {
-    if (!byType[t.pick_type]) byType[t.pick_type] = [];
-    byType[t.pick_type].push(t);
-  }
-  const pills = [];
-  for (const type of priority) {
-    if (pills.length >= 3) break;
-    const entries = byType[type];
-    if (!entries) continue;
-    entries.sort((a, b) => b.count - a.count);
-    const top = entries[0];
-    let label, sideClass;
-    if (type === 'moneyline') {
-      const name = top.side === 'home' ? (homeAbbr || 'HOME') : top.side === 'away' ? (awayAbbr || 'AWAY') : 'DRAW';
-      label = top.count > 1 ? name + ' x' + top.count : name;
-      sideClass = 'side-' + top.side;
-    } else if (type === 'over_under') {
-      const dir = top.side === 'over' ? 'Over' : 'Under';
-      label = top.avg_value != null ? dir + ' ' + top.avg_value : dir;
-      sideClass = 'side-' + top.side;
-    } else if (type === 'prop') {
-      label = 'BTTS ' + (top.side === 'yes' ? 'Yes' : 'No');
-      sideClass = 'side-' + top.side;
-    } else if (type === 'spread') {
-      const name = top.side === 'home' ? (homeAbbr || 'HOME') : (awayAbbr || 'AWAY');
-      label = name + ' Sprd';
-      sideClass = 'side-' + top.side;
-    }
-    pills.push({ label, sideClass });
-  }
-  return pills;
-}
-
-function createMatchRow(m) {
-  const conf = sportConf(m.sport);
-
-  const card = document.createElement('div');
-  card.className = 'match-card';
-  card.dataset.matchId = m.id;
-
-  const tips = typeof m.tips === 'string' ? JSON.parse(m.tips) : (m.tips || []);
-  const pills = summarizeTips(tips, m.home_abbr, m.away_abbr);
-  const pillsHtml = pills.map(p =>
-    `<span class="match-tip ${p.sideClass}">${esc(p.label)}</span>`
-  ).join('');
-
-  card.innerHTML = `
-    <div class="match-card-header">
-      <span class="sport-dot" style="background:${conf.color}"></span>
-      <span class="match-time-col">${esc(formatShortTime(m.game_time) || '--')}</span>
-      <span class="match-teams-col">${esc(m.home_team)}<span class="vs">vs</span>${esc(m.away_team)}</span>
-      <span class="match-picks-count">${m.prediction_count} tips</span>
-      <span class="match-chevron">&#9654;</span>
-    </div>
-    ${pillsHtml ? `<div class="match-tips">${pillsHtml}</div>` : ''}
-  `;
-
-  const detailWrap = document.createElement('div');
-  detailWrap.className = 'match-detail-wrap';
-  detailWrap.innerHTML = `<div class="match-detail" id="mdetail-${m.id}"></div>`;
-
-  card.onclick = () => toggleMatchRow(card, m.id);
-
-  return { row: card, detailWrap };
-}
-
-async function toggleMatchRow(row, matchId) {
-  const wasExpanded = row.classList.contains('expanded');
-
-  document.querySelectorAll('.match-card.expanded').forEach(r => r.classList.remove('expanded'));
-
-  if (wasExpanded) return;
-
-  row.classList.add('expanded');
-  const container = document.getElementById('mdetail-' + matchId);
-
-  if (S.matchPredictions[matchId]) {
-    renderMatchPredictions(container, S.matchPredictions[matchId]);
-    return;
-  }
-
-  container.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px">Loading...</div>';
-  const res = await api('/predictions/' + matchId);
-  S.matchPredictions[matchId] = res.data || [];
-  renderMatchPredictions(container, S.matchPredictions[matchId]);
-}
-
-function renderMatchPredictions(container, preds) {
-  if (!preds.length) {
-    container.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-muted);font-size:12px">No predictions</div>';
-    return;
-  }
-  let rows = '';
-  for (const p of preds) {
-    const confP = p.confidence ? `<span class="conf-pill conf-${p.confidence}">${p.confidence.replace('_', ' ')}</span>` : '';
-    const val = p.value != null ? p.value : '--';
-    const isOU = p.side === 'over' || p.side === 'under';
-    const sideLabel = isOU && val !== '--' ? `${p.side} ${val}` : p.side;
-    const valDisplay = isOU && val !== '--' ? '' : val;
-    rows += `<tr>
-      <td style="font-size:11px">${p.pick_type.replace('_', ' ')}</td>
-      <td><span class="side-pill side-${p.side}">${sideLabel}</span></td>
-      <td class="value-text">${valDisplay}</td>
-      <td>${confP}</td>
-      <td style="color:var(--text-muted);font-size:11px">${esc(p.picker_name)}</td>
-    </tr>`;
-  }
-  container.innerHTML = `<table class="predictions-table">
-    <thead><tr><th>Type</th><th>Side</th><th>Value</th><th>Conf</th><th>Picker</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
-}
-
 // ===== HEALTH =====
 async function checkHealth() {
   try {
@@ -2493,24 +2000,12 @@ async function checkHealth() {
 
 // ===== LOAD ALL =====
 async function loadAll() {
-  await Promise.all([loadStats(), loadTop5(), loadPicks(), loadMatches(), checkHealth()]);
-  // Reload lazy tabs if already visited
-  if (S.valueBetsLoaded) loadValueBets();
-  if (S.ouLoaded) loadOverUnder();
-  if (S.hcLoaded) loadHandicap();
+  await Promise.all([loadBookingCodes(), checkHealth()]);
 }
 
 // ===== POLL =====
 async function poll() {
-  try {
-    const [statsChanged, , , matchesChanged] = await Promise.all([
-      loadStats(),
-      loadTop5(),
-      loadPicks(),
-      loadMatches(true),
-    ]);
-    if (statsChanged || matchesChanged) S.matchPredictions = {};
-  } catch (e) {}
+  // Booking codes have their own cache TTL, no aggressive polling needed
 }
 
 // ===== WEBSOCKET =====
@@ -2544,132 +2039,21 @@ function connectWS() {
   ws.onerror = () => ws.close();
 }
 
-// ===== FETCH ALL BUTTON =====
-document.getElementById('fetch-all-btn').onclick = async () => {
-  const btn = document.getElementById('fetch-all-btn');
-  btn.disabled = true;
-  btn.classList.add('fetch-spinning');
-  btn.querySelector('span').textContent = 'Enqueuing...';
-  try {
-    const res = await fetch('/sources/trigger-all', { method: 'POST' });
-    const data = await res.json();
-    const jobIds = data.jobIds || [];
-    const total = data.enqueued;
-    btn.querySelector('span').textContent = `0 / ${total}`;
-
-    // Poll for completion
-    const pollStatus = async () => {
-      try {
-        const sr = await fetch('/sources/fetch-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jobIds }),
-        });
-        const status = await sr.json();
-        const done = status.completed + status.failed;
-        btn.querySelector('span').textContent = `${done} / ${total}` + (status.failed ? ` (${status.failed} failed)` : '');
-
-        if (status.pending > 0) {
-          setTimeout(pollStatus, 3000);
-        } else {
-          // All done
-          btn.classList.remove('fetch-spinning');
-          const msg = status.failed
-            ? `${status.completed} ok, ${status.failed} failed`
-            : `${status.completed} done`;
-          btn.querySelector('span').textContent = msg;
-          // Refresh sources tab if open
-          if (S.activeTab === 'sources') loadSources();
-          poll();
-          setTimeout(() => {
-            btn.querySelector('span').textContent = 'Fetch All';
-            btn.disabled = false;
-          }, 5000);
-        }
-      } catch {
-        btn.querySelector('span').textContent = 'Poll error';
-        btn.classList.remove('fetch-spinning');
-        btn.disabled = false;
-      }
-    };
-    setTimeout(pollStatus, 5000);
-  } catch {
-    btn.querySelector('span').textContent = 'Error';
-    btn.classList.remove('fetch-spinning');
-    setTimeout(() => {
-      btn.querySelector('span').textContent = 'Fetch All';
-      btn.disabled = false;
-    }, 2000);
-  }
+// Quick generate button in action bar
+document.getElementById('ab-quick-gen').onclick = () => {
+  generateSafeCode(5, document.getElementById('ab-quick-gen'));
 };
-
-// ===== SOURCES TAB =====
-let sourcesFilter = 'all';
-
-document.querySelectorAll('[data-src-filter]').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('[data-src-filter]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    sourcesFilter = btn.dataset.srcFilter;
-    applySourcesFilter();
-  };
-});
-
-function applySourcesFilter() {
-  document.querySelectorAll('.source-card').forEach(card => {
-    const isWorking = card.dataset.status === 'working';
-    if (sourcesFilter === 'all') card.style.display = '';
-    else if (sourcesFilter === 'working') card.style.display = isWorking ? '' : 'none';
-    else card.style.display = isWorking ? 'none' : '';
-  });
-}
-
-async function loadSources() {
-  const grid = document.getElementById('sources-grid');
-  try {
-    const res = await api('/sources/status');
-    const sources = res.data || [];
-    const working = sources.filter(s => Number(s.today_count) > 0 || Number(s.week_count) > 0);
-    document.getElementById('sources-tab-count').textContent = `${working.length} / ${sources.length} active`;
-
-    grid.innerHTML = '';
-    for (const s of sources) {
-      const isWorking = Number(s.today_count) > 0 || Number(s.week_count) > 0;
-      const card = document.createElement('div');
-      card.className = 'source-card';
-      card.dataset.status = isWorking ? 'working' : 'dead';
-      const lf = s.last_fetched_at ? new Date(s.last_fetched_at).toLocaleString() : 'Never';
-      card.innerHTML = `
-        <div class="source-card-head">
-          <span class="source-card-name">${esc(s.slug)}</span>
-          <span class="source-status ${isWorking ? 'working' : 'dead'}">${isWorking ? 'Working' : 'Dead'}</span>
-        </div>
-        <div class="source-card-stats">
-          <div class="source-stat">
-            <span class="source-stat-label">Today</span>
-            <span class="source-stat-val" style="color:${Number(s.today_count) > 0 ? 'var(--success)' : 'var(--text-muted)'}">${Number(s.today_count).toLocaleString()}</span>
-          </div>
-          <div class="source-stat">
-            <span class="source-stat-label">This Week</span>
-            <span class="source-stat-val">${Number(s.week_count).toLocaleString()}</span>
-          </div>
-        </div>
-        <div class="source-card-meta">Last fetched: ${esc(lf)}</div>
-      `;
-      grid.appendChild(card);
-    }
-    applySourcesFilter();
-  } catch {
-    grid.innerHTML = '<div class="empty">Failed to load sources.</div>';
-  }
-}
 
 // ===== INIT =====
 (async () => {
   await loadAll();
   connectWS();
   setInterval(checkHealth, POLL_MS);
-  setInterval(poll, POLL_MS);
+
+  // Auto-open tracker if there are tracked codes from previous session
+  if (trackedCodes.length) {
+    document.getElementById('col-tracker').classList.add('open');
+  }
 
   // Register service worker
   if ('serviceWorker' in navigator) {
