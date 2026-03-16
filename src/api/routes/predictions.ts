@@ -1,14 +1,36 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { getAllBookingCodes } from '../booking-codes-scraper.js';
 
+// Strict alphanumeric pattern for booking codes
+const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
+
+// Validate a Sportybet event/market/outcome ID format
+const BETRADAR_ID = /^sr:[a-z]+:\d+$/;
+const NUMERIC_ID = /^\d+$/;
+
+function isValidSelection(s: unknown): s is { eventId: string; marketId: string; outcomeId: string; specifier?: string; sportId: string } {
+  if (!s || typeof s !== 'object') return false;
+  const sel = s as Record<string, unknown>;
+  if (typeof sel.eventId !== 'string' || !BETRADAR_ID.test(sel.eventId)) return false;
+  if (typeof sel.marketId !== 'string' || !NUMERIC_ID.test(sel.marketId)) return false;
+  if (typeof sel.outcomeId !== 'string' || !NUMERIC_ID.test(sel.outcomeId)) return false;
+  if (typeof sel.sportId !== 'string' || !BETRADAR_ID.test(sel.sportId)) return false;
+  if (sel.specifier !== undefined && typeof sel.specifier !== 'string') return false;
+  if (typeof sel.specifier === 'string' && sel.specifier.length > 50) return false;
+  return true;
+}
+
 export const predictionsRoutes: FastifyPluginAsync = async (app) => {
 
   // GET /predictions/track-codes?codes=ABC123,DEF456 — bulk live status
   app.get('/track-codes', async (request, reply) => {
     const { codes: codesParam } = request.query as { codes?: string };
-    if (!codesParam) return reply.status(400).send({ error: 'No codes provided' });
+    if (!codesParam || codesParam.length > 100) return reply.status(400).send({ error: 'Invalid input' });
 
-    const codeList = codesParam.split(',').map(c => c.trim().toUpperCase()).filter(c => c.length >= 5 && c.length <= 8).slice(0, 10);
+    const codeList = codesParam.split(',')
+      .map(c => c.trim().toUpperCase())
+      .filter(c => CODE_PATTERN.test(c))
+      .slice(0, 10);
     if (!codeList.length) return reply.status(400).send({ error: 'No valid codes' });
 
     const results = await Promise.allSettled(codeList.map(async (code) => {
@@ -70,7 +92,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     return { data: results.map(r => r.status === 'fulfilled' ? r.value : { code: '?', valid: false, selections: [], wonCount: 0, lostCount: 0, pendingCount: 0, totalOdds: 0, isDead: false, cashoutAdvice: 'Error' }) };
   });
 
-  // GET /predictions/booking-codes — all scraped Sportybet codes
+  // GET /predictions/booking-codes — all Sportybet codes
   app.get('/booking-codes', async (_request, reply) => {
     const codes = await getAllBookingCodes();
     void reply.header('Cache-Control', 'public, max-age=900');
@@ -80,7 +102,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   // GET /predictions/load-code/:code — load a single code from Sportybet
   app.get<{ Params: { code: string } }>('/load-code/:code', async (request, reply) => {
     const { code } = request.params;
-    if (!code || code.length < 5 || code.length > 8) {
+    if (!code || !CODE_PATTERN.test(code)) {
       return reply.status(400).send({ error: 'Invalid code format' });
     }
     try {
@@ -96,18 +118,32 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
 
   // POST /predictions/create-code — create a Sportybet booking code
   app.post('/create-code', async (request, reply) => {
-    const body = request.body as { selections?: Array<{ eventId: string; marketId: string; outcomeId: string; specifier?: string; sportId: string }> };
-    if (!body?.selections?.length) {
+    const body = request.body as { selections?: unknown[] };
+    if (!body?.selections || !Array.isArray(body.selections) || !body.selections.length) {
       return reply.status(400).send({ error: 'No selections provided' });
     }
     if (body.selections.length > 50) {
       return reply.status(400).send({ error: 'Too many selections (max 50)' });
     }
+    // Validate every selection strictly — prevent arbitrary data being proxied
+    const validated = [];
+    for (const s of body.selections) {
+      if (!isValidSelection(s)) {
+        return reply.status(400).send({ error: 'Invalid selection format' });
+      }
+      validated.push({
+        eventId: s.eventId,
+        marketId: s.marketId,
+        outcomeId: s.outcomeId,
+        specifier: s.specifier || '',
+        sportId: s.sportId,
+      });
+    }
     try {
       const res = await fetch('https://www.sportybet.com/api/ng/orders/share', {
         method: 'POST',
         headers: { 'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selections: body.selections }),
+        body: JSON.stringify({ selections: validated }),
         signal: AbortSignal.timeout(10000),
       });
       return await res.json();

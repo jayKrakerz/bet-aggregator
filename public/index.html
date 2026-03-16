@@ -1862,7 +1862,7 @@ document.getElementById('gen-code-btn').onclick = async () => {
         </div>
       `;
     } else {
-      resultDiv.innerHTML = '<div style="padding:12px;color:var(--danger);font-size:12px">Failed to generate code: ' + (data.message || 'Unknown error') + '</div>';
+      resultDiv.innerHTML = '<div style="padding:12px;color:var(--danger);font-size:12px">Failed to generate code: ' + esc(data.message || 'Unknown error') + '</div>';
     }
   } catch {
     resultDiv.innerHTML = '<div style="padding:12px;color:var(--danger);font-size:12px">Failed to reach server.</div>';
