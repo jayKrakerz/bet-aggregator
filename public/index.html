@@ -102,7 +102,7 @@ body{min-height:100vh;overflow-x:hidden}
 .section-card{background:var(--surface);border:1px solid var(--surface-border);border-radius:var(--radius);padding:20px;transition:border-color 0.3s,box-shadow 0.3s}
 .section-card:hover{border-color:rgba(59,130,246,0.12);box-shadow:0 0 20px rgba(59,130,246,0.04)}
 .card-title{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.card-title-icon{font-size:18px;flex-shrink:0}
+.card-title-icon{flex-shrink:0;display:inline-flex;align-items:center}
 .card-hint{font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5}
 
 /* ===== TOOL GRID (2-col) ===== */
@@ -184,7 +184,7 @@ body{min-height:100vh;overflow-x:hidden}
 .collapsible:hover{border-color:rgba(59,130,246,0.12)}
 .collapsible-header{display:flex;align-items:center;gap:8px;padding:12px 20px;cursor:pointer;user-select:none;transition:background 0.2s}
 .collapsible-header:hover{background:rgba(255,255,255,0.02)}
-.collapsible-header .card-title-icon{font-size:16px;flex-shrink:0}
+.collapsible-header .card-title-icon{flex-shrink:0;display:inline-flex;align-items:center}
 .collapsible-header span.ch-label{font-size:13px;font-weight:700;color:var(--text)}
 .collapsible-header .ch-hint{font-size:11px;color:var(--text-muted);margin-left:auto}
 .collapsible-header .ch-arrow{font-size:10px;color:var(--text-muted);transition:transform 0.3s;margin-left:8px}
@@ -292,7 +292,7 @@ body{min-height:100vh;overflow-x:hidden}
     content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
     width:24px;height:2px;background:var(--accent);border-radius:0 0 2px 2px;
   }
-  .bnav-icon{font-size:20px;line-height:1}
+  .bnav-icon{display:flex;align-items:center;justify-content:center;height:22px}
 
   /* Action bar: compact stats row */
   .action-bar{margin:10px 0;padding:10px 12px;gap:8px;border-radius:var(--radius-sm)}
@@ -421,7 +421,7 @@ body{min-height:100vh;overflow-x:hidden}
         <!-- LEFT: Check a Code -->
         <div class="section-card">
           <div class="card-title">
-            <span class="card-title-icon">&#128269;</span> Check a Code
+            <span class="card-title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span> Check a Code
           </div>
           <div class="flex-row">
             <input type="text" id="load-code-input" placeholder="e.g. Z4PMH3" maxlength="8" class="input-mono flex-1" />
@@ -433,7 +433,7 @@ body{min-height:100vh;overflow-x:hidden}
         <!-- RIGHT: Quick Generate -->
         <div class="section-card" id="auto-gen-section">
           <div class="card-title">
-            <span class="card-title-icon">&#9889;</span> Generate Safe Code
+            <span class="card-title-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span> Generate Safe Code
             <span class="badge-count ml-auto" id="pool-count">--</span>
           </div>
           <div class="flex-row" style="margin-top:4px">
@@ -483,10 +483,10 @@ body{min-height:100vh;overflow-x:hidden}
       <!-- COLLAPSIBLE: Live Tracker -->
       <div class="collapsible" id="col-tracker">
         <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
-          <span class="card-title-icon">&#128225;</span>
+          <span class="card-title-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.72 11.06A10.94 10.94 0 0 1 19 17.94"/><path d="M7.28 11.06A10.94 10.94 0 0 0 5 17.94"/><path d="M14.34 14.54a5 5 0 0 1 1.17 2.96"/><path d="M9.66 14.54a5 5 0 0 0-1.17 2.96"/><circle cx="12" cy="20" r="2"/><path d="M12 2v8"/></svg></span>
           <span class="ch-label">Live Code Tracker</span>
           <span id="tracker-status" class="ch-hint"></span>
-          <span class="ch-arrow">&#9660;</span>
+          <span class="ch-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
         </div>
         <div class="collapsible-body"><div class="collapsible-inner">
           <div class="flex-row" style="margin-bottom:10px">
@@ -502,10 +502,10 @@ body{min-height:100vh;overflow-x:hidden}
       <!-- COLLAPSIBLE: Bankroll Calculator -->
       <div class="collapsible" id="col-bankroll">
         <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
-          <span class="card-title-icon">&#128176;</span>
+          <span class="card-title-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
           <span class="ch-label">Bankroll Strategy</span>
           <span class="ch-hint">Calculate optimal stakes</span>
-          <span class="ch-arrow">&#9660;</span>
+          <span class="ch-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
         </div>
         <div class="collapsible-body"><div class="collapsible-inner">
           <div class="flex-row-wrap" style="margin-bottom:12px;gap:10px">
@@ -529,10 +529,10 @@ body{min-height:100vh;overflow-x:hidden}
       <!-- COLLAPSIBLE: Compare Codes -->
       <div class="collapsible" id="col-compare">
         <div class="collapsible-header" onclick="this.parentElement.classList.toggle('open')">
-          <span class="card-title-icon">&#128260;</span>
+          <span class="card-title-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg></span>
           <span class="ch-label">Compare Codes</span>
           <span class="ch-hint">Find repeated matches</span>
-          <span class="ch-arrow">&#9660;</span>
+          <span class="ch-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
         </div>
         <div class="collapsible-body"><div class="collapsible-inner">
           <div class="flex-row-wrap">
@@ -590,19 +590,19 @@ body{min-height:100vh;overflow-x:hidden}
 <!-- BOTTOM NAV (mobile only) -->
 <nav class="bottom-nav" id="bottom-nav">
   <button class="bnav-item active" data-tab="booking-codes">
-    <span class="bnav-icon">&#127918;</span>
+    <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
     <span>Codes</span>
   </button>
   <button class="bnav-item" data-tab="generate">
-    <span class="bnav-icon">&#9889;</span>
+    <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
     <span>Generate</span>
   </button>
   <button class="bnav-item" data-tab="tracker">
-    <span class="bnav-icon">&#128200;</span>
+    <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span>
     <span>Tracker</span>
   </button>
   <button class="bnav-item" data-tab="history">
-    <span class="bnav-icon">&#128203;</span>
+    <span class="bnav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
     <span>History</span>
   </button>
 </nav>
@@ -630,6 +630,27 @@ const S = {
 
 const API = '';
 const POLL_MS = 60000;
+
+// ===== SVG ICONS =====
+const I = {
+  search: (s=16,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+  zap: (s=16,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+  radio: (s=16,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.72 11.06A10.94 10.94 0 0 1 19 17.94"/><path d="M7.28 11.06A10.94 10.94 0 0 0 5 17.94"/><path d="M14.34 14.54a5 5 0 0 1 1.17 2.96"/><path d="M9.66 14.54a5 5 0 0 0-1.17 2.96"/><circle cx="12" cy="20" r="2"/><path d="M12 2v8"/></svg>`,
+  wallet: (s=16,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
+  compare: (s=16,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>`,
+  chevDown: (s=10,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`,
+  chevUp: (s=10,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>`,
+  check: (s=14,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+  x: (s=14,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
+  clock: (s=14,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  arrowDown: (s=10,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>`,
+  warn: (s=12,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
+  extLink: (s=12,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1-2-2h6"/></svg>`,
+  // Bottom nav icons
+  grid: (s=20,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>`,
+  chart: (s=20,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`,
+  list: (s=20,c='currentColor') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>`,
+};
 
 // ===== SPORT CONFIG =====
 const SPORTS = {
@@ -822,7 +843,7 @@ function buildSelectionsHTML(selections, expanded) {
   if (!selections || !selections.length) return '';
   const showing = expanded ? selections : selections.slice(0, 5);
   const rows = showing.map(s => {
-    const icon = s.isWinning === 1 ? '&#9989;' : s.isWinning === 0 ? '&#10060;' : '&#9203;';
+    const icon = s.isWinning === 1 ? I.check(12,'var(--success)') : s.isWinning === 0 ? I.x(12,'var(--danger)') : I.clock(12,'var(--text-dim)');
     const color = s.isWinning === 1 ? 'var(--success)' : s.isWinning === 0 ? 'var(--danger)' : 'var(--text)';
     const leagueShort = (s.league || '').split(' - ').pop() || '';
     const canSelect = s.eventId && s.matchStatus !== 'Ended' && s.matchStatus !== 'Cancelled' && s.isWinning === null;
@@ -839,14 +860,14 @@ function buildSelectionsHTML(selections, expanded) {
         let badges = '';
         // Sharp money badge
         const mv = oddsMovement(s);
-        if (mv.isSharpMoney) badges += '<span style="font-size:8px;font-weight:700;color:var(--success);background:rgba(34,197,94,0.12);padding:1px 4px;border-radius:3px;flex-shrink:0">&#9889; Sharp ' + mv.pctChange + '%</span> ';
-        else if (mv.dropped) badges += '<span style="font-size:8px;font-weight:600;color:var(--text-dim);background:rgba(255,255,255,0.05);padding:1px 4px;border-radius:3px;flex-shrink:0">&#8595; ' + mv.pctChange + '%</span> ';
+        if (mv.isSharpMoney) badges += '<span style="font-size:8px;font-weight:700;color:var(--success);background:rgba(34,197,94,0.12);padding:1px 4px;border-radius:3px;flex-shrink:0;display:inline-flex;align-items:center;gap:2px">' + I.zap(8,'var(--success)') + ' Sharp ' + mv.pctChange + '%</span> ';
+        else if (mv.dropped) badges += '<span style="font-size:8px;font-weight:600;color:var(--text-dim);background:rgba(255,255,255,0.05);padding:1px 4px;border-radius:3px;flex-shrink:0;display:inline-flex;align-items:center;gap:2px">' + I.arrowDown(8,'var(--text-dim)') + ' ' + mv.pctChange + '%</span> ';
         // Trap badges
         const tr = detectTraps(s);
         badges += tr.map(t => {
           const col = t.severity === 'high' ? 'var(--danger)' : t.severity === 'medium' ? 'var(--amber)' : 'var(--text-muted)';
           const bg = t.severity === 'high' ? 'rgba(239,68,68,0.1)' : t.severity === 'medium' ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.05)';
-          return '<span style="font-size:8px;font-weight:700;color:' + col + ';background:' + bg + ';padding:1px 4px;border-radius:3px;flex-shrink:0">&#9888; ' + esc(t.label) + '</span>';
+          return '<span style="font-size:8px;font-weight:700;color:' + col + ';background:' + bg + ';padding:1px 4px;border-radius:3px;flex-shrink:0;display:inline-flex;align-items:center;gap:2px">' + I.warn(8,col) + ' ' + esc(t.label) + '</span>';
         }).join(' ');
         return badges;
       })()}
@@ -857,9 +878,9 @@ function buildSelectionsHTML(selections, expanded) {
   const dataAttr = ' data-all-selections=\'' + JSON.stringify(selections).replace(/'/g, '&#39;') + '\'';
   let toggleLabel = '';
   if (moreCount > 0) {
-    toggleLabel = `<div style="text-align:center;padding:6px;font-size:10px;color:var(--accent);cursor:pointer;font-weight:600" class="show-more-btn"${dataAttr}>Show ${moreCount} more &#9660;</div>`;
+    toggleLabel = `<div style="text-align:center;padding:6px;font-size:10px;color:var(--accent);cursor:pointer;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px" class="show-more-btn"${dataAttr}>Show ${moreCount} more ${I.chevDown(10,'var(--accent)')}</div>`;
   } else if (expanded && selections.length > 5) {
-    toggleLabel = `<div style="text-align:center;padding:6px;font-size:10px;color:var(--accent);cursor:pointer;font-weight:600" class="show-less-btn"${dataAttr}>Show less &#9650;</div>`;
+    toggleLabel = `<div style="text-align:center;padding:6px;font-size:10px;color:var(--accent);cursor:pointer;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px" class="show-less-btn"${dataAttr}>Show less ${I.chevUp(10,'var(--accent)')}</div>`;
   }
 
   return `<div style="margin-top:10px;border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-sm);overflow:hidden;background:rgba(0,0,0,0.15)">
@@ -889,15 +910,15 @@ function createCodeCard(c) {
 
   // Status badge
   let statusBadge = '';
-  if (hasPending) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:10px">&#9203; ${c.pendingCount} live</span>`;
-  else if (allWon) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--success);background:rgba(34,197,94,0.1);padding:2px 8px;border-radius:10px">&#9989; Won</span>`;
-  else if (anyLost) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--danger);background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:10px">&#10060; ${c.lostCount} lost</span>`;
+  if (hasPending) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:3px">${I.clock(10,'var(--accent)')} ${c.pendingCount} live</span>`;
+  else if (allWon) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--success);background:rgba(34,197,94,0.1);padding:2px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:3px">${I.check(10,'var(--success)')} Won</span>`;
+  else if (anyLost) statusBadge = `<span style="font-size:10px;font-weight:700;color:var(--danger);background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:10px;display:inline-flex;align-items:center;gap:3px">${I.x(10,'var(--danger)')} ${c.lostCount} lost</span>`;
 
   // Score tally
   const tally = [
-    c.wonCount ? `<span style="color:var(--success)">${c.wonCount}&#10003;</span>` : '',
-    c.lostCount ? `<span style="color:var(--danger)">${c.lostCount}&#10060;</span>` : '',
-    c.pendingCount ? `<span style="color:var(--text-dim)">${c.pendingCount}&#9203;</span>` : '',
+    c.wonCount ? `<span style="color:var(--success);display:inline-flex;align-items:center;gap:1px">${c.wonCount}${I.check(9,'var(--success)')}</span>` : '',
+    c.lostCount ? `<span style="color:var(--danger);display:inline-flex;align-items:center;gap:1px">${c.lostCount}${I.x(9,'var(--danger)')}</span>` : '',
+    c.pendingCount ? `<span style="color:var(--text-dim);display:inline-flex;align-items:center;gap:1px">${c.pendingCount}${I.clock(9,'var(--text-dim)')}</span>` : '',
   ].filter(Boolean).join(' ');
 
   card.innerHTML = `
@@ -1313,12 +1334,12 @@ document.getElementById('compare-codes-btn').onclick = async () => {
 
     if (overlaps.length === 0) {
       html += `<div style="padding:10px;border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-xs);background:rgba(34,197,94,0.05)">
-        <span style="color:var(--success);font-weight:700">&#10003; No repeated matches!</span>
+        <span style="color:var(--success);font-weight:700;display:inline-flex;align-items:center;gap:4px">${I.check(14,'var(--success)')} No repeated matches!</span>
         <span style="font-size:11px;color:var(--text-dim);margin-left:6px">Safe to stake both codes</span>
       </div>`;
     } else {
       html += `<div style="padding:10px;border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-xs);background:rgba(239,68,68,0.05);margin-bottom:8px">
-        <span style="color:var(--danger);font-weight:700">&#9888; ${overlaps.length} repeated match${overlaps.length > 1 ? 'es' : ''} found</span>
+        <span style="color:var(--danger);font-weight:700;display:inline-flex;align-items:center;gap:4px">${I.warn(14,'var(--danger)')} ${overlaps.length} repeated match${overlaps.length > 1 ? 'es' : ''} found</span>
         <span style="font-size:11px;color:var(--text-dim);margin-left:6px">If ${overlaps.length === 1 ? 'this game' : 'any of these games'} loses, BOTH codes lose</span>
       </div>`;
 
@@ -1879,7 +1900,7 @@ async function generateSafeCode(targetOdds, btn) {
     const data = await res.json();
     // Update progress step
     const step = document.getElementById('gen-step-' + idx);
-    if (step) { step.classList.remove('active'); step.classList.add('done'); step.querySelector('.gen-step-dot').innerHTML = '&#10003;'; }
+    if (step) { step.classList.remove('active'); step.classList.add('done'); step.querySelector('.gen-step-dot').innerHTML = I.check(8,'var(--success)'); }
     return { data, picked, idx };
   }));
 
@@ -2119,7 +2140,7 @@ document.getElementById('gen-code-btn').onclick = async () => {
           <div style="font-size:32px;font-weight:800;font-family:monospace;letter-spacing:4px;color:var(--success);user-select:all;margin-bottom:8px">${esc(code)}</div>
           <div style="display:flex;justify-content:center;gap:8px">
             <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',2000)})" style="padding:8px 20px;font-size:13px;font-weight:700;border:1px solid rgba(34,197,94,0.4);border-radius:6px;background:rgba(34,197,94,0.1);color:var(--success);cursor:pointer;font-family:inherit">Copy Code</button>
-            ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" style="padding:8px 20px;font-size:13px;font-weight:700;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center">Open in Sportybet &#8599;</a>` : ''}
+            ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener" style="padding:8px 20px;font-size:13px;font-weight:700;border:none;border-radius:6px;background:var(--accent);color:#fff;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center">Open in Sportybet ${I.extLink(12,'#fff')}</a>` : ''}
           </div>
           <div style="font-size:11px;color:var(--text-dim);margin-top:8px">${selections.length} games selected</div>
         </div>
@@ -2172,7 +2193,7 @@ document.getElementById('load-code-btn').onclick = async () => {
     const data = await res.json();
 
     if (data.bizCode !== 10000 || !data.isAvailable || !data.data?.outcomes) {
-      resultDiv.innerHTML = '<div style="padding:12px;border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);background:rgba(239,68,68,0.05)"><span style="color:var(--danger);font-weight:700">&#10060; Invalid code</span><span style="color:var(--text-dim);margin-left:8px;font-size:12px">Code "' + esc(code) + '" not found on Sportybet</span></div>';
+      resultDiv.innerHTML = '<div style="padding:12px;border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);background:rgba(239,68,68,0.05)"><span style="color:var(--danger);font-weight:700;display:inline-flex;align-items:center;gap:4px">' + I.x(14,'var(--danger)') + ' Invalid code</span><span style="color:var(--text-dim);margin-left:8px;font-size:12px">Code "' + esc(code) + '" not found on Sportybet</span></div>';
       return;
     }
 
@@ -2213,14 +2234,14 @@ document.getElementById('load-code-btn').onclick = async () => {
       <div style="border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);background:rgba(34,197,94,0.03);padding:14px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
           <span style="font-size:22px;font-weight:800;font-family:monospace;letter-spacing:2px;color:var(--success)">${esc(code)}</span>
-          <span style="font-size:9px;color:var(--success);font-weight:700">&#10003; VALID</span>
+          <span style="font-size:9px;color:var(--success);font-weight:700;display:inline-flex;align-items:center;gap:2px">${I.check(9,'var(--success)')} VALID</span>
           <span style="font-size:11px;color:${statusColor};font-weight:700">${statusText}</span>
         </div>
         <div style="display:flex;gap:12px;font-size:12px;color:var(--text-dim);margin-bottom:8px">
           <span><b style="color:var(--text)">${selections.length}</b> games</span>
           <span>Total: <b style="color:var(--amber)">${totalOdds.toLocaleString(undefined,{maximumFractionDigits:2})}</b></span>
-          ${won ? '<span style="color:var(--success)"><b>' + won + '</b> &#10003;</span>' : ''}
-          ${lost ? '<span style="color:var(--danger)"><b>' + lost + '</b> &#10060;</span>' : ''}
+          ${won ? '<span style="color:var(--success);display:inline-flex;align-items:center;gap:2px"><b>' + won + '</b> ' + I.check(10,'var(--success)') + '</span>' : ''}
+          ${lost ? '<span style="color:var(--danger);display:inline-flex;align-items:center;gap:2px"><b>' + lost + '</b> ' + I.x(10,'var(--danger)') + '</span>' : ''}
         </div>
         ${buildSelectionsHTML(selections, selections.length <= 20)}
       </div>
