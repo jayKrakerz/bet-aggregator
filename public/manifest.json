@@ -1,11 +1,11 @@
 {
-  "name": "JA EdgeScore",
-  "short_name": "EdgeScore",
-  "description": "Betting prediction aggregator with intelligent scoring",
+  "name": "JA Win Zone",
+  "short_name": "JA Win Zone",
+  "description": "Smart betting code aggregator with safe code generation",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#faf7f4",
-  "theme_color": "#ea580c",
+  "background_color": "#0f1420",
+  "theme_color": "#0f1420",
   "orientation": "portrait-primary",
   "icons": [
     {

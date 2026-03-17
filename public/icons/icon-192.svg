@@ -1,5 +1,23 @@
 <svg width="192" height="192" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
-  <rect width="192" height="192" rx="32" fill="#ea580c"/>
-  <path d="M40 140L76 68L108 98L152 40" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M132 40H152V60" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0f2027"/>
+      <stop offset="50%" stop-color="#1a1f33"/>
+      <stop offset="100%" stop-color="#15202e"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="40" y1="20" x2="152" y2="172" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="50%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="40" fill="url(#bg)"/>
+  <!-- Shield -->
+  <path d="M96 24L36 52v44c0 42 25.6 72 60 80 34.4-8 60-38 60-80V52L96 24z" fill="url(#shield)" opacity="0.18"/>
+  <path d="M96 24L36 52v44c0 42 25.6 72 60 80 34.4-8 60-38 60-80V52L96 24z" stroke="url(#shield)" stroke-width="4" fill="none"/>
+  <!-- Rising arrow -->
+  <path d="M56 130l28-38 20 22 36-52" stroke="#22c55e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M128 62l14 0 0-14" stroke="#22c55e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Star -->
+  <path d="M96 36l4.5 9 10 1.4-7.2 7 1.7 10L96 58.5 87 63.4l1.7-10-7.2-7 10-1.4 4.5-9z" fill="#f59e0b"/>
 </svg>
