@@ -563,9 +563,8 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
 
   const raw = [...byCode.values()];
 
-  // Validate ALL codes against Sportybet API to get correct ticket selection IDs
-  // (needed for manual code generation from selected games)
-  const needsValidation = raw;
+  // Only validate codes that haven't been validated yet (Code Hub codes come pre-validated)
+  const needsValidation = raw.filter(c => !c.validated);
   for (let i = 0; i < needsValidation.length; i += 5) {
     const batch = needsValidation.slice(i, i + 5);
     const validations = await Promise.all(
