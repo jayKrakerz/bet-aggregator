@@ -220,31 +220,144 @@ body{min-height:100vh;overflow-x:hidden}
 .toast-info{background:var(--accent)}
 .toast-warn{background:var(--amber);color:#000}
 
-/* ===== RESPONSIVE ===== */
+/* ===== BOTTOM NAV (mobile only) ===== */
+.bottom-nav{display:none}
+
+/* ===== DRAWER / BOTTOM SHEET ===== */
+.drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;opacity:0;transition:opacity 0.3s;-webkit-tap-highlight-color:transparent}
+.drawer-overlay.open{display:block;opacity:1}
+.drawer{position:fixed;bottom:0;left:0;right:0;z-index:201;background:var(--bg);border-top-left-radius:20px;border-top-right-radius:20px;max-height:85vh;overflow-y:auto;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.drawer.open{transform:translateY(0)}
+.drawer-handle{width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:4px;margin:10px auto 6px}
+.drawer-header{display:flex;align-items:center;gap:10px;padding:8px 20px 14px;border-bottom:1px solid rgba(255,255,255,0.06);position:sticky;top:0;background:var(--bg);z-index:1;border-top-left-radius:20px;border-top-right-radius:20px}
+.drawer-body{padding:16px 20px 32px}
+.drawer-close{width:32px;height:32px;border-radius:50%;border:none;background:rgba(255,255,255,0.08);color:var(--text-dim);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:auto;-webkit-tap-highlight-color:transparent}
+
+/* ===== RESPONSIVE: TABLET ===== */
 @media(max-width:768px){
-  .header{padding:0 16px;height:50px}
+  .header{padding:0 16px;height:48px}
   .header-inner{gap:8px}
   .logo h1{font-size:15px}
-  .chip{padding:5px 10px;font-size:11px}
-  .container{padding:0 16px 40px}
-  .tab-btn{padding:8px 16px;font-size:12px}
+  .container{padding:0 12px 40px}
   .tool-grid{grid-template-columns:1fr}
-  .section-card{padding:16px}
+  .section-card{padding:14px}
   .card-title{font-size:13px}
   .gen-pill{min-width:44px;padding:8px 2px;font-size:11px}
   .btn-primary,.btn-success,.btn-danger{padding:8px 14px;font-size:12px}
-  .action-bar{flex-direction:column;gap:10px;padding:12px 16px}
+  .action-bar{flex-direction:column;gap:10px;padding:12px 14px}
   .action-bar-stats{justify-content:center}
   .ab-quick-btn{width:100%;text-align:center}
   .flex-row{flex-wrap:wrap}
   .input-mono{font-size:14px;padding:10px 12px}
-  .collapsible-header{padding:10px 16px}
-  .collapsible-inner{padding:0 16px 16px}
-  #market-filter-chips .chip{font-size:9px;padding:3px 8px}
+  .collapsible-header{padding:10px 14px}
+  .collapsible-inner{padding:0 14px 14px}
 }
-@media(max-width:480px){
+
+/* ===== RESPONSIVE: MOBILE ===== */
+@media(max-width:640px){
+  :root{--header-h:48px;--bottom-nav-h:60px}
+  html{font-size:13px}
+
+  /* Safe areas for notch/home indicator */
+  body{padding-bottom:calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px))}
+  .header{padding:0 14px;height:var(--header-h)}
+  .logo svg{width:22px;height:22px}
+  .logo h1{font-size:14px}
+  .health{padding:4px 8px;font-size:10px;gap:4px}
+
+  /* Container: tighter padding */
+  .container{padding:0 10px 20px;padding-bottom:calc(20px + var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px))}
+
+  /* Hide desktop tabs — use bottom nav instead */
+  .tabs-header{display:none !important}
+
+  /* Bottom nav */
+  .bottom-nav{
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    height:calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+    background:rgba(11,15,25,0.95);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-top:1px solid rgba(255,255,255,0.08);z-index:100;
+    align-items:stretch;justify-content:space-around;
+  }
+  .bnav-item{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;color:var(--text-muted);font-size:10px;font-weight:600;
+    cursor:pointer;-webkit-tap-highlight-color:transparent;
+    transition:color 0.2s;position:relative;border:none;background:none;font-family:inherit;
+    padding:6px 0;
+  }
+  .bnav-item.active{color:var(--accent)}
+  .bnav-item.active::before{
+    content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:24px;height:2px;background:var(--accent);border-radius:0 0 2px 2px;
+  }
+  .bnav-icon{font-size:20px;line-height:1}
+
+  /* Action bar: compact stats row */
+  .action-bar{margin:10px 0;padding:10px 12px;gap:8px;border-radius:var(--radius-sm)}
   .ab-stat{font-size:11px}
-  .ab-quick-btn{font-size:13px;padding:10px 20px}
+  .ab-num{font-size:12px}
+  .ab-divider{height:12px}
+  .ab-quick-btn{padding:10px 18px;font-size:13px;border-radius:var(--radius-sm)}
+
+  /* Tab content spacing */
+  .tab-btn{padding:7px 14px;font-size:12px}
+
+  /* Cards: full bleed feel */
+  .section-card{padding:12px;border-radius:var(--radius-sm)}
+  .tool-grid{gap:10px;margin-bottom:14px}
+
+  /* Generate section */
+  .gen-pill{min-width:40px;padding:10px 4px;font-size:12px;border-radius:var(--radius-sm)}
+  #market-filter-chips .chip{font-size:9px;padding:4px 8px}
+  .gen-options-toggle{font-size:10px}
+  .card-hint{font-size:10px}
+
+  /* Inputs: larger touch targets */
+  .input-mono,.input-num,.input-std{font-size:16px !important;padding:12px !important;min-height:44px}
+  select.input-num{font-size:13px !important;padding:10px 8px !important;min-height:44px}
+  .btn-primary,.btn-success,.btn-danger,.btn-outline{min-height:44px;padding:10px 16px;font-size:13px}
+
+  /* Code cards: compact on mobile */
+  .ou-card{padding:10px 12px;border-radius:var(--radius-sm)}
+  .picks-list{gap:8px}
+
+  /* Collapsible sections: tighter */
+  .collapsible{border-radius:var(--radius-sm);margin-bottom:8px}
+  .collapsible-header{padding:12px 14px}
+  .collapsible-header span.ch-label{font-size:12px}
+  .collapsible-header .ch-hint{font-size:10px}
+  .collapsible-inner{padding:0 12px 12px}
+
+  /* Section title */
+  .section-title{margin-bottom:12px}
+  .section-title h2{font-size:12px}
+
+  /* Selections: hide on mobile cards, show in drawer */
+  .ou-card .sel-table-mobile-hide{display:none !important}
+
+  /* Toasts: top center on mobile */
+  #toast-container{bottom:auto !important;top:calc(var(--header-h) + 8px) !important;right:10px !important;left:10px !important}
+  .toast{font-size:12px;padding:10px 14px;text-align:center}
+
+  /* Skeleton: shorter */
+  .skel-pick{height:64px;margin-bottom:8px}
+
+  /* Sticky generate bar */
+  .generate-bar{padding:8px 12px;gap:8px;border-radius:var(--radius-sm)}
+
+  /* Flex row wrap always on mobile */
+  .flex-row,.flex-row-wrap{gap:6px}
+}
+
+/* ===== RESPONSIVE: SMALL PHONES ===== */
+@media(max-width:380px){
+  .container{padding:0 8px 16px;padding-bottom:calc(16px + var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px))}
+  .action-bar-stats{gap:8px}
+  .ab-stat{font-size:10px}
+  .section-card{padding:10px}
+  .gen-pill{font-size:11px;padding:8px 2px}
 }
 </style>
 </head>
@@ -474,6 +587,38 @@ body{min-height:100vh;overflow-x:hidden}
 
 </div>
 
+<!-- BOTTOM NAV (mobile only) -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bnav-item active" data-tab="booking-codes">
+    <span class="bnav-icon">&#127918;</span>
+    <span>Codes</span>
+  </button>
+  <button class="bnav-item" data-tab="generate">
+    <span class="bnav-icon">&#9889;</span>
+    <span>Generate</span>
+  </button>
+  <button class="bnav-item" data-tab="tracker">
+    <span class="bnav-icon">&#128200;</span>
+    <span>Tracker</span>
+  </button>
+  <button class="bnav-item" data-tab="history">
+    <span class="bnav-icon">&#128203;</span>
+    <span>History</span>
+  </button>
+</nav>
+
+<!-- DRAWER OVERLAY -->
+<div class="drawer-overlay" id="drawer-overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <span id="drawer-title" style="font-size:16px;font-weight:800;font-family:monospace;letter-spacing:2px;color:var(--success)"></span>
+    <span id="drawer-subtitle" style="font-size:12px;color:var(--text-dim)"></span>
+    <button class="drawer-close" id="drawer-close">&times;</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</div>
+
 <div id="toast-container" style="position:fixed;bottom:24px;right:24px;z-index:1000;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
 
 <script>
@@ -539,23 +684,101 @@ function formatShortTime(t) {
 }
 
 // ===== TABS =====
+function switchTab(tabName) {
+  // Map mobile-specific tabs to existing panels
+  const panelMap = { 'generate': 'booking-codes', 'tracker': 'booking-codes' };
+  const panelName = panelMap[tabName] || tabName;
+
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const tabBtn = document.querySelector('.tab-btn[data-tab="' + panelName + '"]');
+  if (tabBtn) tabBtn.classList.add('active');
+  S.activeTab = panelName;
+  const panel = document.getElementById('panel-' + panelName);
+  if (panel) panel.classList.add('active');
+
+  // Lazy load
+  if (panelName === 'booking-codes' && !S.codesLoaded) loadBookingCodes();
+  if (panelName === 'history') { renderHistory(); refreshHistoryStatuses(); }
+
+  // Mobile-specific: scroll to relevant section
+  if (tabName === 'generate') {
+    const el = document.getElementById('auto-gen-section');
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }
+  if (tabName === 'tracker') {
+    const el = document.getElementById('col-tracker');
+    if (el) { el.classList.add('open'); setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100); }
+  }
+
+  // Update bottom nav active state
+  document.querySelectorAll('.bnav-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tabName);
+  });
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.onclick = () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    S.activeTab = btn.dataset.tab;
-    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-    // lazy load tabs on first switch
-    if (btn.dataset.tab === 'booking-codes' && !S.codesLoaded) {
-      loadBookingCodes();
-    }
-    if (btn.dataset.tab === 'history') {
-      renderHistory();
-      refreshHistoryStatuses();
-    }
-  };
+  btn.onclick = () => switchTab(btn.dataset.tab);
 });
+
+// ===== BOTTOM NAV =====
+document.querySelectorAll('.bnav-item').forEach(btn => {
+  btn.onclick = () => switchTab(btn.dataset.tab);
+});
+
+// ===== DRAWER (mobile code detail sheet) =====
+const isMobile = () => window.innerWidth <= 640;
+const drawerOverlay = document.getElementById('drawer-overlay');
+const drawerEl = document.getElementById('drawer');
+
+function openDrawer(code, codeData) {
+  const title = document.getElementById('drawer-title');
+  const subtitle = document.getElementById('drawer-subtitle');
+  const body = document.getElementById('drawer-body');
+
+  title.textContent = code;
+  const oddsText = codeData.totalOdds ? '@' + codeData.totalOdds.toLocaleString(undefined, {maximumFractionDigits:2}) : '';
+  const statusText = codeData.pendingCount > 0 ? codeData.pendingCount + ' live' : codeData.lostCount > 0 ? codeData.lostCount + ' lost' : codeData.wonCount > 0 ? 'Won' : '';
+  subtitle.innerHTML = '<span style="color:var(--amber);font-weight:700">' + oddsText + '</span> <span style="margin-left:6px">' + (codeData.events || '') + ' games</span> <span style="margin-left:6px;font-weight:700;color:' + (codeData.pendingCount > 0 ? 'var(--accent)' : codeData.lostCount > 0 ? 'var(--danger)' : 'var(--success)') + '">' + statusText + '</span>';
+
+  // Copy button + selections
+  body.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button onclick="navigator.clipboard.writeText('${esc(code)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',1500)})" class="btn-primary" style="flex:1;font-size:14px">Copy Code</button>
+      <button onclick="document.getElementById('tracker-input').value='${esc(code)}';closeDrawer();switchTab('tracker');document.getElementById('tracker-start-btn').click()" class="btn-outline" style="flex:1;font-size:12px">Track Live</button>
+    </div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;letter-spacing:0.5px">Selections</div>
+    ${buildSelectionsHTML(codeData.selections, true)}
+    <div style="margin-top:12px;display:flex;gap:10px;font-size:12px;justify-content:center">
+      <span style="color:var(--success);font-weight:700">${codeData.wonCount} won</span>
+      <span style="color:var(--danger);font-weight:700">${codeData.lostCount} lost</span>
+      <span style="color:var(--text-dim);font-weight:700">${codeData.pendingCount} pending</span>
+    </div>
+  `;
+
+  drawerOverlay.classList.add('open');
+  drawerEl.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDrawer() {
+  drawerEl.classList.remove('open');
+  drawerOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+drawerOverlay.onclick = closeDrawer;
+document.getElementById('drawer-close').onclick = closeDrawer;
+
+// Swipe down to close drawer
+let drawerTouchStartY = 0;
+drawerEl.addEventListener('touchstart', function(e) {
+  drawerTouchStartY = e.touches[0].clientY;
+}, { passive: true });
+drawerEl.addEventListener('touchmove', function(e) {
+  const dy = e.touches[0].clientY - drawerTouchStartY;
+  if (dy > 80 && drawerEl.scrollTop <= 0) closeDrawer();
+}, { passive: true });
 
 // ===== BOOKING CODES =====
 async function loadBookingCodes() {
@@ -696,7 +919,7 @@ function createCodeCard(c) {
         ${c.postedAgo ? `<span style="font-size:9px;color:var(--text-muted)">${esc(c.postedAgo)}</span>` : ''}
       </div>
     </div>
-    ${buildSelectionsHTML(c.selections, false)}
+    <div class="sel-table-mobile-hide">${buildSelectionsHTML(c.selections, false)}</div>
   `;
 
   const copyBtn = card.querySelector('.copy-btn');
@@ -708,6 +931,14 @@ function createCodeCard(c) {
       setTimeout(() => { copyBtn.textContent = 'COPY'; copyBtn.style.background = ''; }, 1500);
       showToast('Code copied!', 'success');
     });
+  };
+
+  // Mobile: tap card to open detail drawer
+  card.onclick = (e) => {
+    if (e.target.closest('.copy-btn') || e.target.closest('.sel-check') || e.target.closest('.sel-row')) return;
+    if (isMobile()) {
+      openDrawer(c.code, c);
+    }
   };
 
   return card;
