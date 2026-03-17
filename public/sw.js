@@ -1,10 +1,9 @@
-const CACHE_NAME = 'edgescore-shell-v1';
+const CACHE_NAME = 'betpulse-shell-v2';
 const SHELL_URLS = [
-  '/',
   '/manifest.json',
 ];
 
-// Install: cache the app shell
+// Install: cache static assets (NOT the HTML page — it changes frequently)
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS))
@@ -22,7 +21,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: cache-first for shell, network-only for API
+// Fetch: network-first for HTML, cache-first for static assets, network-only for API
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -35,7 +34,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Shell assets — cache-first
+  // HTML pages — network-first (so deploys take effect immediately)
+  if (event.request.mode === 'navigate' || url.pathname === '/') {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request) || caches.match('/'))
+    );
+    return;
+  }
+
+  // Static assets — cache-first
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
