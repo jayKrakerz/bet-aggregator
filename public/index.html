@@ -2068,9 +2068,22 @@ document.getElementById('ab-quick-gen').onclick = () => {
     document.getElementById('col-tracker').classList.add('open');
   }
 
-  // Register service worker
+  // Force-clear old caches and re-register service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    // Nuke all old caches first
+    if ('caches' in window) {
+      caches.keys().then(keys => {
+        keys.forEach(k => { if (k !== 'betpulse-shell-v2') caches.delete(k); });
+      });
+    }
+    // Unregister old SW, then register fresh
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      Promise.all(regs.map(r => r.unregister())).then(() => {
+        navigator.serviceWorker.register('/sw.js?v=2').catch(() => {});
+      });
+    }).catch(() => {
+      navigator.serviceWorker.register('/sw.js?v=2').catch(() => {});
+    });
   }
 })();
 </script>
