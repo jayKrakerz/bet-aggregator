@@ -311,7 +311,15 @@ body{min-height:100vh;overflow-x:hidden}
             <span class="badge-count ml-auto" id="pool-count">--</span>
           </div>
           <div class="flex-row" style="margin-top:4px">
-            <input type="number" id="custom-odds-input" placeholder="Custom odds e.g. 7.5" min="1.5" max="500" step="0.5" class="input-num flex-1" style="font-size:13px" />
+            <input type="number" id="custom-odds-input" placeholder="Odds e.g. 7.5" min="1.5" max="500" step="0.5" class="input-num" style="font-size:13px;flex:1;min-width:70px" />
+            <select id="days-range-select" class="input-num" style="font-size:12px;width:auto;min-width:90px;padding:7px 8px;cursor:pointer;appearance:auto">
+              <option value="0">Auto days</option>
+              <option value="1">Today only</option>
+              <option value="2">2 days</option>
+              <option value="3">3 days</option>
+              <option value="5">5 days</option>
+              <option value="7">7 days</option>
+            </select>
             <button id="custom-odds-btn" class="btn-primary" style="padding:7px 16px">Generate</button>
           </div>
           <span class="gen-options-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'Less options':'More options'">More options</span>
@@ -1414,7 +1422,7 @@ function pickMultipleSets(targetOdds, count = 3, globalExclude = new Set()) {
 
   // For high-odds targets (50+), expand window to 3 days since we need more games
   const today = new Date();
-  const maxDays = targetOdds >= 50 ? 3 : 1;
+  const maxDays = selectedDaysRange > 0 ? selectedDaysRange : (targetOdds >= 50 ? 3 : 1);
   const allowedDates = new Set();
   for (let d = 0; d < maxDays; d++) {
     const dt = new Date(today);
@@ -1487,7 +1495,7 @@ function pickDiversifiedSets(targetOdds) {
   if (!gamePool.length) return [];
 
   const today = new Date();
-  const maxDays = targetOdds >= 50 ? 3 : 1;
+  const maxDays = selectedDaysRange > 0 ? selectedDaysRange : (targetOdds >= 50 ? 3 : 1);
   const allowedDates = new Set();
   for (let d = 0; d < maxDays; d++) {
     const dt = new Date(today);
@@ -1736,6 +1744,11 @@ document.getElementById('auto-gen-clear').onclick = () => {
 
 // Market filter for code generation
 let selectedMarketFilter = '';
+let selectedDaysRange = 0; // 0 = auto (1 day for <50 odds, 3 for 50+)
+
+document.getElementById('days-range-select').addEventListener('change', (e) => {
+  selectedDaysRange = parseInt((e.target as HTMLSelectElement).value) || 0;
+});
 document.querySelectorAll('#market-filter-chips .chip').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('#market-filter-chips .chip').forEach(b => b.classList.remove('active'));
