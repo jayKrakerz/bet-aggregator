@@ -2,6 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>
+// Kill stale service workers FIRST — before anything else loads
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(r) { r.unregister(); });
+  });
+}
+if ('caches' in window) {
+  caches.keys().then(function(keys) {
+    keys.forEach(function(k) { caches.delete(k); });
+  });
+}
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0b0f19">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2068,23 +2081,7 @@ document.getElementById('ab-quick-gen').onclick = () => {
     document.getElementById('col-tracker').classList.add('open');
   }
 
-  // Force-clear old caches and re-register service worker
-  if ('serviceWorker' in navigator) {
-    // Nuke all old caches first
-    if ('caches' in window) {
-      caches.keys().then(keys => {
-        keys.forEach(k => { if (k !== 'betpulse-shell-v2') caches.delete(k); });
-      });
-    }
-    // Unregister old SW, then register fresh
-    navigator.serviceWorker.getRegistrations().then(regs => {
-      Promise.all(regs.map(r => r.unregister())).then(() => {
-        navigator.serviceWorker.register('/sw.js?v=2').catch(() => {});
-      });
-    }).catch(() => {
-      navigator.serviceWorker.register('/sw.js?v=2').catch(() => {});
-    });
-  }
+  // Service worker removed — was causing stale cache issues
 })();
 </script>
 </body>
