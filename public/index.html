@@ -1344,80 +1344,75 @@ const MID_LEAGUES = new Set([
 function safetyScore(g) {
   let score = 50; // base
 
-  // 1. MARKET TYPE (30 pts max — the single biggest predictor of safety)
+  // 1. MARKET TYPE — reward markets with high historical hit rates
   const mkt = (g.market || '').toLowerCase();
   const pick = (g.pick || '').toLowerCase();
 
   if (mkt.includes('over/under') || mkt.includes('total goals') || mkt.includes('total')) {
-    if (pick.includes('under 5.5') || pick.includes('under 6.5')) score += 20;
-    else if (pick.includes('under 4.5')) score += 17;
-    else if (pick.includes('under 3.5')) score += 13;
-    else if (pick.includes('under 2.5')) score += 6;
-    else if (pick.includes('over 0.5')) score += 18;
-    else if (pick.includes('over 1.5')) score += 10;
-    else if (pick.includes('over 2.5')) score += 3;
-    else score += 5;
+    if (pick.includes('over 0.5')) score += 15;
+    else if (pick.includes('over 1.5')) score += 8;
+    else if (pick.includes('under 4.5')) score += 8;
+    else if (pick.includes('under 3.5')) score += 5;
+    else if (pick.includes('under 5.5') || pick.includes('under 6.5')) score += 6;
+    else if (pick.includes('over 2.5')) score += 2;
+    else if (pick.includes('under 2.5')) score += 2;
+    else score += 3;
   } else if (mkt.includes('double chance')) {
-    score += 15;
-  } else if (mkt.includes('1st half') && mkt.includes('handicap')) {
-    if (pick.includes('0:2') || pick.includes('2:0')) score += 14;
-    else if (pick.includes('0:1') || pick.includes('1:0')) score += 7;
-    else score += 4;
+    score += 12;
   } else if (mkt.includes('handicap')) {
-    score += 5;
+    if (mkt.includes('1st half')) {
+      if (pick.includes('0:2') || pick.includes('2:0')) score += 10;
+      else score += 4;
+    } else {
+      score += 5;
+    }
   } else if (mkt === '1x2') {
     score += 0;
   } else if (mkt.includes('both teams') || mkt.includes('btts') || mkt.includes('gg')) {
-    score += 3;
-  } else if (mkt.includes('correct score')) {
-    score -= 20;
-  } else {
     score += 2;
+  } else if (mkt.includes('correct score')) {
+    score -= 25;
+  } else {
+    score += 1;
   }
 
-  // 2. LEAGUE QUALITY (20 pts max — top leagues are more predictable, less prone to upsets)
+  // 2. LEAGUE QUALITY — top leagues have more data, fewer freak results
   const league = (g.league || '').toLowerCase();
   const leagueName = league.split(' - ').pop() || league;
-  if ([...TOP_LEAGUES].some(l => leagueName.includes(l))) score += 12;
-  else if ([...MID_LEAGUES].some(l => leagueName.includes(l))) score += 6;
-  // no penalty for other leagues — they're fine, just no bonus
+  if ([...TOP_LEAGUES].some(l => leagueName.includes(l))) score += 10;
+  else if ([...MID_LEAGUES].some(l => leagueName.includes(l))) score += 5;
 
-  // 3. ODDS — mild signal, NOT the main factor
-  // Only penalize extremes; the market type + league matter more
+  // 3. ODDS SWEET SPOT — the bookmaker's implied probability is the best signal we have
+  // Odds 1.10-1.40 are the sweet spot: high enough to contribute, low enough to be reliable
+  // Penalize very low odds (add legs for nothing) and high odds (too risky)
   const odds = g.odds || 1;
-  if (odds <= 1.05) score += 5;       // almost certain, small bonus
-  else if (odds <= 1.20) score += 3;
-  else if (odds <= 1.50) score += 0;   // neutral zone
-  else if (odds > 3.0) score -= 10;    // long shot
-  else if (odds > 2.0) score -= 5;
-  else if (odds > 1.5) score -= 1;
+  if (odds <= 1.05) score -= 5;         // near-certain but adds a leg for almost nothing
+  else if (odds <= 1.10) score += 2;
+  else if (odds <= 1.25) score += 8;    // sweet spot: ~80-90% implied probability
+  else if (odds <= 1.40) score += 6;    // good: ~71-80% implied probability
+  else if (odds <= 1.60) score += 3;    // decent: ~62-71%
+  else if (odds <= 2.00) score += 0;    // coin-flippy territory
+  else if (odds <= 3.00) score -= 8;
+  else score -= 15;                      // long shot
 
-  // 4. MATCH STATUS
-  const status = (g.matchStatus || '').toLowerCase();
-  if (status.includes('ht') || status.includes('half')) score += 5;
-
-  // 5. ANTI-TRAP — penalize known trap patterns
+  // 4. ANTI-TRAP — penalize known trap patterns
   const traps = detectTraps(g);
   for (const t of traps) {
     if (t.severity === 'high') score -= 15;
     else if (t.severity === 'medium') score -= 8;
-    else score -= 4;
+    else score -= 3;
   }
 
-  // 6. CONSENSUS — THE MOST POWERFUL SIGNAL
-  // If multiple independent codes all picked the same outcome, it's crowd wisdom.
-  // This is the single strongest predictor because it aggregates many analysts.
+  // 5. CONSENSUS — mild bonus only, tipster sites often copy each other
   const consensus = getConsensus(g);
-  if (consensus >= 5) score += 30;       // 5+ sources agree — very strong signal
-  else if (consensus >= 4) score += 24;
-  else if (consensus >= 3) score += 18;  // 3 sources — solid agreement
-  else if (consensus >= 2) score += 10;  // 2 sources — moderate signal
-  // consensus === 1 means only 1 code picked this — no bonus
+  if (consensus >= 4) score += 8;
+  else if (consensus >= 3) score += 5;
+  else if (consensus >= 2) score += 3;
 
-  // 7. SHARP MONEY — odds dropping means professional bettors are backing this
+  // 6. SHARP MONEY — odds dropping means money flowing in
   const movement = oddsMovement(g);
-  if (movement.isSharpMoney) score += 12;
-  else if (movement.dropped) score += 5;
+  if (movement.isSharpMoney) score += 8;
+  else if (movement.dropped) score += 3;
 
   return Math.max(0, Math.min(100, score));
 }
@@ -1462,35 +1457,39 @@ function pickMultipleSets(targetOdds, count = 3, globalExclude = new Set()) {
   const scored = todayGames.map(g => ({ ...g, _safety: safetyScore(g) }));
   scored.sort((a, b) => b._safety - a._safety);
 
+  // Cap legs to minimize failure points
+  const maxLegs = targetOdds <= 3 ? 3 : targetOdds <= 10 ? 5 : targetOdds <= 30 ? 7 : targetOdds <= 100 ? 10 : 15;
+  const minOdds = targetOdds <= 5 ? 1.10 : targetOdds <= 20 ? 1.08 : 1.05;
+  const eligible = scored.filter(g => g.odds >= minOdds);
+
   const allSets = [];
-  const usedAcrossSets = new Set(globalExclude); // tracks events used across ALL sets
+  const usedAcrossSets = new Set(globalExclude);
 
   for (let setIdx = 0; setIdx < count; setIdx++) {
     const picked = [];
     const usedInThisSet = new Set();
     let total = 1;
 
-    for (const g of scored) {
+    for (const g of eligible) {
       if (total >= targetOdds) break;
-      if (usedInThisSet.has(g.eventId)) continue;  // no dupes within this code
-      if (usedAcrossSets.has(g.eventId)) continue;  // no dupes across codes
+      if (picked.length >= maxLegs) break;
+      if (usedInThisSet.has(g.eventId)) continue;
+      if (usedAcrossSets.has(g.eventId)) continue;
       usedInThisSet.add(g.eventId);
       picked.push(g);
       total *= g.odds;
     }
 
-    // Fine-tune overshoot
     if (picked.length > 1) {
       const withoutLast = total / picked[picked.length - 1].odds;
-      if (withoutLast >= targetOdds * 0.75 && Math.abs(withoutLast - targetOdds) < Math.abs(total - targetOdds)) {
+      if (withoutLast >= targetOdds * 0.80 && Math.abs(withoutLast - targetOdds) < Math.abs(total - targetOdds)) {
         const removed = picked.pop();
         usedInThisSet.delete(removed.eventId);
       }
     }
 
-    if (picked.length === 0) break; // no more games available
+    if (picked.length === 0) break;
 
-    // Mark these events as used for subsequent sets
     for (const g of picked) usedAcrossSets.add(g.eventId);
     allSets.push(picked);
   }
@@ -1536,21 +1535,30 @@ function pickDiversifiedSets(targetOdds) {
   const usedAcrossSets = new Set();
   const allSets = [];
 
+  // Max legs based on target odds — fewer legs = higher chance of all hitting
+  // Each leg is an independent failure point, so fewer is always better
+  const maxLegs = targetOdds <= 3 ? 3 : targetOdds <= 10 ? 5 : targetOdds <= 30 ? 7 : targetOdds <= 100 ? 10 : 15;
+
+  // Minimum individual odds — skip near-certain picks that add legs for nothing
+  const minOdds = targetOdds <= 5 ? 1.10 : targetOdds <= 20 ? 1.08 : 1.05;
+
   function pickSet(pool) {
+    const eligible = pool.filter(g => g.odds >= minOdds);
     const picked = [];
     const usedInSet = new Set();
     let total = 1;
-    for (const g of pool) {
+    for (const g of eligible) {
       if (total >= targetOdds) break;
+      if (picked.length >= maxLegs) break;
       if (usedInSet.has(g.eventId) || usedAcrossSets.has(g.eventId)) continue;
       usedInSet.add(g.eventId);
       picked.push(g);
       total *= g.odds;
     }
-    // Fine-tune overshoot
+    // Fine-tune overshoot — drop last pick if we're still close enough without it
     if (picked.length > 1) {
       const withoutLast = total / picked[picked.length - 1].odds;
-      if (withoutLast >= targetOdds * 0.75 && Math.abs(withoutLast - targetOdds) < Math.abs(total - targetOdds)) {
+      if (withoutLast >= targetOdds * 0.80 && Math.abs(withoutLast - targetOdds) < Math.abs(total - targetOdds)) {
         const removed = picked.pop();
         usedInSet.delete(removed.eventId);
       }
