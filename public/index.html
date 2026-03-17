@@ -1382,16 +1382,15 @@ function safetyScore(g) {
   if ([...TOP_LEAGUES].some(l => leagueName.includes(l))) score += 10;
   else if ([...MID_LEAGUES].some(l => leagueName.includes(l))) score += 5;
 
-  // 3. ODDS SWEET SPOT — the bookmaker's implied probability is the best signal we have
-  // Odds 1.10-1.40 are the sweet spot: high enough to contribute, low enough to be reliable
-  // Penalize very low odds (add legs for nothing) and high odds (too risky)
+  // 3. ODDS — bookmaker's implied probability is the best signal we have
+  // Reward the sweet spot (1.10-1.40) but don't penalize very safe picks
   const odds = g.odds || 1;
-  if (odds <= 1.05) score -= 5;         // near-certain but adds a leg for almost nothing
-  else if (odds <= 1.10) score += 2;
+  if (odds <= 1.05) score += 3;         // near-certain — safe but contributes little
+  else if (odds <= 1.10) score += 5;
   else if (odds <= 1.25) score += 8;    // sweet spot: ~80-90% implied probability
   else if (odds <= 1.40) score += 6;    // good: ~71-80% implied probability
-  else if (odds <= 1.60) score += 3;    // decent: ~62-71%
-  else if (odds <= 2.00) score += 0;    // coin-flippy territory
+  else if (odds <= 1.60) score += 2;    // decent: ~62-71%
+  else if (odds <= 2.00) score += 0;    // coinflip territory
   else if (odds <= 3.00) score -= 8;
   else score -= 15;                      // long shot
 
@@ -1459,7 +1458,7 @@ function pickMultipleSets(targetOdds, count = 3, globalExclude = new Set()) {
 
   // Cap legs to minimize failure points
   const maxLegs = targetOdds <= 3 ? 3 : targetOdds <= 10 ? 5 : targetOdds <= 30 ? 7 : targetOdds <= 100 ? 10 : 15;
-  const minOdds = targetOdds <= 5 ? 1.10 : targetOdds <= 20 ? 1.08 : 1.05;
+  const minOdds = 1.03; // allow safe picks like Over 0.5 — the leg cap prevents bloat
   const eligible = scored.filter(g => g.odds >= minOdds);
 
   const allSets = [];
@@ -1540,7 +1539,7 @@ function pickDiversifiedSets(targetOdds) {
   const maxLegs = targetOdds <= 3 ? 3 : targetOdds <= 10 ? 5 : targetOdds <= 30 ? 7 : targetOdds <= 100 ? 10 : 15;
 
   // Minimum individual odds — skip near-certain picks that add legs for nothing
-  const minOdds = targetOdds <= 5 ? 1.10 : targetOdds <= 20 ? 1.08 : 1.05;
+  const minOdds = 1.03; // allow safe picks like Over 0.5 — the leg cap prevents bloat
 
   function pickSet(pool) {
     const eligible = pool.filter(g => g.odds >= minOdds);
