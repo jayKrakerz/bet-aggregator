@@ -1446,12 +1446,77 @@ function safetyScore(g) {
   // LEARNED ADJUSTMENT — boost/penalize based on user's own history
   const learned = getLearnedRates();
   if (learned) {
-    // If low-odds codes have been winning, boost low-odds picks more
     const lowRate = learned.byOddsBand.low;
     if (lowRate && (lowRate.won + lowRate.lost) >= 3) {
       const winPct = lowRate.won / (lowRate.won + lowRate.lost);
       if (winPct >= 0.6 && odds <= 2) s += 4;
       else if (winPct < 0.3 && odds <= 2) s -= 4;
+    }
+  }
+
+  // EXTERNAL DATA — real form, H2H, and prediction confidence from API-Football
+  const enrich = getEnrichment(g.eventId);
+  if (enrich) {
+    // FORM: Check both teams' recent form
+    const hForm = formScore(enrich.homeForm);
+    const aForm = formScore(enrich.awayForm);
+
+    // For Double Chance "Home or Draw" — home team form matters most
+    if (mkt.includes('double chance')) {
+      if (pick.includes('home') || pick.includes('1x') || pick.includes('x2') === false) {
+        if (hForm !== null) {
+          if (hForm >= 12) s += 10;      // 4+ wins in last 5
+          else if (hForm >= 9) s += 5;   // 3 wins
+          else if (hForm <= 3) s -= 10;  // terrible form
+        }
+      }
+    }
+
+    // For Over/Under — use goals stats
+    if (mkt.includes('over/under') || mkt.includes('total')) {
+      const avgGoals = (enrich.homeGoalsFor + enrich.awayGoalsFor) / 2;
+      if (pick.includes('over 0.5') && avgGoals >= 1.2) s += 5;
+      if (pick.includes('over 1.5') && avgGoals >= 1.5) s += 5;
+      if (pick.includes('under 3.5') && avgGoals <= 1.5) s += 5;
+      if (pick.includes('over 2.5') && avgGoals < 1.2) s -= 8;  // low-scoring teams
+    }
+
+    // PREDICTION CONFIDENCE — API-Football's own analysis
+    // If their predicted winner aligns with our pick, boost confidence
+    const homeConfidence = enrich.homeWinPct || 0;
+    const drawConfidence = enrich.drawPct || 0;
+    const awayConfidence = enrich.awayWinPct || 0;
+
+    if (mkt.includes('double chance')) {
+      const dcPct = pick.includes('home') || pick.includes('1x')
+        ? homeConfidence + drawConfidence
+        : pick.includes('away') || pick.includes('x2')
+          ? awayConfidence + drawConfidence
+          : homeConfidence + awayConfidence;
+      if (dcPct >= 75) s += 8;
+      else if (dcPct >= 60) s += 4;
+      else if (dcPct < 40) s -= 8;
+    }
+
+    // H2H — if historically one side dominates
+    const totalH2H = enrich.h2hHomeWins + enrich.h2hAwayWins + enrich.h2hDraws;
+    if (totalH2H >= 3) {
+      if (mkt.includes('double chance')) {
+        const homeH2HPct = (enrich.h2hHomeWins + enrich.h2hDraws) / totalH2H;
+        const awayH2HPct = (enrich.h2hAwayWins + enrich.h2hDraws) / totalH2H;
+        if (pick.includes('home') || pick.includes('1x')) {
+          if (homeH2HPct >= 0.7) s += 6;
+          else if (homeH2HPct < 0.3) s -= 6;
+        } else if (pick.includes('away') || pick.includes('x2')) {
+          if (awayH2HPct >= 0.7) s += 6;
+          else if (awayH2HPct < 0.3) s -= 6;
+        }
+      }
+    }
+
+    // GENERAL FORM QUALITY — penalize if both teams in bad form (unpredictable)
+    if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) {
+      s -= 5;  // both teams struggling = volatile match
     }
   }
 
@@ -1582,7 +1647,58 @@ function pickDiversifiedSets(targetOdds) {
   return allSets;
 }
 
+// ===== MATCH ENRICHMENT =====
+let enrichmentData = {};  // eventId -> enrichment object
+let enrichmentFetched = false;
+
+async function fetchEnrichment() {
+  if (enrichmentFetched || !gamePool.length) return;
+  enrichmentFetched = true;
+
+  // Send top 25 candidates (by current safety score) for enrichment
+  const top = [...gamePool]
+    .sort((a, b) => safetyScore(b) - safetyScore(a))
+    .slice(0, 25)
+    .map(g => ({ homeTeam: g.homeTeam, awayTeam: g.awayTeam, matchDate: g.matchDate, eventId: g.eventId }));
+
+  try {
+    const res = await fetch('/predictions/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matches: top }),
+    });
+    const json = await res.json();
+    if (json.available && json.data) {
+      enrichmentData = json.data;
+      // Re-sort the game pool now that we have enrichment data
+      gamePool.sort((a, b) => safetyScore(b) - safetyScore(a));
+    }
+  } catch {}
+}
+
+function getEnrichment(eventId) {
+  return enrichmentData[eventId] || null;
+}
+
+/**
+ * Calculate a form score from a form string like "WWDLW".
+ * Returns a number: higher = better form.
+ * W=3, D=1, L=0. Max 15 for "WWWWW".
+ */
+function formScore(form) {
+  if (!form) return null;
+  let s = 0;
+  for (const c of form.slice(-5)) {
+    if (c === 'W') s += 3;
+    else if (c === 'D') s += 1;
+  }
+  return s;
+}
+
 async function generateSafeCode(targetOdds, btn) {
+  // Fetch enrichment data before generating (only first time)
+  await fetchEnrichment();
+
   const sets = pickDiversifiedSets(targetOdds);
   if (!sets.length) return;
   const resultsDiv = document.getElementById('auto-gen-results');
@@ -1637,6 +1753,15 @@ async function generateSafeCode(targetOdds, btn) {
         else if (safety >= 55) tags.push(`<span class="reason-badge" style="color:var(--blue);background:var(--blue-soft)">${safety} safe</span>`);
         const mv = oddsMovement(g);
         if (mv.isSharpMoney) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">${I.zap(8,'var(--green)')} Sharp</span>`);
+        // Enrichment badges
+        const enr = getEnrichment(g.eventId);
+        if (enr) {
+          const hf = formScore(enr.homeForm);
+          const af = formScore(enr.awayForm);
+          if (hf !== null && hf >= 12) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">H:${enr.homeForm?.slice(-5)}</span>`);
+          if (af !== null && af >= 12) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">A:${enr.awayForm?.slice(-5)}</span>`);
+          if (enr.h2hHomeWins + enr.h2hAwayWins + enr.h2hDraws >= 3) tags.push(`<span class="reason-badge" style="color:var(--blue);background:var(--blue-soft)">H2H ${enr.h2hHomeWins}-${enr.h2hDraws}-${enr.h2hAwayWins}</span>`);
+        }
         return `<div style="display:flex;align-items:center;gap:4px;padding:3px 0;flex-wrap:wrap"><span style="font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(g.pick)} <span style="color:var(--amber);font-weight:700">@${g.odds}</span></span>${tags.join('')}</div>`;
       }).join('');
 

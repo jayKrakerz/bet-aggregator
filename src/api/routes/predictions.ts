@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { getAllBookingCodes } from '../booking-codes-scraper.js';
+import { enrichMatches, hasFootballApi } from '../football-enrichment.js';
 
 // Strict alphanumeric pattern for booking codes
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
@@ -164,5 +165,29 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       }
     }
     return reply.status(502).send({ error: 'All Sportybet endpoints failed' });
+  });
+
+  // GET /predictions/enrich — batch enrich matches with external data
+  app.post('/enrich', async (request, reply) => {
+    if (!hasFootballApi()) {
+      return reply.status(200).send({ data: {}, available: false });
+    }
+
+    const body = request.body as { matches?: Array<{ homeTeam: string; awayTeam: string; matchDate: string | null; eventId: string }> };
+    if (!body?.matches || !Array.isArray(body.matches)) {
+      return reply.status(400).send({ error: 'No matches provided' });
+    }
+
+    // Limit to 25 matches per request
+    const matches = body.matches.slice(0, 25);
+    const enrichments = await enrichMatches(matches);
+
+    // Convert Map to plain object for JSON
+    const data: Record<string, unknown> = {};
+    for (const [eventId, enrichment] of enrichments) {
+      data[eventId] = enrichment;
+    }
+
+    return { data, available: true, enriched: enrichments.size };
   });
 };
