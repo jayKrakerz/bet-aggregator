@@ -4,10 +4,7 @@
 <meta charset="UTF-8">
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(r => r.forEach(s => s.unregister()));
-}
-if ('caches' in window) {
-  caches.keys().then(k => k.forEach(c => caches.delete(c)));
+  navigator.serviceWorker.register('/sw.js');
 }
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -247,6 +244,17 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .refresh-btn{background:none;border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 12px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px;transition:all .15s}
 .refresh-btn:hover{background:rgba(255,255,255,0.04);border-color:var(--border-hover);color:var(--text)}
 .refresh-btn.spinning svg{animation:spin .8s linear infinite}
+
+/* ===== INSTALL PROMPT ===== */
+.install-banner{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 12px);left:12px;right:12px;z-index:99;background:var(--surface);border:1px solid var(--border-hover);border-radius:var(--r);padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:none;align-items:center;gap:12px;animation:fadeUp .35s ease-out}
+.install-banner.show{display:flex}
+.install-banner-icon{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#34d472,#4e94ff);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff;flex-shrink:0}
+.install-banner-text{flex:1;min-width:0}
+.install-banner-text b{font-size:14px;display:block}
+.install-banner-text span{font-size:12px;color:var(--text-2)}
+.install-banner .btn{flex-shrink:0}
+.install-banner-close{background:none;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0}
+@media(min-width:641px){.install-banner{bottom:12px;max-width:420px;left:50%;right:auto;transform:translateX(-50%)}}
 
 /* ===== PICK REASON BADGES ===== */
 .reason-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;white-space:nowrap}
@@ -642,6 +650,17 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
     <button class="drawer-close" id="drawer-close">&times;</button>
   </div>
   <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<!-- Install prompt -->
+<div class="install-banner" id="install-banner">
+  <div class="install-banner-icon">JW</div>
+  <div class="install-banner-text">
+    <b>Install JA Win Zone</b>
+    <span>Add to home screen for quick access</span>
+  </div>
+  <button class="btn btn-blue btn-sm" id="install-btn">Install</button>
+  <button class="install-banner-close" id="install-close">&times;</button>
 </div>
 
 <div id="toast-box"></div>
@@ -1597,6 +1616,56 @@ async function checkHealth() {
     el.querySelector('span:last-child').textContent='Offline';
   }
 }
+
+// ===== PWA INSTALL PROMPT =====
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // Don't show if user dismissed before
+  if (localStorage.getItem('installDismissed')) return;
+  // Show after a short delay so the page loads first
+  setTimeout(() => {
+    document.getElementById('install-banner').classList.add('show');
+  }, 2000);
+});
+
+document.getElementById('install-btn').onclick = async () => {
+  if (!deferredInstallPrompt) {
+    // iOS fallback — show manual instructions
+    showToast('Tap the share button, then "Add to Home Screen"', 'info');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  if (result.outcome === 'accepted') {
+    showToast('App installed!', 'success');
+  }
+  deferredInstallPrompt = null;
+  document.getElementById('install-banner').classList.remove('show');
+};
+
+document.getElementById('install-close').onclick = () => {
+  document.getElementById('install-banner').classList.remove('show');
+  localStorage.setItem('installDismissed', '1');
+};
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('show');
+  deferredInstallPrompt = null;
+});
+
+// iOS detection — show install banner with manual instructions
+(function() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (isIOS && !isStandalone && !localStorage.getItem('installDismissed')) {
+    setTimeout(() => {
+      document.getElementById('install-banner').classList.add('show');
+    }, 3000);
+  }
+})();
 
 // ===== ONBOARDING =====
 (function() {

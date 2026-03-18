@@ -1,12 +1,13 @@
 {
   "name": "JA Win Zone",
   "short_name": "JA Win Zone",
-  "description": "Smart betting code aggregator with safe code generation",
+  "description": "Smart Sportybet booking code aggregator with safe code generation",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f1420",
-  "theme_color": "#0f1420",
+  "background_color": "#131620",
+  "theme_color": "#131620",
   "orientation": "portrait-primary",
+  "id": "/",
   "icons": [
     {
       "src": "/icons/icon-192.svg",
