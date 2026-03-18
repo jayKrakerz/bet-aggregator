@@ -14,7 +14,7 @@ if ('serviceWorker' in navigator) {
 <meta name="apple-mobile-web-app-title" content="JA Win Zone">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg">
-<link rel="apple-touch-icon" href="/icons/icon-192.svg">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <title>JA Win Zone</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -123,7 +123,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 
 /* ===== GENERATE PILLS ===== */
 .gen-pills{display:flex;gap:8px;flex-wrap:wrap}
-.gen-pill{flex:1;min-width:56px;padding:12px 6px;font-size:15px;font-weight:800;border-radius:var(--r-xs);cursor:pointer;font-family:inherit;transition:all .2s;text-align:center;border:1px solid}
+.gen-pill{flex:1;min-width:56px;padding:12px 6px;font-size:15px;font-weight:800;border-radius:20px;cursor:pointer;font-family:inherit;transition:all .2s;text-align:center;border:1px solid}
 .gen-pill:hover{transform:translateY(-1px)}
 .gen-pill:active{transform:translateY(0)}
 .gen-pill-safe{border-color:rgba(34,197,94,0.25);background:var(--green-soft);color:var(--green)}
@@ -259,6 +259,15 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 /* ===== PICK REASON BADGES ===== */
 .reason-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;white-space:nowrap}
 
+/* ===== FOCUS / A11Y ===== */
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.btn-green{background:#1a9d4a;color:#fff}
+.btn-green:hover{background:#22b35a}
+
+/* ===== DESKTOP TAB ACTIVE ===== */
+.desktop-tabs .chip.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
 /* ===== FLEX HELPERS ===== */
 .flex{display:flex;gap:8px;align-items:center}
 .flex-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -365,7 +374,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 
   <!-- Onboarding (first visit) -->
   <div class="onboard" id="onboard" style="display:none">
-    <button class="onboard-close" id="onboard-close">&times;</button>
+    <button class="onboard-close" id="onboard-close" aria-label="Dismiss">&times;</button>
     <h3>Welcome to JA Win Zone</h3>
     <div class="onboard-steps">
       <div class="onboard-step">
@@ -431,7 +440,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
     </select>
   </div>
 
-  <div id="filter-info" style="display:none;margin-bottom:10px;font-size:13px;color:var(--text-2);display:none">
+  <div id="filter-info" style="display:none;margin-bottom:10px;font-size:13px;color:var(--text-2)">
     <span id="filter-count"></span>
     <button id="filter-clear" class="btn btn-ghost btn-sm" style="margin-left:8px;padding:3px 8px;font-size:10px">Clear</button>
   </div>
@@ -511,12 +520,12 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
     </div>
 
     <div class="gen-pills" id="auto-gen-btns">
-      <button class="auto-gen-btn gen-pill gen-pill-safe" data-target="2">x2</button>
-      <button class="auto-gen-btn gen-pill gen-pill-safe" data-target="3">x3</button>
-      <button class="auto-gen-btn gen-pill gen-pill-mid" data-target="5">x5</button>
-      <button class="auto-gen-btn gen-pill gen-pill-mid" data-target="10">x10</button>
-      <button class="auto-gen-btn gen-pill gen-pill-risky" data-target="20">x20</button>
-      <button class="auto-gen-btn gen-pill gen-pill-risky" data-target="50">x50</button>
+      <button type="button" class="auto-gen-btn gen-pill gen-pill-safe" data-target="2">x2</button>
+      <button type="button" class="auto-gen-btn gen-pill gen-pill-safe" data-target="3">x3</button>
+      <button type="button" class="auto-gen-btn gen-pill gen-pill-mid" data-target="5">x5</button>
+      <button type="button" class="auto-gen-btn gen-pill gen-pill-mid" data-target="10">x10</button>
+      <button type="button" class="auto-gen-btn gen-pill gen-pill-risky" data-target="20">x20</button>
+      <button type="button" class="auto-gen-btn gen-pill gen-pill-risky" data-target="50">x50</button>
     </div>
 
     <div style="margin-top:8px">
@@ -605,7 +614,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 
 <!-- ===== PAGE: HISTORY ===== -->
 <div class="page" id="page-history">
-  <div id="history-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-bottom:14px"></div>
+  <div id="history-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px"></div>
   <div class="filter-bar" id="history-filters">
     <button class="chip active" data-hf="all">All</button>
     <button class="chip" data-hf="won" style="color:var(--green);border-color:rgba(34,197,94,0.25)">Won</button>
@@ -647,7 +656,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
   <div class="drawer-head">
     <span id="drawer-title" style="font-size:20px;font-weight:800;font-family:'SF Mono','Fira Code',monospace;letter-spacing:2px;color:var(--green)"></span>
     <span id="drawer-subtitle" style="font-size:14px;color:var(--text-2)"></span>
-    <button class="drawer-close" id="drawer-close">&times;</button>
+    <button class="drawer-close" id="drawer-close" aria-label="Close">&times;</button>
   </div>
   <div class="drawer-body" id="drawer-body"></div>
 </div>
@@ -660,10 +669,10 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
     <span>Add to home screen for quick access</span>
   </div>
   <button class="btn btn-blue btn-sm" id="install-btn">Install</button>
-  <button class="install-banner-close" id="install-close">&times;</button>
+  <button class="install-banner-close" id="install-close" aria-label="Dismiss">&times;</button>
 </div>
 
-<div id="toast-box"></div>
+<div id="toast-box" role="status" aria-live="polite"></div>
 
 <script>
 // ===== STATE =====
@@ -776,6 +785,7 @@ function closeDrawer() {
 }
 drawerOverlay.onclick = closeDrawer;
 document.getElementById('drawer-close').onclick = closeDrawer;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
 let drawerTouchStartY = 0;
 drawerEl.addEventListener('touchstart', e => { drawerTouchStartY = e.touches[0].clientY; }, { passive: true });
@@ -1012,7 +1022,13 @@ function createCodeCard(c) {
 
   card.onclick = e => {
     if (e.target.closest('.code-copy') || e.target.closest('.sel-check') || e.target.closest('.sel-row')) return;
-    if (isMobile()) openDrawer(c.code, c);
+    if (isMobile()) {
+      openDrawer(c.code, c);
+    } else {
+      // Desktop: toggle inline selections
+      const sel = card.querySelector('.sel-table-desktop');
+      if (sel) sel.style.display = sel.style.display === 'none' ? '' : 'none';
+    }
   };
 
   return card;
@@ -1124,7 +1140,7 @@ function updateBankroll() {
   const riskCol = breakEvenPct < 30 ? 'var(--green)' : breakEvenPct < 50 ? 'var(--amber)' : 'var(--red)';
   const riskLabel = breakEvenPct < 30 ? 'Low' : breakEvenPct < 50 ? 'Medium' : 'High';
   const stat = (l,v,c) => `<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px;text-align:center"><div style="font-size:9px;text-transform:uppercase;color:var(--text-3);font-weight:700;letter-spacing:.5px;margin-bottom:3px">${l}</div><div style="font-size:15px;font-weight:800;color:${c||'var(--text)'}">${v}</div></div>`;
-  div.innerHTML = stat('Stake', 'GH₵'+stakeEach.toLocaleString()) + stat('Return', 'GH₵'+returnEach.toLocaleString(), 'var(--green)') + stat('Need', Math.ceil(numCodes/targetOdds)+'/'+numCodes, 'var(--blue)') + stat('Break-even', breakEvenPct+'%', riskCol) + stat('1 Win', (profitIf1>=0?'+':'')+'GH₵'+profitIf1.toLocaleString(), profitIf1>=0?'var(--green)':'var(--red)') + stat('Risk', riskLabel, riskCol);
+  div.innerHTML = stat('Stake', '₦'+stakeEach.toLocaleString()) + stat('Return', '₦'+returnEach.toLocaleString(), 'var(--green)') + stat('Need', Math.ceil(numCodes/targetOdds)+'/'+numCodes, 'var(--blue)') + stat('Break-even', breakEvenPct+'%', riskCol) + stat('1 Win', (profitIf1>=0?'+':'')+'₦'+profitIf1.toLocaleString(), profitIf1>=0?'var(--green)':'var(--red)') + stat('Risk', riskLabel, riskCol);
 }
 updateBankroll();
 
