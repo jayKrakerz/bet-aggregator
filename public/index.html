@@ -1344,25 +1344,68 @@ function safetyScore(g) {
   let s = 50;
   const mkt = (g.market||'').toLowerCase();
   const pick = (g.pick||'').toLowerCase();
+
+  // MARKET TYPE — only reward genuinely safe markets
   if (mkt.includes('over/under')||mkt.includes('total')) {
-    if (pick.includes('over 0.5')) s+=15; else if (pick.includes('over 1.5')) s+=8; else if (pick.includes('under 4.5')) s+=8; else if (pick.includes('under 3.5')) s+=5; else if (pick.includes('over 2.5')) s+=2; else s+=3;
-  } else if (mkt.includes('double chance')) s+=12;
-  else if (mkt.includes('handicap')) s+=5;
-  else if (mkt.includes('correct score')) s-=25;
-  else if (mkt.includes('both teams')||mkt.includes('btts')) s+=2;
+    if (pick.includes('over 0.5')) s+=18;
+    else if (pick.includes('over 1.5')) s+=10;
+    else if (pick.includes('under 4.5')||pick.includes('under 5.5')||pick.includes('under 6.5')) s+=10;
+    else if (pick.includes('under 3.5')) s+=6;
+    else if (pick.includes('over 2.5')) s-=2;  // risky, 50/50
+    else if (pick.includes('under 2.5')) s-=2;
+    else s+=2;
+  } else if (mkt.includes('double chance')) {
+    s+=14;  // ~66% base probability
+  } else if (mkt.includes('handicap')) {
+    // Handicaps are safe when spread is large
+    if (pick.includes('0:2')||pick.includes('2:0')||pick.includes('0:3')||pick.includes('3:0')) s+=8;
+    else s-=3;  // tight handicaps are coinflips
+  } else if (mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2')) {
+    s-=10;  // outright winners are inherently risky
+  } else if (mkt.includes('both teams')||mkt.includes('btts')||mkt.includes('gg')) {
+    s-=5;   // BTTS is ~50/50, not safe
+  } else if (mkt.includes('correct score')) {
+    s-=30;
+  } else {
+    s-=2;   // unknown markets penalized
+  }
 
+  // LEAGUE QUALITY — unknown leagues are dangerous
   const league = ((g.league||'').split(' - ').pop()||'').toLowerCase();
-  if (TOP_LEAGUES.some(l => league.includes(l))) s+=10;
-  else if (MID_LEAGUES.some(l => league.includes(l))) s+=5;
+  if (TOP_LEAGUES.some(l => league.includes(l))) s+=12;
+  else if (MID_LEAGUES.some(l => league.includes(l))) s+=6;
+  else s-=8;  // unknown/obscure league penalty
 
+  // ODDS — bookmaker's implied probability is king
   const odds = g.odds||1;
-  if (odds<=1.05) s+=3; else if (odds<=1.10) s+=5; else if (odds<=1.25) s+=8; else if (odds<=1.40) s+=6; else if (odds<=1.60) s+=2; else if (odds<=2) s+=0; else if (odds<=3) s-=8; else s-=15;
+  if (odds<=1.05) s+=5;
+  else if (odds<=1.10) s+=8;
+  else if (odds<=1.20) s+=10;   // sweet spot: 83-90% implied
+  else if (odds<=1.30) s+=7;    // 77-83%
+  else if (odds<=1.40) s+=4;    // 71-77%
+  else if (odds<=1.60) s+=0;    // 62-71% — neutral
+  else if (odds<=2.00) s-=10;   // coinflip territory
+  else if (odds<=3.00) s-=20;
+  else s-=30;                    // long shot
 
-  for (const t of detectTraps(g)) { if (t.severity==='high') s-=15; else if (t.severity==='medium') s-=8; else s-=3; }
+  // TRAP DETECTION
+  for (const t of detectTraps(g)) { if (t.severity==='high') s-=20; else if (t.severity==='medium') s-=10; else s-=4; }
+
+  // CONSENSUS — strongest signal when high
   const con = getConsensus(g);
-  if (con>=6) s+=20; else if (con>=5) s+=16; else if (con>=4) s+=13; else if (con>=3) s+=9; else if (con>=2) s+=5;
+  if (con>=6) s+=22; else if (con>=5) s+=18; else if (con>=4) s+=14; else if (con>=3) s+=10; else if (con>=2) s+=5;
+
+  // SHARP MONEY
   const mv = oddsMovement(g);
-  if (mv.isSharpMoney) s+=8; else if (mv.dropped) s+=3;
+  if (mv.isSharpMoney) s+=10; else if (mv.dropped) s+=4;
+
+  // TIME FILTER — games starting very soon are riskier (late changes)
+  if (g.estimateStartTime) {
+    const hoursUntil = (g.estimateStartTime - Date.now()) / 3600000;
+    if (hoursUntil < 0.5) s-=5;  // about to start or live
+    else if (hoursUntil < 1) s-=2;
+  }
+
   return Math.max(0, Math.min(100, s));
 }
 
@@ -1401,36 +1444,53 @@ function pickDiversifiedSets(targetOdds) {
   const scored = available.map(g => ({...g, _safety:safetyScore(g), _consensus:getConsensus(g)}));
   const used = new Set();
   const allSets = [];
-  const maxLegs = targetOdds<=3?5:targetOdds<=10?8:Infinity;
 
-  function pickSet(pool) {
-    const eligible = pool.filter(g => g.odds >= 1.03);
+  // STRICT leg caps — fewer legs = exponentially higher win rate
+  // 2 legs at 90% each = 81% combined. 5 legs = 59%. 8 legs = 43%.
+  const maxLegs = targetOdds<=2?3:targetOdds<=3?4:targetOdds<=5?5:targetOdds<=10?6:targetOdds<=20?7:8;
+
+  // Minimum individual odds — picks below this just add failure points for nothing
+  const MIN_ODDS = 1.08;
+
+  // Minimum safety score — reject games below this threshold
+  const SAFE_MIN = 55;
+  const VALUE_MIN = 45;
+
+  function pickSet(pool, minSafety) {
+    const eligible = pool.filter(g => g.odds >= MIN_ODDS && g._safety >= minSafety);
     const picked = []; const usedSet = new Set(); let total = 1;
     for (const g of eligible) {
       if (total >= targetOdds || picked.length >= maxLegs) break;
       if (usedSet.has(g.eventId) || used.has(g.eventId)) continue;
       usedSet.add(g.eventId); picked.push(g); total *= g.odds;
     }
+    // Fine-tune: drop last pick if we're close enough without it
     if (picked.length > 1) {
       const without = total / picked[picked.length-1].odds;
-      if (without >= targetOdds*0.8 && Math.abs(without-targetOdds) < Math.abs(total-targetOdds)) { const r=picked.pop(); usedSet.delete(r.eventId); }
+      if (without >= targetOdds*0.85 && Math.abs(without-targetOdds) < Math.abs(total-targetOdds)) { const r=picked.pop(); usedSet.delete(r.eventId); }
     }
     if (picked.length) for (const g of picked) used.add(g.eventId);
     return picked;
   }
 
+  // Strategy A: SAFE — highest safety, strict minimum
   const safePool = [...scored].sort((a,b) => b._safety-a._safety);
-  const setA = pickSet(safePool);
+  const setA = pickSet(safePool, SAFE_MIN);
   if (setA.length) { setA._strategy='safe'; allSets.push(setA); }
 
-  let valuePool = scored.filter(g => g.odds>=1.3 && g.odds<=2.5 && g._consensus>=2).sort((a,b)=>b._consensus-a._consensus||b._safety-a._safety);
-  let setB = pickSet(valuePool);
-  if (!setB.length) setB = pickSet([...scored].sort((a,b)=>b._safety-a._safety));
+  // Strategy B: VALUE — consensus-backed picks
+  let valuePool = scored.filter(g => g.odds>=1.2 && g.odds<=2.0 && g._consensus>=2).sort((a,b)=>b._consensus-a._consensus||b._safety-a._safety);
+  let setB = pickSet(valuePool, VALUE_MIN);
+  if (!setB.length) {
+    // Fallback: just use next safest games
+    setB = pickSet([...scored].sort((a,b)=>b._safety-a._safety), VALUE_MIN);
+  }
   if (setB.length) { setB._strategy='value'; allSets.push(setB); }
 
-  let riskPool = scored.filter(g => g.odds>=1.5 && g.odds<=4).sort((a,b)=>b.odds-a.odds);
-  let setC = pickSet(riskPool);
-  if (!setC.length) setC = pickSet([...scored].sort((a,b)=>b.odds-a.odds));
+  // Strategy C: HIGH-RISK — higher odds, fewer games
+  let riskPool = scored.filter(g => g.odds>=1.4 && g.odds<=3.5).sort((a,b)=>b.odds-a.odds||b._safety-a._safety);
+  let setC = pickSet(riskPool, 35);
+  if (!setC.length) setC = pickSet([...scored].sort((a,b)=>b.odds-a.odds), 30);
   if (setC.length) { setC._strategy='high-risk'; allSets.push(setC); }
 
   return allSets;
