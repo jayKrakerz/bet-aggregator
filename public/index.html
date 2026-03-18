@@ -1603,7 +1603,7 @@ document.querySelectorAll('#market-filter-chips .chip').forEach(b => {
 
 function getEligibleGames(targetOdds) {
   const today = new Date();
-  const maxDays = selectedDaysRange > 0 ? selectedDaysRange : (targetOdds >= 50 ? 3 : 1);
+  const maxDays = selectedDaysRange > 0 ? selectedDaysRange : (targetOdds >= 20 ? 3 : targetOdds >= 10 ? 2 : 1);
   const dates = new Set();
   for (let d=0;d<maxDays;d++) { const dt = new Date(today); dt.setDate(dt.getDate()+d); dates.add(dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')); }
   let pool = gamePool.filter(g => !g.matchDate || dates.has(g.matchDate));
@@ -1622,23 +1622,27 @@ function getEligibleGames(targetOdds) {
   return pool;
 }
 
+/**
+ * Get constraints that SCALE with the target odds.
+ * Low targets = ultra strict. High targets = relaxed to actually reach the odds.
+ */
+function getConstraints(targetOdds) {
+  if (targetOdds <= 2)  return { maxLegs: 3,  minOdds: 1.08, safeMin: 55, valueMin: 45, riskMin: 35, maxPerLeague: 2, maxOdds: 1.40 };
+  if (targetOdds <= 3)  return { maxLegs: 4,  minOdds: 1.08, safeMin: 55, valueMin: 45, riskMin: 35, maxPerLeague: 2, maxOdds: 1.50 };
+  if (targetOdds <= 5)  return { maxLegs: 5,  minOdds: 1.08, safeMin: 50, valueMin: 40, riskMin: 30, maxPerLeague: 2, maxOdds: 1.80 };
+  if (targetOdds <= 10) return { maxLegs: 7,  minOdds: 1.08, safeMin: 45, valueMin: 35, riskMin: 25, maxPerLeague: 2, maxOdds: 2.50 };
+  if (targetOdds <= 20) return { maxLegs: 10, minOdds: 1.10, safeMin: 40, valueMin: 30, riskMin: 20, maxPerLeague: 3, maxOdds: 3.00 };
+  if (targetOdds <= 50) return { maxLegs: 14, minOdds: 1.10, safeMin: 35, valueMin: 25, riskMin: 15, maxPerLeague: 3, maxOdds: 4.00 };
+  return                        { maxLegs: 20, minOdds: 1.10, safeMin: 30, valueMin: 20, riskMin: 10, maxPerLeague: 4, maxOdds: 5.00 };
+}
+
 function pickDiversifiedSets(targetOdds) {
   if (!gamePool.length) return [];
   const available = getEligibleGames(targetOdds);
   const scored = available.map(g => ({...g, _safety:safetyScore(g), _consensus:getConsensus(g)}));
   const used = new Set();
   const allSets = [];
-
-  // STRICT leg caps — fewer legs = exponentially higher win rate
-  // 2 legs at 90% each = 81% combined. 5 legs = 59%. 8 legs = 43%.
-  const maxLegs = targetOdds<=2?3:targetOdds<=3?4:targetOdds<=5?5:targetOdds<=10?6:targetOdds<=20?7:8;
-
-  // Minimum individual odds — picks below this just add failure points for nothing
-  const MIN_ODDS = 1.08;
-
-  // Minimum safety score — reject games below this threshold
-  const SAFE_MIN = 55;
-  const VALUE_MIN = 45;
+  const C = getConstraints(targetOdds);
 
   // Track teams used across all codes to avoid correlated failures
   const usedTeams = new Set();
@@ -1651,20 +1655,21 @@ function pickDiversifiedSets(targetOdds) {
     return [(g.homeTeam||'').toLowerCase().trim(), (g.awayTeam||'').toLowerCase().trim()].filter(Boolean);
   }
 
-  function pickSet(pool, minSafety) {
-    const eligible = pool.filter(g => g.odds >= MIN_ODDS && g._safety >= minSafety);
+  function pickSet(pool, minSafety, maxOddsOverride) {
+    const maxO = maxOddsOverride || C.maxOdds;
+    const eligible = pool.filter(g => g.odds >= C.minOdds && g.odds <= maxO && g._safety >= minSafety);
     const picked = []; const usedSet = new Set(); let total = 1;
-    const leagueCount = {};  // max 2 picks per league
+    const leagueCount = {};
 
     for (const g of eligible) {
-      if (total >= targetOdds || picked.length >= maxLegs) break;
+      if (total >= targetOdds || picked.length >= C.maxLegs) break;
       if (usedSet.has(g.eventId) || used.has(g.eventId)) continue;
 
-      // League diversity: max 2 picks from same league
+      // League diversity
       const lk = getLeagueKey(g);
-      if ((leagueCount[lk]||0) >= 2) continue;
+      if ((leagueCount[lk]||0) >= C.maxPerLeague) continue;
 
-      // Team dedup across codes: if Liverpool was in Code A, skip any Liverpool game in Code B
+      // Team dedup across codes
       const teams = getTeams(g);
       if (teams.some(t => usedTeams.has(t))) continue;
 
@@ -1694,24 +1699,21 @@ function pickDiversifiedSets(targetOdds) {
     return picked;
   }
 
-  // Strategy A: SAFE — highest safety, strict minimum
+  // Strategy A: SAFE — highest safety, use constraint-appropriate odds range
   const safePool = [...scored].sort((a,b) => b._safety-a._safety);
-  const setA = pickSet(safePool, SAFE_MIN);
+  const setA = pickSet(safePool, C.safeMin);
   if (setA.length) { setA._strategy='safe'; allSets.push(setA); }
 
-  // Strategy B: VALUE — consensus-backed picks
-  let valuePool = scored.filter(g => g.odds>=1.2 && g.odds<=2.0 && g._consensus>=2).sort((a,b)=>b._consensus-a._consensus||b._safety-a._safety);
-  let setB = pickSet(valuePool, VALUE_MIN);
-  if (!setB.length) {
-    // Fallback: just use next safest games
-    setB = pickSet([...scored].sort((a,b)=>b._safety-a._safety), VALUE_MIN);
-  }
+  // Strategy B: VALUE — consensus-backed, allow slightly higher odds
+  let valuePool = scored.filter(g => g._consensus>=2).sort((a,b)=>b._consensus-a._consensus||b._safety-a._safety);
+  let setB = pickSet(valuePool, C.valueMin, C.maxOdds * 1.2);
+  if (!setB.length) setB = pickSet([...scored].sort((a,b)=>b._safety-a._safety), C.valueMin);
   if (setB.length) { setB._strategy='value'; allSets.push(setB); }
 
-  // Strategy C: HIGH-RISK — higher odds, fewer games
-  let riskPool = scored.filter(g => g.odds>=1.4 && g.odds<=3.5).sort((a,b)=>b.odds-a.odds||b._safety-a._safety);
-  let setC = pickSet(riskPool, 35);
-  if (!setC.length) setC = pickSet([...scored].sort((a,b)=>b.odds-a.odds), 30);
+  // Strategy C: HIGH-RISK — higher individual odds, fewer games
+  let riskPool = scored.filter(g => g.odds >= 1.3).sort((a,b)=>b.odds-a.odds||b._safety-a._safety);
+  let setC = pickSet(riskPool, C.riskMin, C.maxOdds * 1.5);
+  if (!setC.length) setC = pickSet([...scored].sort((a,b)=>b.odds-a.odds), C.riskMin, 10);
   if (setC.length) { setC._strategy='high-risk'; allSets.push(setC); }
 
   return allSets;
