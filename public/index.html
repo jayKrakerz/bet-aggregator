@@ -268,6 +268,17 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 /* ===== PICK REASON BADGES ===== */
 .reason-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;white-space:nowrap}
 
+/* ===== ROLLOVER ===== */
+.rollover-progress{display:flex;gap:6px;margin:12px 0}
+.rollover-day{flex:1;text-align:center;padding:10px 4px;border-radius:var(--r-xs);border:1px solid var(--border);background:var(--surface);font-size:11px;font-weight:700;transition:all .3s}
+.rollover-day.won{border-color:rgba(52,212,114,0.4);background:var(--green-soft);color:var(--green)}
+.rollover-day.lost{border-color:rgba(240,96,96,0.4);background:var(--red-soft);color:var(--red)}
+.rollover-day.active{border-color:rgba(78,148,255,0.4);background:var(--blue-soft);color:var(--blue);box-shadow:0 0 12px rgba(78,148,255,0.15)}
+.rollover-day .day-num{font-size:13px;font-weight:800;display:block}
+.rollover-day .day-label{font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px}
+.rollover-stat{display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:var(--r-xs);border:1px solid var(--border);font-size:13px;margin-bottom:6px}
+.rollover-stat b{font-variant-numeric:tabular-nums}
+
 /* ===== FOCUS / A11Y ===== */
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:var(--r-xs)}
@@ -486,6 +497,65 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 
 <!-- ===== PAGE: GENERATE ===== -->
 <div class="page" id="page-generate">
+
+  <!-- Rollover Mode -->
+  <div class="card" style="border-color:rgba(52,212,114,0.2);background:linear-gradient(135deg,rgba(52,212,114,0.04),rgba(78,148,255,0.04))">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--green-soft)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      </div>
+      <div class="card-title">5-Day Rollover</div>
+    </div>
+
+    <!-- Progress tracker -->
+    <div class="rollover-progress" id="rollover-progress">
+      <div class="rollover-day" id="rday-1"><span class="day-num">1</span><span class="day-label">Day 1</span></div>
+      <div class="rollover-day" id="rday-2"><span class="day-num">2</span><span class="day-label">Day 2</span></div>
+      <div class="rollover-day" id="rday-3"><span class="day-num">3</span><span class="day-label">Day 3</span></div>
+      <div class="rollover-day" id="rday-4"><span class="day-num">4</span><span class="day-label">Day 4</span></div>
+      <div class="rollover-day" id="rday-5"><span class="day-num">5</span><span class="day-label">Day 5</span></div>
+    </div>
+
+    <!-- Config -->
+    <div class="flex-wrap" style="gap:10px;margin-bottom:10px">
+      <div style="flex:1;min-width:90px">
+        <label class="input-label">Starting Stake</label>
+        <input type="number" id="rv-stake" value="5000" min="100" step="500" class="input-sm" />
+      </div>
+      <div style="flex:1;min-width:80px">
+        <label class="input-label">Daily Target</label>
+        <select id="rv-target" class="input-sm" style="cursor:pointer">
+          <option value="1.2">x1.2 (safest)</option>
+          <option value="1.3" selected>x1.3 (recommended)</option>
+          <option value="1.5">x1.5 (risky)</option>
+          <option value="2.0">x2.0 (very risky)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Projections -->
+    <div id="rv-projections"></div>
+
+    <!-- Action -->
+    <div style="margin-top:10px">
+      <button class="btn btn-green" id="rv-generate" style="width:100%;font-size:15px;padding:14px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Generate Today's Rollover Code
+      </button>
+    </div>
+
+    <!-- Result -->
+    <div id="rv-result" style="margin-top:10px"></div>
+
+    <!-- Controls -->
+    <div id="rv-controls" style="display:none;margin-top:10px;display:flex;gap:8px">
+      <button class="btn btn-green btn-sm" id="rv-mark-won" style="flex:1">Mark Won</button>
+      <button class="btn btn-red btn-sm" id="rv-mark-lost" style="flex:1">Mark Lost</button>
+      <button class="btn btn-ghost btn-sm" id="rv-reset">Reset</button>
+    </div>
+
+    <div class="card-hint">Ultra-conservative mode: only Over 0.5, Double Chance, Under 4.5 from top leagues. Max 3 picks at highest safety. Track your 5-day streak.</div>
+  </div>
 
   <!-- Check a code -->
   <div class="card">
@@ -1914,6 +1984,289 @@ async function checkHealth() {
     el.querySelector('span:last-child').textContent='Offline';
   }
 }
+
+// ===== ROLLOVER MODE =====
+let rollover = JSON.parse(localStorage.getItem('rollover') || 'null') || {
+  days: [null, null, null, null, null], // null=pending, 'won', 'lost'
+  codes: [null, null, null, null, null],
+  stake: 5000,
+  target: 1.3,
+  startDate: null,
+};
+function saveRollover() { localStorage.setItem('rollover', JSON.stringify(rollover)); }
+
+function getRolloverDay() {
+  // Find the next pending day
+  for (let i = 0; i < 5; i++) {
+    if (rollover.days[i] === null) return i;
+  }
+  return -1; // all done
+}
+
+function updateRolloverUI() {
+  const target = parseFloat(document.getElementById('rv-target').value) || 1.3;
+  const stake = parseFloat(document.getElementById('rv-stake').value) || 5000;
+  rollover.stake = stake;
+  rollover.target = target;
+
+  // Update progress dots
+  for (let i = 0; i < 5; i++) {
+    const el = document.getElementById('rday-' + (i + 1));
+    el.className = 'rollover-day';
+    if (rollover.days[i] === 'won') el.classList.add('won');
+    else if (rollover.days[i] === 'lost') el.classList.add('lost');
+    else if (i === getRolloverDay()) el.classList.add('active');
+    // Show code on day if exists
+    if (rollover.codes[i]) {
+      el.querySelector('.day-label').textContent = rollover.codes[i];
+    }
+  }
+
+  // Calculate projections
+  const currentDay = getRolloverDay();
+  const dailyProb = target <= 1.2 ? 0.85 : target <= 1.3 ? 0.81 : target <= 1.5 ? 0.68 : 0.61;
+  const remainingDays = currentDay >= 0 ? 5 - currentDay : 0;
+  const fullProb = Math.round(Math.pow(dailyProb, remainingDays) * 100);
+  const projectedPayout = Math.round(stake * Math.pow(target, 5));
+
+  // Current balance (accounting for wins so far)
+  let currentBalance = stake;
+  for (let i = 0; i < 5; i++) {
+    if (rollover.days[i] === 'won') currentBalance = Math.round(currentBalance * target);
+    else break;
+  }
+
+  const projDiv = document.getElementById('rv-projections');
+  const winsCount = rollover.days.filter(d => d === 'won').length;
+  const isLost = rollover.days.some(d => d === 'lost');
+  const isComplete = winsCount === 5;
+
+  if (isComplete) {
+    projDiv.innerHTML = `
+      <div style="text-align:center;padding:16px;background:var(--green-soft);border:1px solid rgba(52,212,114,0.3);border-radius:var(--r-xs)">
+        <div style="font-size:24px;font-weight:900;color:var(--green)">ROLLOVER COMPLETE!</div>
+        <div style="font-size:18px;font-weight:800;color:var(--text);margin-top:4px">₦${stake.toLocaleString()} → ₦${currentBalance.toLocaleString()}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px">${winsCount}/5 days won | x${Math.pow(target, 5).toFixed(2)} total return</div>
+      </div>`;
+  } else if (isLost) {
+    projDiv.innerHTML = `
+      <div style="text-align:center;padding:16px;background:var(--red-soft);border:1px solid rgba(240,96,96,0.3);border-radius:var(--r-xs)">
+        <div style="font-size:18px;font-weight:800;color:var(--red)">Rollover Failed</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px">${winsCount}/5 days won before losing. Reset to try again.</div>
+      </div>`;
+  } else {
+    projDiv.innerHTML = `
+      <div class="rollover-stat"><span>Day ${currentDay + 1} of 5</span><b style="color:var(--blue)">Today's stake: ₦${currentBalance.toLocaleString()}</b></div>
+      <div class="rollover-stat"><span>Today's target</span><b style="color:var(--amber)">x${target} → ₦${Math.round(currentBalance * target).toLocaleString()}</b></div>
+      <div class="rollover-stat"><span>Full rollover payout</span><b style="color:var(--green)">₦${projectedPayout.toLocaleString()}</b></div>
+      <div class="rollover-stat"><span>Success probability</span><b style="color:${fullProb >= 40 ? 'var(--green)' : fullProb >= 25 ? 'var(--amber)' : 'var(--red)'}">${fullProb}% for remaining ${remainingDays} days</b></div>
+    `;
+  }
+
+  // Show/hide controls
+  const controls = document.getElementById('rv-controls');
+  const genBtn = document.getElementById('rv-generate');
+  if (isComplete || isLost) {
+    controls.style.display = 'flex';
+    genBtn.style.display = 'none';
+    document.getElementById('rv-mark-won').style.display = 'none';
+    document.getElementById('rv-mark-lost').style.display = 'none';
+  } else if (rollover.codes[currentDay]) {
+    // Code already generated for today — show mark won/lost
+    controls.style.display = 'flex';
+    genBtn.style.display = 'none';
+    document.getElementById('rv-mark-won').style.display = '';
+    document.getElementById('rv-mark-lost').style.display = '';
+  } else {
+    controls.style.display = 'none';
+    genBtn.style.display = '';
+  }
+
+  saveRollover();
+}
+
+/**
+ * ULTRA-SAFE picking — only the safest markets and leagues.
+ * Returns a single set of picks targeting the daily odds.
+ */
+function pickRolloverCode(targetOdds) {
+  if (!gamePool.length) return [];
+  const today = new Date();
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+  // Only today's games
+  let pool = gamePool.filter(g => !g.matchDate || g.matchDate === todayStr);
+
+  // ULTRA-SAFE market filter: only the safest markets
+  pool = pool.filter(g => {
+    const mkt = (g.market || '').toLowerCase();
+    const pick = (g.pick || '').toLowerCase();
+    // Over 0.5 goals — ~95% hit rate
+    if ((mkt.includes('over/under') || mkt.includes('total')) && pick.includes('over 0.5')) return true;
+    // Over 1.5 goals — ~85% hit rate
+    if ((mkt.includes('over/under') || mkt.includes('total')) && pick.includes('over 1.5')) return true;
+    // Under 4.5/5.5/6.5 — ~90% hit rate
+    if ((mkt.includes('over/under') || mkt.includes('total')) && (pick.includes('under 4.5') || pick.includes('under 5.5') || pick.includes('under 6.5'))) return true;
+    // Double Chance — ~66% base but much higher with form
+    if (mkt.includes('double chance')) return true;
+    // Handicap with large spread
+    if (mkt.includes('handicap') && (pick.includes('0:2') || pick.includes('2:0') || pick.includes('0:3') || pick.includes('3:0'))) return true;
+    return false;
+  });
+
+  // Score and filter
+  const scored = pool.map(g => ({ ...g, _safety: safetyScore(g), _consensus: getConsensus(g) }));
+
+  // STRICT: safety >= 60, odds >= 1.05, top leagues preferred
+  const eligible = scored
+    .filter(g => g._safety >= 60 && g.odds >= 1.05 && g.odds <= 1.30)
+    .sort((a, b) => b._safety - a._safety);
+
+  // Fallback: relax odds to 1.40 if not enough picks
+  const fallback = scored
+    .filter(g => g._safety >= 55 && g.odds >= 1.05 && g.odds <= 1.40)
+    .sort((a, b) => b._safety - a._safety);
+
+  const candidates = eligible.length >= 2 ? eligible : fallback;
+
+  // Pick max 3 legs, with league diversity
+  const picked = [];
+  const usedEvents = new Set();
+  const leagueCount = {};
+  let total = 1;
+
+  for (const g of candidates) {
+    if (total >= targetOdds || picked.length >= 3) break;
+    if (usedEvents.has(g.eventId)) continue;
+    const lk = ((g.league || '').split(' - ').pop() || '').toLowerCase().trim();
+    if ((leagueCount[lk] || 0) >= 1) continue; // max 1 per league for rollover
+
+    // Skip games starting in < 30 min
+    if (g.estimateStartTime && (g.estimateStartTime - Date.now()) < 30 * 60000) continue;
+
+    usedEvents.add(g.eventId);
+    leagueCount[lk] = (leagueCount[lk] || 0) + 1;
+    picked.push(g);
+    total *= g.odds;
+  }
+
+  return picked;
+}
+
+// Generate rollover code
+document.getElementById('rv-generate').onclick = async () => {
+  const btn = document.getElementById('rv-generate');
+  const target = parseFloat(document.getElementById('rv-target').value) || 1.3;
+  const currentDay = getRolloverDay();
+  if (currentDay < 0) return;
+
+  await fetchEnrichment();
+  const picked = pickRolloverCode(target);
+
+  if (!picked.length) {
+    document.getElementById('rv-result').innerHTML = '<div style="padding:10px;color:var(--amber);font-size:13px">Not enough safe games available right now. Try later when more top-league games are scheduled.</div>';
+    return;
+  }
+
+  btnLoad(btn);
+
+  // Create the code
+  const sels = picked.map(g => ({ eventId: g.eventId, marketId: g.marketId, outcomeId: g.outcomeId, specifier: g.specifier || '', sportId: g.sportId }));
+  try {
+    const res = await fetch('/predictions/create-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ selections: sels }) });
+    const data = await res.json();
+
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      const actualOdds = picked.reduce((a, g) => a * g.odds, 1);
+      const avgSafety = Math.round(picked.reduce((s, g) => s + (g._safety || safetyScore(g)), 0) / picked.length);
+      const estWinPct = Math.round(picked.reduce((p, g) => p * Math.min(0.95, 1 / g.odds), 1) * 100);
+
+      rollover.codes[currentDay] = code;
+      if (!rollover.startDate) rollover.startDate = new Date().toISOString();
+      saveRollover();
+
+      // Save to history
+      codeHistory.push({ code, strategy: 'rollover', targetOdds: target, actualOdds: Math.round(actualOdds * 100) / 100, gamesCount: picked.length, createdAt: new Date().toISOString(), status: 'pending', wonCount: 0, lostCount: 0, pendingCount: picked.length, lastChecked: null });
+      saveCHistory();
+
+      document.getElementById('rv-result').innerHTML = `
+        <div style="border:2px solid rgba(52,212,114,0.4);border-radius:var(--r-sm);background:var(--green-soft);padding:16px;text-align:center">
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:2px">DAY ${currentDay + 1} ROLLOVER CODE</div>
+          <div style="font-size:28px;font-weight:900;font-family:monospace;letter-spacing:3px;color:var(--green);user-select:all;margin-bottom:6px">${esc(code)}</div>
+          <div style="display:flex;justify-content:center;gap:12px;font-size:13px;margin-bottom:8px">
+            <span style="color:var(--amber);font-weight:700">@${actualOdds.toFixed(2)}</span>
+            <span style="color:var(--text-2)">${picked.length} picks</span>
+            <span style="font-weight:700;color:${estWinPct >= 60 ? 'var(--green)' : 'var(--amber)'}">~${estWinPct}% win</span>
+            <span style="color:var(--text-2)">Safety: ${avgSafety}</span>
+          </div>
+          <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',2000)})" class="btn btn-green" style="margin-bottom:8px">Copy Code</button>
+          <div style="font-size:11px;color:var(--text-3)">
+            ${picked.map(g => {
+              const con = getConsensus(g);
+              const enr = getEnrichment(g.eventId);
+              let info = esc(g.homeTeam) + ' vs ' + esc(g.awayTeam) + ' — ' + esc(g.pick) + ' @' + g.odds;
+              if (con >= 2) info += ' <span style="color:var(--amber)">' + con + 'x</span>';
+              if (enr && enr.homeForm) info += ' <span style="color:var(--green)">Form:' + enr.homeForm.slice(-5) + '</span>';
+              return '<div style="padding:3px 0">' + info + '</div>';
+            }).join('')}
+          </div>
+        </div>
+      `;
+
+      updateRolloverUI();
+      showToast('Day ' + (currentDay + 1) + ' code generated!', 'success');
+    } else {
+      document.getElementById('rv-result').innerHTML = '<div style="padding:10px;color:var(--red);font-size:13px">Failed to create code. Try again.</div>';
+    }
+  } catch {
+    document.getElementById('rv-result').innerHTML = '<div style="padding:10px;color:var(--red);font-size:13px">Connection error.</div>';
+  }
+  btnDone(btn);
+};
+
+// Mark won/lost/reset
+document.getElementById('rv-mark-won').onclick = () => {
+  const d = getRolloverDay() - 1; // last generated day
+  const dayIdx = rollover.codes.findIndex((c, i) => c && rollover.days[i] === null);
+  if (dayIdx >= 0) {
+    rollover.days[dayIdx] = 'won';
+    saveRollover();
+    updateRolloverUI();
+    showToast('Day ' + (dayIdx + 1) + ' marked as won!', 'success');
+    // Update history
+    const entry = codeHistory.find(c => c.code === rollover.codes[dayIdx]);
+    if (entry) { entry.status = 'won'; saveCHistory(); }
+  }
+};
+
+document.getElementById('rv-mark-lost').onclick = () => {
+  const dayIdx = rollover.codes.findIndex((c, i) => c && rollover.days[i] === null);
+  if (dayIdx >= 0) {
+    rollover.days[dayIdx] = 'lost';
+    saveRollover();
+    updateRolloverUI();
+    showToast('Rollover failed on Day ' + (dayIdx + 1), 'error');
+    const entry = codeHistory.find(c => c.code === rollover.codes[dayIdx]);
+    if (entry) { entry.status = 'lost'; saveCHistory(); }
+  }
+};
+
+document.getElementById('rv-reset').onclick = () => {
+  if (!confirm('Reset the rollover? All progress will be lost.')) return;
+  rollover = { days: [null, null, null, null, null], codes: [null, null, null, null, null], stake: parseFloat(document.getElementById('rv-stake').value) || 5000, target: parseFloat(document.getElementById('rv-target').value) || 1.3, startDate: null };
+  saveRollover();
+  document.getElementById('rv-result').innerHTML = '';
+  updateRolloverUI();
+  showToast('Rollover reset', 'info');
+};
+
+// Update on input change
+document.getElementById('rv-stake').oninput = updateRolloverUI;
+document.getElementById('rv-target').onchange = updateRolloverUI;
+
+// Init rollover UI
+updateRolloverUI();
 
 // ===== PWA INSTALL PROMPT =====
 let deferredInstallPrompt = null;
