@@ -258,13 +258,40 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
   .collapse-head{padding:14px 16px}
   .collapse-inner{padding:0 16px 16px}
   .code-card .sel-table{display:none}
-  .code-card{cursor:pointer}
+  .code-card{cursor:pointer;overflow:hidden;max-width:100%}
   .code-card::after{content:'Tap to view selections';display:block;font-size:11px;color:var(--text-3);margin-top:6px;text-align:center}
-  .chip{font-size:13px;padding:6px 14px}
+
+  /* Code card layout: wrap on mobile */
+  .code-card-top{flex-wrap:wrap;gap:8px}
+  .code-val{font-size:16px;letter-spacing:1px}
+  .code-meta{font-size:12px;gap:6px;flex-basis:100%;order:3}
+  .code-badge{font-size:11px}
+  .code-tally{font-size:11px}
+  .code-copy{font-size:10px}
+
+  /* Chips: smaller on mobile */
+  .chip{font-size:12px;padding:5px 12px}
   .filter-label{font-size:11px}
-  .code-val{font-size:18px}
-  .code-meta{font-size:13px}
+  .filter-bar{gap:6px}
+  .filter-bar select{font-size:12px;padding:6px 8px;min-height:auto}
+
+  /* Section header */
   .sec-header h2{font-size:14px}
+  .sec-badge{font-size:12px;padding:3px 8px}
+  .sec-sub{font-size:11px}
+
+  /* Gen bar */
+  .gen-bar{padding:10px 14px;gap:8px;flex-wrap:wrap}
+
+  /* Search bar */
+  .search-bar input{padding-left:36px}
+
+  /* Progress bar */
+  .progress{margin-top:6px}
+
+  /* Prevent any horizontal overflow */
+  .container,.page,.card,.code-card,.collapse,.filter-bar,.hero{max-width:100%;overflow-x:hidden}
+  .flex,.flex-wrap{max-width:100%}
 }
 @media(min-width:641px){
   body{padding-bottom:0}
