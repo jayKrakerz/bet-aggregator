@@ -1316,6 +1316,38 @@ function addToGamePool(selections) {
   document.getElementById('stat-games').textContent = todayCount;
 }
 
+// ===== LEARNED WIN RATES =====
+// Analyze user's own history to find what actually works
+function getLearnedRates() {
+  const rates = { byMarket: {}, byOddsBand: {}, byLeague: {} };
+  // Need at least 10 settled codes to learn anything meaningful
+  const settled = codeHistory.filter(c => c.status === 'won' || c.status === 'lost');
+  if (settled.length < 5) return null;
+
+  // We don't have per-pick outcomes stored in history, but we know:
+  // - strategy, actualOdds, gamesCount, status
+  // Use code-level outcomes as proxy signals
+  const byStrategy = {};
+  for (const c of settled) {
+    const k = c.strategy || 'unknown';
+    if (!byStrategy[k]) byStrategy[k] = { won: 0, lost: 0 };
+    if (c.status === 'won') byStrategy[k].won++;
+    else byStrategy[k].lost++;
+  }
+  rates.byStrategy = byStrategy;
+
+  // Win rate by odds band
+  for (const c of settled) {
+    const o = c.actualOdds || 0;
+    const band = o <= 2 ? 'low' : o <= 5 ? 'mid' : o <= 15 ? 'high' : 'extreme';
+    if (!rates.byOddsBand[band]) rates.byOddsBand[band] = { won: 0, lost: 0 };
+    if (c.status === 'won') rates.byOddsBand[band].won++;
+    else rates.byOddsBand[band].lost++;
+  }
+
+  return rates;
+}
+
 // ===== TRAP DETECTION =====
 const DERBY_PAIRS = new Set(['arsenal|tottenham','liverpool|everton','manchester united|manchester city','chelsea|tottenham','chelsea|arsenal','liverpool|manchester united','real madrid|barcelona','atletico madrid|real madrid','real betis|sevilla','ac milan|inter','juventus|inter','roma|lazio','borussia dortmund|bayern munich','psg|marseille','galatasaray|fenerbahce','boca juniors|river plate','celtic|rangers','ajax|feyenoord','benfica|porto']);
 
@@ -1345,48 +1377,53 @@ function safetyScore(g) {
   const mkt = (g.market||'').toLowerCase();
   const pick = (g.pick||'').toLowerCase();
 
+  // HARD EXCLUDE — games starting in <20 min or already live
+  if (g.estimateStartTime) {
+    const minsUntil = (g.estimateStartTime - Date.now()) / 60000;
+    if (minsUntil < 20) return 0;
+  }
+
   // MARKET TYPE — only reward genuinely safe markets
   if (mkt.includes('over/under')||mkt.includes('total')) {
     if (pick.includes('over 0.5')) s+=18;
     else if (pick.includes('over 1.5')) s+=10;
     else if (pick.includes('under 4.5')||pick.includes('under 5.5')||pick.includes('under 6.5')) s+=10;
     else if (pick.includes('under 3.5')) s+=6;
-    else if (pick.includes('over 2.5')) s-=2;  // risky, 50/50
+    else if (pick.includes('over 2.5')) s-=2;
     else if (pick.includes('under 2.5')) s-=2;
     else s+=2;
   } else if (mkt.includes('double chance')) {
-    s+=14;  // ~66% base probability
+    s+=14;
   } else if (mkt.includes('handicap')) {
-    // Handicaps are safe when spread is large
     if (pick.includes('0:2')||pick.includes('2:0')||pick.includes('0:3')||pick.includes('3:0')) s+=8;
-    else s-=3;  // tight handicaps are coinflips
+    else s-=3;
   } else if (mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2')) {
-    s-=10;  // outright winners are inherently risky
+    s-=10;
   } else if (mkt.includes('both teams')||mkt.includes('btts')||mkt.includes('gg')) {
-    s-=5;   // BTTS is ~50/50, not safe
+    s-=5;
   } else if (mkt.includes('correct score')) {
     s-=30;
   } else {
-    s-=2;   // unknown markets penalized
+    s-=2;
   }
 
   // LEAGUE QUALITY — unknown leagues are dangerous
   const league = ((g.league||'').split(' - ').pop()||'').toLowerCase();
   if (TOP_LEAGUES.some(l => league.includes(l))) s+=12;
   else if (MID_LEAGUES.some(l => league.includes(l))) s+=6;
-  else s-=8;  // unknown/obscure league penalty
+  else s-=8;
 
   // ODDS — bookmaker's implied probability is king
   const odds = g.odds||1;
   if (odds<=1.05) s+=5;
   else if (odds<=1.10) s+=8;
-  else if (odds<=1.20) s+=10;   // sweet spot: 83-90% implied
-  else if (odds<=1.30) s+=7;    // 77-83%
-  else if (odds<=1.40) s+=4;    // 71-77%
-  else if (odds<=1.60) s+=0;    // 62-71% — neutral
-  else if (odds<=2.00) s-=10;   // coinflip territory
+  else if (odds<=1.20) s+=10;
+  else if (odds<=1.30) s+=7;
+  else if (odds<=1.40) s+=4;
+  else if (odds<=1.60) s+=0;
+  else if (odds<=2.00) s-=10;
   else if (odds<=3.00) s-=20;
-  else s-=30;                    // long shot
+  else s-=30;
 
   // TRAP DETECTION
   for (const t of detectTraps(g)) { if (t.severity==='high') s-=20; else if (t.severity==='medium') s-=10; else s-=4; }
@@ -1399,11 +1436,23 @@ function safetyScore(g) {
   const mv = oddsMovement(g);
   if (mv.isSharpMoney) s+=10; else if (mv.dropped) s+=4;
 
-  // TIME FILTER — games starting very soon are riskier (late changes)
+  // TIME — prefer games 2+ hours away (more stable info)
   if (g.estimateStartTime) {
     const hoursUntil = (g.estimateStartTime - Date.now()) / 3600000;
-    if (hoursUntil < 0.5) s-=5;  // about to start or live
-    else if (hoursUntil < 1) s-=2;
+    if (hoursUntil >= 3) s+=3;
+    else if (hoursUntil < 1) s-=4;
+  }
+
+  // LEARNED ADJUSTMENT — boost/penalize based on user's own history
+  const learned = getLearnedRates();
+  if (learned) {
+    // If low-odds codes have been winning, boost low-odds picks more
+    const lowRate = learned.byOddsBand.low;
+    if (lowRate && (lowRate.won + lowRate.lost) >= 3) {
+      const winPct = lowRate.won / (lowRate.won + lowRate.lost);
+      if (winPct >= 0.6 && odds <= 2) s += 4;
+      else if (winPct < 0.3 && odds <= 2) s -= 4;
+    }
   }
 
   return Math.max(0, Math.min(100, s));
@@ -1456,20 +1505,57 @@ function pickDiversifiedSets(targetOdds) {
   const SAFE_MIN = 55;
   const VALUE_MIN = 45;
 
+  // Track teams used across all codes to avoid correlated failures
+  const usedTeams = new Set();
+
+  function getLeagueKey(g) {
+    return ((g.league||'').split(' - ').pop()||'unknown').toLowerCase().trim();
+  }
+
+  function getTeams(g) {
+    return [(g.homeTeam||'').toLowerCase().trim(), (g.awayTeam||'').toLowerCase().trim()].filter(Boolean);
+  }
+
   function pickSet(pool, minSafety) {
     const eligible = pool.filter(g => g.odds >= MIN_ODDS && g._safety >= minSafety);
     const picked = []; const usedSet = new Set(); let total = 1;
+    const leagueCount = {};  // max 2 picks per league
+
     for (const g of eligible) {
       if (total >= targetOdds || picked.length >= maxLegs) break;
       if (usedSet.has(g.eventId) || used.has(g.eventId)) continue;
-      usedSet.add(g.eventId); picked.push(g); total *= g.odds;
+
+      // League diversity: max 2 picks from same league
+      const lk = getLeagueKey(g);
+      if ((leagueCount[lk]||0) >= 2) continue;
+
+      // Team dedup across codes: if Liverpool was in Code A, skip any Liverpool game in Code B
+      const teams = getTeams(g);
+      if (teams.some(t => usedTeams.has(t))) continue;
+
+      usedSet.add(g.eventId);
+      leagueCount[lk] = (leagueCount[lk]||0) + 1;
+      picked.push(g);
+      total *= g.odds;
     }
+
     // Fine-tune: drop last pick if we're close enough without it
     if (picked.length > 1) {
       const without = total / picked[picked.length-1].odds;
-      if (without >= targetOdds*0.85 && Math.abs(without-targetOdds) < Math.abs(total-targetOdds)) { const r=picked.pop(); usedSet.delete(r.eventId); }
+      if (without >= targetOdds*0.85 && Math.abs(without-targetOdds) < Math.abs(total-targetOdds)) {
+        const r = picked.pop();
+        usedSet.delete(r.eventId);
+        const rlk = getLeagueKey(r);
+        leagueCount[rlk]--;
+      }
     }
-    if (picked.length) for (const g of picked) used.add(g.eventId);
+
+    if (picked.length) {
+      for (const g of picked) {
+        used.add(g.eventId);
+        for (const t of getTeams(g)) usedTeams.add(t);
+      }
+    }
     return picked;
   }
 
@@ -1531,6 +1617,9 @@ async function generateSafeCode(targetOdds, btn) {
       const actualOdds = picked.reduce((a,g) => a*g.odds, 1);
       const avgSafety = Math.round(picked.reduce((s,g) => s+(g._safety||safetyScore(g)),0)/picked.length);
       const safetyCol = avgSafety>=75?'var(--green)':avgSafety>=55?'var(--blue)':'var(--amber)';
+      // Estimate win probability: multiply implied probabilities of each pick
+      const estWinPct = Math.round(picked.reduce((p,g) => p * Math.min(0.95, 1/g.odds), 1) * 100);
+      const winCol = estWinPct>=60?'var(--green)':estWinPct>=40?'var(--amber)':'var(--red)';
       const strategy = picked._strategy || ['safe','value','high-risk'][idx] || 'safe';
 
       codeHistory.push({code, strategy, targetOdds, actualOdds:Math.round(actualOdds*100)/100, gamesCount:picked.length, createdAt:new Date().toISOString(), status:'pending', wonCount:0, lostCount:0, pendingCount:picked.length, lastChecked:null});
@@ -1561,6 +1650,7 @@ async function generateSafeCode(targetOdds, btn) {
           <span style="font-size:14px;font-weight:800;color:var(--amber)">@${actualOdds.toFixed(2)}</span>
           <span style="font-size:11px;color:var(--text-3)">${picked.length}g</span>
           <span style="font-size:11px;font-weight:700;color:${safetyCol}">Safety: ${avgSafety}</span>
+          <span style="font-size:11px;font-weight:800;color:${winCol};background:${estWinPct>=60?'var(--green-soft)':estWinPct>=40?'var(--amber-soft)':'var(--red-soft)'};padding:2px 8px;border-radius:4px">~${estWinPct}% win</span>
         </div>
         <div style="border:1px solid ${sc.border};border-radius:var(--r-xs);padding:6px 10px;margin-bottom:6px;background:rgba(0,0,0,0.1)">
           ${reasonsHTML}
