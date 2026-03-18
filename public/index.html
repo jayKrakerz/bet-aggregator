@@ -257,7 +257,14 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
   .gen-pill{padding:12px 4px;font-size:14px}
   .collapse-head{padding:14px 16px}
   .collapse-inner{padding:0 16px 16px}
-  .sel-table{display:none}
+  .sel-table .sel-head{display:none}
+  .sel-table{border:none;background:transparent;margin-top:6px}
+  .sel-row{padding:6px 0;gap:4px;font-size:12px;border-bottom-color:rgba(255,255,255,0.04)}
+  .sel-col-league,.sel-col-score{display:none}
+  .sel-col-match{font-size:11px}
+  .sel-col-market{font-size:10px}
+  .sel-col-pick{min-width:auto !important;font-size:11px}
+  .sel-col-odds{min-width:auto !important;font-size:11px}
   .chip{font-size:13px;padding:6px 14px}
   .filter-label{font-size:11px}
   .code-val{font-size:18px}
@@ -696,12 +703,12 @@ function buildSelectionsHTML(selections, expanded) {
     const selData = canSelect ? `data-sel='${JSON.stringify({eventId:s.eventId,marketId:s.marketId,outcomeId:s.outcomeId,specifier:s.specifier||'',sportId:s.sportId}).replace(/'/g,"&#39;")}'` : '';
     return `<div class="sel-row" ${selData}>
       ${canSelect ? `<input type="checkbox" class="sel-check" style="flex-shrink:0;width:14px;height:14px;cursor:pointer;accent-color:var(--blue)" />` : `<span style="flex-shrink:0;width:14px;text-align:center">${icon}</span>`}
-      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${esc(s.homeTeam)} vs ${esc(s.awayTeam)}</span>
-      <span style="color:var(--text-3);font-size:9px;flex-shrink:0">${esc(league)}</span>
-      <span style="color:var(--blue);font-size:10px;flex-shrink:0;min-width:50px">${esc(s.market)}</span>
-      <span style="color:${color};font-weight:700;flex-shrink:0;min-width:70px">${esc(s.pick)}</span>
-      <span style="font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0;min-width:40px;text-align:right;color:var(--amber)">@${s.odds}</span>
-      ${s.score ? `<span style="color:var(--text-3);flex-shrink:0;min-width:30px;text-align:center;font-weight:600">${s.score}</span>` : '<span style="flex-shrink:0;min-width:30px"></span>'}
+      <span class="sel-col-match" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${esc(s.homeTeam)} vs ${esc(s.awayTeam)}</span>
+      <span class="sel-col-league" style="color:var(--text-3);font-size:9px;flex-shrink:0">${esc(league)}</span>
+      <span class="sel-col-market" style="color:var(--blue);font-size:10px;flex-shrink:0;min-width:50px">${esc(s.market)}</span>
+      <span class="sel-col-pick" style="color:${color};font-weight:700;flex-shrink:0;min-width:70px">${esc(s.pick)}</span>
+      <span class="sel-col-odds" style="font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0;min-width:40px;text-align:right;color:var(--amber)">@${s.odds}</span>
+      ${s.score ? `<span class="sel-col-score" style="color:var(--text-3);flex-shrink:0;min-width:30px;text-align:center;font-weight:600">${s.score}</span>` : '<span class="sel-col-score" style="flex-shrink:0;min-width:30px"></span>'}
       ${(() => {
         let b = '';
         const mv = oddsMovement(s);
