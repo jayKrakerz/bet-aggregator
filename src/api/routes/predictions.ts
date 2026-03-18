@@ -139,16 +139,30 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         sportId: s.sportId,
       });
     }
-    try {
-      const res = await fetch('https://www.sportybet.com/api/ng/orders/share', {
-        method: 'POST',
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selections: validated }),
-        signal: AbortSignal.timeout(10000),
-      });
-      return await res.json();
-    } catch {
-      return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
+    const payload = JSON.stringify({ selections: validated });
+    const countries = ['ng', 'gh', 'ke', 'tz', 'zm'];
+    for (const cc of countries) {
+      try {
+        const res = await fetch(`https://www.sportybet.com/api/${cc}/orders/share`, {
+          method: 'POST',
+          headers: { 'User-Agent': 'Mozilla/5.0', 'Content-Type': 'application/json' },
+          body: payload,
+          signal: AbortSignal.timeout(8000),
+        });
+        const data = await res.json() as { bizCode?: number; data?: { shareCode?: string }; message?: string };
+        if (data.bizCode === 10000 && data.data?.shareCode) {
+          return data;
+        }
+        // If last country also failed, return its error
+        if (cc === countries[countries.length - 1]) {
+          return data;
+        }
+      } catch {
+        if (cc === countries[countries.length - 1]) {
+          return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
+        }
+      }
     }
+    return reply.status(502).send({ error: 'All Sportybet endpoints failed' });
   });
 };

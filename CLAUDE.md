@@ -1,48 +1,31 @@
 # bet-aggregator
 
 ## What is this?
-A betting prediction aggregator that scrapes free picks/predictions from multiple
-sports betting sites (Covers.com, OddsShark, Pickswise), normalizes them, and
-serves them via a REST API.
+A Sportybet booking codes aggregator that scrapes free codes from tipster sites
+and the Sportybet Code Hub API, validates them, and serves them via a REST API
+with a frontend dashboard.
 
 ## Tech stack
 - **Runtime**: Node.js 18, TypeScript (strict mode, ESM)
 - **Package manager**: pnpm
-- **Database**: PostgreSQL 16 (Docker), raw SQL migrations, postgres.js driver
-- **Queue**: BullMQ on Redis 7 (Docker)
-- **HTTP**: undici for server-rendered sites, Playwright for SPAs
-- **Parsing**: cheerio
-- **API**: Fastify 5
-- **Testing**: vitest
+- **HTTP**: native fetch + cheerio for HTML parsing
+- **API**: Fastify 5 with @fastify/static
+- **Config**: zod-validated env
 
 ## Key commands
 - `pnpm dev` - Start dev server with tsx watch
 - `pnpm build` - TypeScript build
-- `pnpm test` - Run vitest
-- `pnpm migrate` - Run SQL migrations
-- `pnpm seed` - Seed NBA teams + aliases
-- `pnpm docker:up` - Start PostgreSQL + Redis containers
-- `pnpm docker:down` - Stop containers
-- `pnpm db:reset` - Nuke DB, recreate, migrate, seed
+- `pnpm start` - Run compiled JS
 
 ## Architecture
-- **Adapters** (`src/adapters/`): One per site. Implements `SiteAdapter` interface.
-  Each defines config (URL, cron, rate limit) and a `parse(html)` method.
-- **Scheduler** (`src/scheduler/`): BullMQ job schedulers, one per adapter+sport.
-- **Workers** (`src/workers/`): Fetch worker (HTTP or browser) and parse worker.
-- **Pipeline** (`src/pipeline/`): Normalize team names, dedup, insert to DB.
-- **API** (`src/api/`): Fastify routes. Bull Board at /admin/queues.
-- **Compliance** (`src/compliance/`): robots.txt checker, per-source rate limiter.
-- **Snapshots** (`./snapshots/`): Raw HTML saved to disk with JSON sidecar metadata.
+- **API** (`src/api/`): Fastify server with routes for booking codes
+- **Scrapers** (`src/api/booking-codes-scraper.ts`, `src/api/social-codes-scraper.ts`):
+  Scrape booking codes from tipster sites + Sportybet Code Hub API
+- **Routes** (`src/api/routes/`): health check + predictions (booking codes, track codes, load/create code)
+- **Config** (`src/config.ts`): zod-validated env (PORT, NODE_ENV, LOG_LEVEL)
+- **Frontend** (`public/index.html`): Dashboard UI
 
 ## Conventions
 - All imports use `.js` extension (ESM)
-- SQL migrations are numbered `NNN_description.sql`
-- One adapter class per file in `src/adapters/`
-- Tests use HTML fixtures in `test/fixtures/{source}/`
-- No ORM. All queries in `src/db/queries.ts` using tagged template literals.
+- No ORM, no database — all data is scraped live and cached in-memory
 - Config validated with zod in `src/config.ts`
-
-## Docker ports (avoid conflicts with local services)
-- PostgreSQL: 5433 (mapped from container 5432)
-- Redis: 6380 (mapped from container 6379)
