@@ -79,25 +79,33 @@ async function apiFetch<T>(endpoint: string): Promise<T | null> {
   const key = getApiKey();
   if (!key) return null;
 
-  try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      headers: { 'x-apisports-key': key },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) {
-      logger.warn({ status: res.status, endpoint }, 'API-Football request failed');
-      return null;
+  // Try direct API-Sports endpoint first, then RapidAPI fallback
+  const attempts: Array<{ url: string; headers: Record<string, string> }> = [
+    { url: `${API_BASE}${endpoint}`, headers: { 'x-apisports-key': key } },
+    { url: `https://api-football-v1.p.rapidapi.com/v3${endpoint}`, headers: { 'x-rapidapi-key': key, 'x-rapidapi-host': 'api-football-v1.p.rapidapi.com' } },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const res = await fetch(attempt.url, {
+        headers: attempt.headers,
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) continue;
+
+      const json = await res.json() as { response?: T; errors?: Record<string, string>; message?: string };
+      if (json.message) continue; // RapidAPI error
+      if (json.errors && Object.keys(json.errors).length > 0) {
+        logger.warn({ errors: json.errors, url: attempt.url }, 'API-Football errors');
+        continue;
+      }
+      if (json.response) return json.response;
+    } catch {
+      continue;
     }
-    const json = await res.json() as { response: T; errors?: Record<string, string> };
-    if (json.errors && Object.keys(json.errors).length > 0) {
-      logger.warn({ errors: json.errors }, 'API-Football returned errors');
-      return null;
-    }
-    return json.response;
-  } catch (err) {
-    logger.warn({ err, endpoint }, 'API-Football fetch error');
-    return null;
   }
+
+  return null;
 }
 
 /**
@@ -147,17 +155,36 @@ async function getTodayFixtures(dateStr: string): Promise<FixtureMatch[]> {
  */
 async function findFixtureId(homeTeam: string, awayTeam: string, matchDate: string | null): Promise<number | null> {
   const dateStr = matchDate || new Date().toISOString().split('T')[0]!;
+
+  // Try the exact date first, then try searching by team names directly
   const fixtures = await getTodayFixtures(dateStr);
 
   for (const f of fixtures) {
     if (nameMatch(homeTeam, f.teams.home.name) && nameMatch(awayTeam, f.teams.away.name)) {
       return f.fixture.id;
     }
-    // Try reversed (sometimes APIs swap home/away)
     if (nameMatch(homeTeam, f.teams.away.name) && nameMatch(awayTeam, f.teams.home.name)) {
       return f.fixture.id;
     }
   }
+
+  // Fallback: search by team name using the search endpoint
+  // This works when date-based search fails (e.g. timezone mismatch)
+  try {
+    const searchResults = await apiFetch<FixtureMatch[]>(
+      `/fixtures?season=2025&search=${encodeURIComponent(homeTeam)}&next=5`,
+    );
+    if (searchResults) {
+      for (const f of searchResults) {
+        if (nameMatch(awayTeam, f.teams.away.name) || nameMatch(awayTeam, f.teams.home.name)) {
+          return f.fixture.id;
+        }
+      }
+    }
+  } catch {
+    // Ignore search failures
+  }
+
   return null;
 }
 
