@@ -1217,7 +1217,7 @@ function updateBankroll() {
   const riskCol = breakEvenPct < 30 ? 'var(--green)' : breakEvenPct < 50 ? 'var(--amber)' : 'var(--red)';
   const riskLabel = breakEvenPct < 30 ? 'Low' : breakEvenPct < 50 ? 'Medium' : 'High';
   const stat = (l,v,c) => `<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px;text-align:center"><div style="font-size:9px;text-transform:uppercase;color:var(--text-3);font-weight:700;letter-spacing:.5px;margin-bottom:3px">${l}</div><div style="font-size:15px;font-weight:800;color:${c||'var(--text)'}">${v}</div></div>`;
-  div.innerHTML = stat('Stake', '₦'+stakeEach.toLocaleString()) + stat('Return', '₦'+returnEach.toLocaleString(), 'var(--green)') + stat('Need', Math.ceil(numCodes/targetOdds)+'/'+numCodes, 'var(--blue)') + stat('Break-even', breakEvenPct+'%', riskCol) + stat('1 Win', (profitIf1>=0?'+':'')+'₦'+profitIf1.toLocaleString(), profitIf1>=0?'var(--green)':'var(--red)') + stat('Risk', riskLabel, riskCol);
+  div.innerHTML = stat('Stake', 'GH₵'+stakeEach.toLocaleString()) + stat('Return', 'GH₵'+returnEach.toLocaleString(), 'var(--green)') + stat('Need', Math.ceil(numCodes/targetOdds)+'/'+numCodes, 'var(--blue)') + stat('Break-even', breakEvenPct+'%', riskCol) + stat('1 Win', (profitIf1>=0?'+':'')+'GH₵'+profitIf1.toLocaleString(), profitIf1>=0?'var(--green)':'var(--red)') + stat('Risk', riskLabel, riskCol);
 }
 updateBankroll();
 
@@ -2045,7 +2045,7 @@ function updateRolloverUI() {
     projDiv.innerHTML = `
       <div style="text-align:center;padding:16px;background:var(--green-soft);border:1px solid rgba(52,212,114,0.3);border-radius:var(--r-xs)">
         <div style="font-size:24px;font-weight:900;color:var(--green)">ROLLOVER COMPLETE!</div>
-        <div style="font-size:18px;font-weight:800;color:var(--text);margin-top:4px">₦${stake.toLocaleString()} → ₦${currentBalance.toLocaleString()}</div>
+        <div style="font-size:18px;font-weight:800;color:var(--text);margin-top:4px">GH₵${stake.toLocaleString()} → GH₵${currentBalance.toLocaleString()}</div>
         <div style="font-size:13px;color:var(--text-2);margin-top:4px">${winsCount}/5 days won | x${Math.pow(target, 5).toFixed(2)} total return</div>
       </div>`;
   } else if (isLost) {
@@ -2056,9 +2056,9 @@ function updateRolloverUI() {
       </div>`;
   } else {
     projDiv.innerHTML = `
-      <div class="rollover-stat"><span>Day ${currentDay + 1} of 5</span><b style="color:var(--blue)">Today's stake: ₦${currentBalance.toLocaleString()}</b></div>
-      <div class="rollover-stat"><span>Today's target</span><b style="color:var(--amber)">x${target} → ₦${Math.round(currentBalance * target).toLocaleString()}</b></div>
-      <div class="rollover-stat"><span>Full rollover payout</span><b style="color:var(--green)">₦${projectedPayout.toLocaleString()}</b></div>
+      <div class="rollover-stat"><span>Day ${currentDay + 1} of 5</span><b style="color:var(--blue)">Today's stake: GH₵${currentBalance.toLocaleString()}</b></div>
+      <div class="rollover-stat"><span>Today's target</span><b style="color:var(--amber)">x${target} → GH₵${Math.round(currentBalance * target).toLocaleString()}</b></div>
+      <div class="rollover-stat"><span>Full rollover payout</span><b style="color:var(--green)">GH₵${projectedPayout.toLocaleString()}</b></div>
       <div class="rollover-stat"><span>Success probability</span><b style="color:${fullProb >= 40 ? 'var(--green)' : fullProb >= 25 ? 'var(--amber)' : 'var(--red)'}">${fullProb}% for remaining ${remainingDays} days</b></div>
     `;
   }
