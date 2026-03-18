@@ -229,6 +229,27 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 
 /* ===== EMPTY ===== */
 .empty{text-align:center;padding:48px 24px;color:var(--text-2);font-size:15px}
+.empty-action{margin-top:12px}
+.empty-action .btn{font-size:13px}
+
+/* ===== ONBOARDING ===== */
+.onboard{background:linear-gradient(135deg,rgba(78,148,255,0.08),rgba(176,124,255,0.08));border:1px solid rgba(78,148,255,0.2);border-radius:var(--r);padding:16px 18px;margin-bottom:16px;position:relative;animation:fadeUp .4s ease-out}
+.onboard-close{position:absolute;top:10px;right:12px;background:none;border:none;color:var(--text-3);cursor:pointer;font-size:18px;line-height:1;padding:4px}
+.onboard h3{font-size:15px;font-weight:800;margin-bottom:8px;color:var(--text)}
+.onboard-steps{display:flex;gap:12px;flex-wrap:wrap}
+.onboard-step{display:flex;align-items:flex-start;gap:8px;flex:1;min-width:140px}
+.onboard-num{width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.onboard-text{font-size:12px;color:var(--text-2);line-height:1.4}
+
+/* ===== REFRESH BAR ===== */
+.refresh-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;color:var(--text-3)}
+.refresh-bar .countdown{font-variant-numeric:tabular-nums;font-weight:600}
+.refresh-btn{background:none;border:1px solid var(--border);border-radius:var(--r-xs);padding:5px 12px;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:4px;transition:all .15s}
+.refresh-btn:hover{background:rgba(255,255,255,0.04);border-color:var(--border-hover);color:var(--text)}
+.refresh-btn.spinning svg{animation:spin .8s linear infinite}
+
+/* ===== PICK REASON BADGES ===== */
+.reason-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;white-space:nowrap}
 
 /* ===== FLEX HELPERS ===== */
 .flex{display:flex;gap:8px;align-items:center}
@@ -267,7 +288,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
   .code-meta{font-size:12px;gap:6px;flex-basis:100%;order:3}
   .code-badge{font-size:11px}
   .code-tally{font-size:11px}
-  .code-copy{font-size:10px}
+  .code-copy{font-size:12px;padding:6px 14px;border-radius:6px}
 
   /* Chips: smaller on mobile */
   .chip{font-size:12px;padding:5px 12px}
@@ -334,6 +355,26 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 <!-- ===== PAGE: CODES ===== -->
 <div class="page active" id="page-codes">
 
+  <!-- Onboarding (first visit) -->
+  <div class="onboard" id="onboard" style="display:none">
+    <button class="onboard-close" id="onboard-close">&times;</button>
+    <h3>Welcome to JA Win Zone</h3>
+    <div class="onboard-steps">
+      <div class="onboard-step">
+        <span class="onboard-num">1</span>
+        <span class="onboard-text"><b>Browse codes</b> — verified Sportybet booking codes from multiple tipsters</span>
+      </div>
+      <div class="onboard-step">
+        <span class="onboard-num">2</span>
+        <span class="onboard-text"><b>Copy & play</b> — paste any code into Sportybet to load the bet slip</span>
+      </div>
+      <div class="onboard-step">
+        <span class="onboard-num">3</span>
+        <span class="onboard-text"><b>Generate your own</b> — our engine picks the safest games and creates a code for you</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Hero stats -->
   <div class="hero" id="hero-stats">
     <div class="hero-stat">
@@ -398,10 +439,18 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 
   <div id="generated-code-result" style="display:none;margin-bottom:12px"></div>
 
+  <!-- Refresh bar -->
+  <div class="refresh-bar" id="refresh-bar" style="display:none">
+    <button class="refresh-btn" id="refresh-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      Refresh
+    </button>
+    <span>Updated <span id="refresh-ago" class="countdown">just now</span></span>
+  </div>
+
   <!-- Codes list -->
   <div class="sec-header">
     <h2>Available Codes</h2>
-    <span id="codes-updated" class="sec-sub"></span>
     <span class="sec-badge" id="codes-count">--</span>
   </div>
   <div id="codes-list">
@@ -781,10 +830,11 @@ async function loadBookingCodes() {
 
     document.getElementById('codes-count').textContent = codes.length ? codes.length + ' codes' : '--';
     document.getElementById('stat-codes').textContent = codes.length;
-    document.getElementById('codes-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+    startRefreshCountdown();
 
     if (!codes.length) {
-      grid.innerHTML = '<div class="empty">No booking codes found. Try again in a few minutes.</div>';
+      grid.innerHTML = '<div class="empty">No booking codes found right now.<div class="empty-action"><button class="btn btn-ghost" onclick="document.getElementById(\'refresh-btn\').click()">Try refreshing</button></div></div>';
       return;
     }
 
@@ -799,7 +849,8 @@ async function loadBookingCodes() {
     renderFilteredCodes();
     showToast(codes.length + ' codes loaded', 'success');
   } catch {
-    grid.innerHTML = '<div class="empty">Unable to load booking codes.</div>';
+    grid.innerHTML = '<div class="empty">Unable to load codes. Check your connection.<div class="empty-action"><button class="btn btn-ghost" onclick="document.getElementById(\'refresh-btn\').click()">Retry</button></div></div>';
+    startRefreshCountdown();
   }
 }
 
@@ -860,7 +911,7 @@ function renderFilteredCodes() {
   document.getElementById('codes-count').textContent = isFiltered ? `${filtered.length}/${total}` : (total ? `${total} codes` : '--');
 
   if (!filtered.length) {
-    grid.innerHTML = '<div class="empty">No codes match your filters.</div>';
+    grid.innerHTML = '<div class="empty">No codes match your filters.<div class="empty-action"><button class="btn btn-ghost" onclick="document.getElementById(\'filter-clear\').click()">Clear all filters</button></div></div>';
     return;
   }
   grid.innerHTML = '';
@@ -1117,7 +1168,7 @@ function renderHistory() {
   statsDiv.innerHTML = stat('Total',total) + stat('Won',won,'var(--green)') + stat('Lost',lost,'var(--red)') + stat('Pending',pending,'var(--text-3)') + stat('Win%',winRate+'%',winRate>=50?'var(--green)':'var(--amber)') + stat('ROI',(roi>=0?'+':'')+roi+'%',roi>=0?'var(--green)':'var(--red)');
 
   const filtered = historyFilter === 'all' ? codeHistory : codeHistory.filter(c => c.status === historyFilter);
-  if (!filtered.length) { listDiv.innerHTML = '<div class="empty">'+(total===0?'No codes generated yet.':'No codes match filter.')+'</div>'; return; }
+  if (!filtered.length) { listDiv.innerHTML = '<div class="empty">'+(total===0?'No codes generated yet.<div class="empty-action"><button class="btn btn-blue" onclick="switchPage(\'generate\')">Generate your first code</button></div>':'No codes match this filter.<div class="empty-action"><button class="btn btn-ghost" onclick="document.querySelector(\'#history-filters .chip[data-hf=all]\').click()">Show all</button></div>')+'</div>'; return; }
   listDiv.innerHTML = [...filtered].reverse().map(c => {
     const stratCol = {safe:'var(--green)',value:'var(--blue)','high-risk':'var(--purple)'}[c.strategy] || 'var(--text-3)';
     const statusCol = c.status === 'won' ? 'var(--green)' : c.status === 'lost' ? 'var(--red)' : 'var(--text-3)';
@@ -1385,16 +1436,32 @@ async function generateSafeCode(targetOdds, btn) {
 
       const sc = {safe:{border:'rgba(34,197,94,0.25)',bg:'var(--green-soft)',text:'var(--green)'}, value:{border:'rgba(59,130,246,0.25)',bg:'var(--blue-soft)',text:'var(--blue)'}, 'high-risk':{border:'rgba(168,85,247,0.25)',bg:'var(--purple-soft)',text:'var(--purple)'}}[strategy] || {border:'var(--border)',bg:'transparent',text:'var(--text)'};
 
+      // Build reason tags per pick
+      const reasonsHTML = picked.map(g => {
+        const tags = [];
+        const con = getConsensus(g);
+        if (con >= 2) tags.push(`<span class="reason-badge" style="color:var(--amber);background:var(--amber-soft)">${con}x agreed</span>`);
+        const safety = g._safety || safetyScore(g);
+        if (safety >= 75) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">${safety} safe</span>`);
+        else if (safety >= 55) tags.push(`<span class="reason-badge" style="color:var(--blue);background:var(--blue-soft)">${safety} safe</span>`);
+        const mv = oddsMovement(g);
+        if (mv.isSharpMoney) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">${I.zap(8,'var(--green)')} Sharp</span>`);
+        return `<div style="display:flex;align-items:center;gap:4px;padding:3px 0;flex-wrap:wrap"><span style="font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(g.pick)} <span style="color:var(--amber);font-weight:700">@${g.odds}</span></span>${tags.join('')}</div>`;
+      }).join('');
+
       const card = document.createElement('div');
       card.style.cssText = `border:1px solid ${sc.border};border-radius:var(--r-sm);background:${sc.bg};padding:12px;margin-bottom:8px`;
       card.innerHTML = `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
           <span style="font-size:10px;font-weight:800;color:${sc.text};border:1px solid ${sc.border};padding:2px 8px;border-radius:4px">${strategy.toUpperCase()}</span>
           <span style="font-size:20px;font-weight:800;font-family:monospace;letter-spacing:2px;color:${sc.text};user-select:all">${esc(code)}</span>
           <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" class="btn btn-ghost btn-sm" style="padding:5px 12px;font-size:12px">Copy</button>
           <span style="font-size:14px;font-weight:800;color:var(--amber)">@${actualOdds.toFixed(2)}</span>
           <span style="font-size:11px;color:var(--text-3)">${picked.length}g</span>
           <span style="font-size:11px;font-weight:700;color:${safetyCol}">Safety: ${avgSafety}</span>
+        </div>
+        <div style="border:1px solid ${sc.border};border-radius:var(--r-xs);padding:6px 10px;margin-bottom:6px;background:rgba(0,0,0,0.1)">
+          ${reasonsHTML}
         </div>
         ${buildSelectionsHTML(picked, picked.length <= 10)}
       `;
@@ -1531,13 +1598,54 @@ async function checkHealth() {
   }
 }
 
+// ===== ONBOARDING =====
+(function() {
+  const seen = localStorage.getItem('onboardSeen');
+  if (!seen) {
+    document.getElementById('onboard').style.display = '';
+  }
+  document.getElementById('onboard-close').onclick = () => {
+    document.getElementById('onboard').style.display = 'none';
+    localStorage.setItem('onboardSeen', '1');
+  };
+})();
+
+// ===== REFRESH / COUNTDOWN =====
+let lastLoadTime = 0;
+let refreshTimer = null;
+
+function startRefreshCountdown() {
+  lastLoadTime = Date.now();
+  const bar = document.getElementById('refresh-bar');
+  bar.style.display = 'flex';
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(updateRefreshAgo, 15000);
+  updateRefreshAgo();
+}
+
+function updateRefreshAgo() {
+  const el = document.getElementById('refresh-ago');
+  if (!el || !lastLoadTime) return;
+  const secs = Math.floor((Date.now() - lastLoadTime) / 1000);
+  if (secs < 60) el.textContent = 'just now';
+  else if (secs < 3600) el.textContent = Math.floor(secs/60) + 'm ago';
+  else el.textContent = Math.floor(secs/3600) + 'h ago';
+}
+
+document.getElementById('refresh-btn').onclick = async () => {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  codesLoaded = false;
+  await loadBookingCodes();
+  btn.classList.remove('spinning');
+  btn.disabled = false;
+};
+
 // ===== INIT =====
 (async () => {
   await Promise.all([loadBookingCodes(), checkHealth()]);
   setInterval(checkHealth, 60000);
-  if (trackedCodes.length && currentPage === 'codes') {
-    // Auto-start tracker in background
-  }
 })();
 </script>
 </body>
