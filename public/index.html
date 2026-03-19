@@ -455,7 +455,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     <div class="onboard-steps">
       <div class="onboard-step">
         <span class="onboard-num">1</span>
-        <span class="onboard-text"><b>Browse codes</b> — verified Sportybet booking codes from multiple tipsters</span>
+        <span class="onboard-text"><b>Browse codes</b> — verified Sportybet booking codes updated every 15 minutes</span>
       </div>
       <div class="onboard-step">
         <span class="onboard-num">2</span>
@@ -543,14 +543,14 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 
   <!-- Source tabs -->
   <div style="display:flex;gap:4px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:4px" id="source-tabs">
-    <button class="chip active" data-stab="scraped" style="flex:1;text-align:center;border-radius:var(--r-xs)">Scraped <span id="scraped-badge" style="font-size:11px;opacity:0.7"></span></button>
-    <button class="chip" data-stab="discovered" style="flex:1;text-align:center;border-radius:var(--r-xs)">Discovered <span id="discovered-badge" style="font-size:11px;opacity:0.7"></span></button>
+    <button class="chip active" data-stab="scraped" style="flex:1;text-align:center;border-radius:var(--r-xs)">Tipster Codes <span id="scraped-badge" style="font-size:11px;opacity:0.7"></span></button>
+    <button class="chip" data-stab="discovered" style="flex:1;text-align:center;border-radius:var(--r-xs)">Explore More <span id="discovered-badge" style="font-size:11px;opacity:0.7"></span></button>
   </div>
 
-  <!-- Scraped codes -->
+  <!-- Tipster codes -->
   <div class="source-tab active" id="stab-scraped">
     <div class="sec-header">
-      <h2>Scraped Codes</h2>
+      <h2>Available Codes</h2>
       <span class="sec-badge" id="codes-count">--</span>
     </div>
     <div id="codes-list">
@@ -560,19 +560,19 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
-  <!-- Discovered codes -->
+  <!-- Explore more codes -->
   <div class="source-tab" id="stab-discovered" style="display:none">
     <div class="sec-header">
-      <h2>Discovered Codes</h2>
+      <h2>Extra Codes</h2>
       <span class="sec-badge" id="discovered-count">--</span>
     </div>
     <div id="discover-status" style="display:none;margin-bottom:12px"></div>
     <div id="discovered-list">
-      <div class="empty">Click "Discover" to find new codes by mutating existing ones.</div>
+      <div class="empty">Find hundreds of additional codes from the Sportybet network.<div class="empty-action" style="margin-top:8px"><span style="font-size:12px;color:var(--text-3)">This scans for related codes near the ones already loaded</span></div></div>
     </div>
     <button class="btn btn-blue" id="discover-btn" style="width:100%;margin-top:12px;padding:14px;font-size:15px;border-radius:var(--r-sm)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-      Discover New Codes
+      Find More Codes
     </button>
   </div>
 </div>
@@ -1817,7 +1817,7 @@ async function runDiscovery() {
 
   btnLoad(discoverBtn);
   statusEl.style.display = 'block';
-  statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--blue-soft);border:1px solid rgba(78,148,255,0.2);border-radius:var(--r-xs)"><div class="spinner"></div><span style="font-size:13px;color:var(--blue);font-weight:600">Discovering codes — mutating ' + allBookingCodes.length + ' seeds...</span></div>';
+  statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--blue-soft);border:1px solid rgba(78,148,255,0.2);border-radius:var(--r-xs)"><div class="spinner"></div><span style="font-size:13px;color:var(--blue);font-weight:600">Scanning the Sportybet network for new codes...</span></div>';
 
   // Send top 50 codes as seeds
   const seeds = allBookingCodes.slice(0, 50).map(c => c.code);
@@ -1834,7 +1834,7 @@ async function runDiscovery() {
     // Convert discovered codes to BookingCode format for display
     discoveredCodes = codes.map(c => ({
       code: c.code,
-      source: 'Discovered (from ' + c.parentCode + ')',
+      source: 'Sportybet Network',
       sourceUrl: '',
       events: c.events,
       totalOdds: c.totalOdds,
@@ -1860,11 +1860,11 @@ async function runDiscovery() {
     document.getElementById('discovered-badge').textContent = '(' + discoveredCodes.length + ')';
     document.getElementById('discovered-count').textContent = discoveredCodes.length + ' codes';
 
-    statusEl.innerHTML = '<div style="padding:10px;background:var(--green-soft);border:1px solid rgba(52,212,114,0.2);border-radius:var(--r-xs);font-size:13px;color:var(--green);font-weight:600">' + discoveredCodes.length + ' new codes discovered from ' + data.seeds + ' seeds (' + data.stats.checkedCount + ' mutations checked)</div>';
+    statusEl.innerHTML = '<div style="padding:10px;background:var(--green-soft);border:1px solid rgba(52,212,114,0.2);border-radius:var(--r-xs);font-size:13px;color:var(--green);font-weight:600">' + discoveredCodes.length + ' new codes found across the Sportybet network</div>';
 
     // Render discovered codes
     if (discoveredCodes.length === 0) {
-      listEl.innerHTML = '<div class="empty">No new codes found. Try again later when more codes are available.</div>';
+      listEl.innerHTML = '<div class="empty">No additional codes found right now. Try again later when new codes are posted.</div>';
     } else {
       listEl.innerHTML = '';
       // Sort: most pending first, then by odds
@@ -1874,10 +1874,10 @@ async function runDiscovery() {
       }
     }
 
-    showToast(discoveredCodes.length + ' codes discovered!', 'success');
+    showToast(discoveredCodes.length + ' extra codes found!', 'success');
   } catch {
-    statusEl.innerHTML = '<div style="padding:10px;color:var(--red);font-size:13px">Discovery failed. Check your connection.</div>';
-    listEl.innerHTML = '<div class="empty">Discovery failed.<div class="empty-action"><button class="btn btn-ghost" onclick="runDiscovery()">Retry</button></div></div>';
+    statusEl.innerHTML = '<div style="padding:10px;color:var(--red);font-size:13px">Could not reach the network. Check your connection.</div>';
+    listEl.innerHTML = '<div class="empty">Something went wrong.<div class="empty-action"><button class="btn btn-ghost" onclick="runDiscovery()">Try again</button></div></div>';
   }
 
   btnDone(discoverBtn);
