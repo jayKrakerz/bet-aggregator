@@ -297,6 +297,33 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .rollover-stat{display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:var(--r-xs);border:1px solid var(--border);font-size:13px;margin-bottom:6px}
 .rollover-stat b{font-variant-numeric:tabular-nums}
 
+/* ===== SPIN PREDICTOR ===== */
+.spin-bottle{width:120px;height:120px;margin:0 auto 16px;position:relative}
+.spin-wheel{width:120px;height:120px;border-radius:50%;background:conic-gradient(var(--green) 0deg 150deg,var(--amber) 150deg 210deg,var(--red) 210deg 240deg,var(--amber) 240deg 330deg,var(--green) 330deg 360deg);border:3px solid rgba(255,255,255,0.15);position:relative;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.spin-wheel::after{content:'';width:4px;height:44px;background:#fff;border-radius:2px;position:absolute;box-shadow:0 0 8px rgba(255,255,255,0.5)}
+.spin-result-row{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:12px}
+.spin-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0}
+.spin-dot.up{background:var(--green)}
+.spin-dot.down{background:var(--amber)}
+.spin-dot.mid{background:var(--red)}
+.spin-predict{text-align:center;padding:20px;border-radius:var(--r-sm);margin-bottom:14px;font-size:18px;font-weight:800}
+.spin-predict.up{background:var(--green-soft);color:var(--green);border:2px solid rgba(52,212,114,0.3)}
+.spin-predict.down{background:var(--amber-soft);color:var(--amber);border:2px solid rgba(247,183,49,0.3)}
+.spin-predict.skip{background:var(--red-soft);color:var(--red);border:2px solid rgba(240,96,96,0.3)}
+.spin-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.spin-stat{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px;text-align:center}
+.spin-stat .num{font-size:20px;font-weight:800}
+.spin-stat .label{font-size:10px;color:var(--text-3);text-transform:uppercase;margin-top:2px}
+.spin-input-row{display:flex;gap:8px;margin-bottom:14px}
+.spin-input-btn{flex:1;padding:14px;font-size:15px;font-weight:800;border-radius:var(--r-xs);cursor:pointer;border:2px solid;font-family:inherit;transition:all .15s var(--ease-out);touch-action:manipulation}
+.spin-input-btn:active{transform:scale(0.96)}
+.spin-input-btn.up{background:var(--green-soft);color:var(--green);border-color:rgba(52,212,114,0.3)}
+.spin-input-btn.up:hover{background:rgba(52,212,114,0.2)}
+.spin-input-btn.mid{background:var(--red-soft);color:var(--red);border-color:rgba(240,96,96,0.3)}
+.spin-input-btn.mid:hover{background:rgba(240,96,96,0.2)}
+.spin-input-btn.down{background:var(--amber-soft);color:var(--amber);border-color:rgba(247,183,49,0.3)}
+.spin-input-btn.down:hover{background:rgba(247,183,49,0.2)}
+
 /* ===== FOCUS / A11Y ===== */
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:var(--r-xs)}
@@ -434,6 +461,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <button class="chip active" data-page="codes">Codes</button>
       <button class="chip" data-page="generate">Generate</button>
       <button class="chip" data-page="tools">Tools</button>
+      <button class="chip" data-page="spin">Spin</button>
       <button class="chip" data-page="history">History</button>
     </div>
     <div class="hdr-status" id="health">
@@ -791,6 +819,67 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   </div>
 </div>
 
+<!-- ===== PAGE: SPIN ===== -->
+<div class="page" id="page-spin">
+
+  <div class="card" style="text-align:center">
+    <div style="font-size:17px;font-weight:800;margin-bottom:4px">Spin da' Bottle</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Track results and get predictions based on patterns</div>
+
+    <!-- Visual wheel -->
+    <div class="spin-bottle">
+      <div class="spin-wheel"></div>
+    </div>
+
+    <!-- Prediction -->
+    <div class="spin-predict up" id="spin-prediction">
+      Record at least 10 spins to get predictions
+    </div>
+
+    <!-- Input buttons -->
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;font-weight:700;letter-spacing:.5px">Record last result:</div>
+    <div class="spin-input-row">
+      <button class="spin-input-btn up" onclick="recordSpin('up')">UP</button>
+      <button class="spin-input-btn mid" onclick="recordSpin('mid')">MID</button>
+      <button class="spin-input-btn down" onclick="recordSpin('down')">DOWN</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="undoSpin()" style="margin-bottom:10px">Undo last</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="spin-stat-grid" id="spin-stats">
+    <div class="spin-stat"><div class="num" style="color:var(--green)" id="sp-up-pct">--</div><div class="label">UP %</div></div>
+    <div class="spin-stat"><div class="num" style="color:var(--red)" id="sp-mid-pct">--</div><div class="label">MID %</div></div>
+    <div class="spin-stat"><div class="num" style="color:var(--amber)" id="sp-down-pct">--</div><div class="label">DOWN %</div></div>
+  </div>
+
+  <!-- Streak info -->
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:10px">Pattern Analysis</div>
+    <div id="spin-analysis" style="font-size:13px;color:var(--text-2);line-height:1.8">Record spins to see patterns...</div>
+  </div>
+
+  <!-- History dots -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span style="font-size:14px;font-weight:700">History</span>
+      <span style="font-size:12px;color:var(--text-3)" id="spin-total">0 spins</span>
+    </div>
+    <div class="spin-result-row" id="spin-history"></div>
+    <div style="margin-top:10px;text-align:right">
+      <button class="btn btn-red btn-sm" onclick="if(confirm('Clear all spin history?')){spinHistory=[];saveSpinHistory();updateSpinUI();}">Clear</button>
+    </div>
+  </div>
+
+  <!-- Bankroll strategy -->
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:10px">Staking Strategy</div>
+    <div id="spin-staking" style="font-size:13px;color:var(--text-2);line-height:1.8">
+      Record spins to get staking advice...
+    </div>
+  </div>
+</div>
+
 </main>
 
 <!-- BOTTOM NAV -->
@@ -806,6 +895,10 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   <button class="nav-btn" data-page="tools">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
     Tools
+  </button>
+  <button class="nav-btn" data-page="spin">
+    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/><circle cx="12" cy="12" r="3"/></svg></span>
+    Spin
   </button>
   <button class="nav-btn" data-page="history">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
@@ -2731,6 +2824,230 @@ document.getElementById('rv-target').onchange = updateRolloverUI;
 
 // Init rollover UI
 updateRolloverUI();
+
+// ===== SPIN DA BOTTLE PREDICTOR =====
+let spinHistory = [];
+try { spinHistory = JSON.parse(localStorage.getItem('spinHistory') || '[]'); } catch { spinHistory = []; }
+function saveSpinHistory() { if (spinHistory.length > 500) spinHistory = spinHistory.slice(-500); localStorage.setItem('spinHistory', JSON.stringify(spinHistory)); }
+
+function recordSpin(result) {
+  spinHistory.push({ result, ts: Date.now() });
+  saveSpinHistory();
+  updateSpinUI();
+}
+
+function undoSpin() {
+  if (!spinHistory.length) return;
+  spinHistory.pop();
+  saveSpinHistory();
+  updateSpinUI();
+}
+
+function getSpinStats() {
+  const total = spinHistory.length;
+  if (!total) return { total: 0, up: 0, down: 0, mid: 0, upPct: 0, downPct: 0, midPct: 0, streak: '', streakLen: 0, lastN: [] };
+  const up = spinHistory.filter(s => s.result === 'up').length;
+  const down = spinHistory.filter(s => s.result === 'down').length;
+  const mid = spinHistory.filter(s => s.result === 'mid').length;
+
+  // Current streak
+  let streakResult = spinHistory[total - 1].result;
+  let streakLen = 0;
+  for (let i = total - 1; i >= 0; i--) {
+    if (spinHistory[i].result === streakResult) streakLen++;
+    else break;
+  }
+
+  // Last 20 results
+  const lastN = spinHistory.slice(-20).map(s => s.result);
+
+  return {
+    total, up, down, mid,
+    upPct: Math.round((up / total) * 100),
+    downPct: Math.round((down / total) * 100),
+    midPct: Math.round((mid / total) * 100),
+    streak: streakResult,
+    streakLen,
+    lastN,
+  };
+}
+
+/**
+ * PREDICTION ENGINE for Spin da' Bottle
+ *
+ * Virtual games use PRNGs with forced distribution balancing.
+ * After a long streak, the opposite becomes more likely.
+ * After MIDDLE, the game tends to "compensate" with the underrepresented side.
+ *
+ * Strategy:
+ * 1. Track UP/DOWN distribution — bet on the underrepresented side
+ * 2. After 3+ streak, bet against the streak
+ * 3. After MIDDLE, bet on whichever side has fewer recent results
+ * 4. If no clear signal, skip (don't bet)
+ */
+function predictNextSpin() {
+  const stats = getSpinStats();
+  if (stats.total < 10) return { pick: 'wait', confidence: 0, reason: 'Need at least 10 spins to analyze patterns' };
+
+  let pick = 'skip';
+  let confidence = 0;
+  let reasons = [];
+
+  const last = stats.lastN;
+  const recent20Up = last.filter(r => r === 'up').length;
+  const recent20Down = last.filter(r => r === 'down').length;
+  const recent20Mid = last.filter(r => r === 'mid').length;
+
+  // Signal 1: Streak reversal (strongest signal)
+  if (stats.streakLen >= 4) {
+    pick = stats.streak === 'up' ? 'down' : 'up';
+    confidence += 35;
+    reasons.push(stats.streakLen + 'x ' + stats.streak.toUpperCase() + ' streak — reversal likely');
+  } else if (stats.streakLen >= 3) {
+    pick = stats.streak === 'up' ? 'down' : 'up';
+    confidence += 25;
+    reasons.push('3x ' + stats.streak.toUpperCase() + ' streak');
+  }
+
+  // Signal 2: Distribution imbalance in last 20
+  const upDownOnly = recent20Up + recent20Down;
+  if (upDownOnly >= 10) {
+    const upRatio = recent20Up / upDownOnly;
+    if (upRatio > 0.65) {
+      if (pick === 'down' || pick === 'skip') { pick = 'down'; confidence += 20; }
+      reasons.push('UP overrepresented (' + Math.round(upRatio * 100) + '%) — DOWN due');
+    } else if (upRatio < 0.35) {
+      if (pick === 'up' || pick === 'skip') { pick = 'up'; confidence += 20; }
+      reasons.push('DOWN overrepresented (' + Math.round((1 - upRatio) * 100) + '%) — UP due');
+    }
+  }
+
+  // Signal 3: Post-MIDDLE compensation
+  if (last.length >= 2 && last[last.length - 1] === 'mid') {
+    // After MIDDLE, game tends to give the underrepresented side
+    const recentUp = last.slice(-10).filter(r => r === 'up').length;
+    const recentDown = last.slice(-10).filter(r => r === 'down').length;
+    if (recentUp < recentDown) {
+      if (pick === 'up' || pick === 'skip') { pick = 'up'; confidence += 15; }
+      reasons.push('Post-MIDDLE + UP underrepresented');
+    } else {
+      if (pick === 'down' || pick === 'skip') { pick = 'down'; confidence += 15; }
+      reasons.push('Post-MIDDLE + DOWN underrepresented');
+    }
+  }
+
+  // Signal 4: Alternating pattern (UP-DOWN-UP-DOWN)
+  if (last.length >= 4) {
+    const lastFour = last.slice(-4).filter(r => r !== 'mid');
+    if (lastFour.length >= 4) {
+      const isAlternating = lastFour.every((r, i) => i === 0 || r !== lastFour[i - 1]);
+      if (isAlternating) {
+        const nextExpected = lastFour[lastFour.length - 1] === 'up' ? 'down' : 'up';
+        if (pick === nextExpected || pick === 'skip') { pick = nextExpected; confidence += 15; }
+        reasons.push('Alternating pattern detected');
+      }
+    }
+  }
+
+  // Signal 5: Long-term distribution correction
+  if (stats.total >= 30) {
+    const longUpRatio = stats.up / (stats.up + stats.down);
+    if (longUpRatio > 0.58) {
+      if (pick === 'down' || pick === 'skip') { pick = 'down'; confidence += 10; }
+      reasons.push('Long-term UP heavy (' + stats.upPct + '%)');
+    } else if (longUpRatio < 0.42) {
+      if (pick === 'up' || pick === 'skip') { pick = 'up'; confidence += 10; }
+      reasons.push('Long-term DOWN heavy (' + stats.downPct + '%)');
+    }
+  }
+
+  // High MIDDLE rate warning
+  if (stats.total >= 20 && stats.midPct > 15) {
+    confidence -= 10;
+    reasons.push('High MIDDLE rate (' + stats.midPct + '%) — risky session');
+  }
+
+  // Cap confidence
+  confidence = Math.max(0, Math.min(90, confidence));
+
+  // If no strong signal, suggest skip
+  if (confidence < 20) {
+    return { pick: 'skip', confidence, reason: 'No clear pattern — skip this round' };
+  }
+
+  return { pick, confidence, reason: reasons.join('. ') };
+}
+
+function updateSpinUI() {
+  const stats = getSpinStats();
+  const pred = predictNextSpin();
+
+  // Stats
+  document.getElementById('sp-up-pct').textContent = stats.total ? stats.upPct + '%' : '--';
+  document.getElementById('sp-mid-pct').textContent = stats.total ? stats.midPct + '%' : '--';
+  document.getElementById('sp-down-pct').textContent = stats.total ? stats.downPct + '%' : '--';
+  document.getElementById('spin-total').textContent = stats.total + ' spins';
+
+  // History dots (last 50)
+  const histEl = document.getElementById('spin-history');
+  const showing = spinHistory.slice(-50);
+  histEl.innerHTML = showing.map(s =>
+    `<div class="spin-dot ${s.result}">${s.result === 'up' ? 'U' : s.result === 'down' ? 'D' : 'M'}</div>`
+  ).join('');
+
+  // Prediction
+  const predEl = document.getElementById('spin-prediction');
+  if (pred.pick === 'wait') {
+    predEl.className = 'spin-predict skip';
+    predEl.innerHTML = '<div style="font-size:14px">Record more spins</div><div style="font-size:12px;font-weight:500;margin-top:4px;opacity:0.7">' + pred.reason + '</div>';
+  } else if (pred.pick === 'skip') {
+    predEl.className = 'spin-predict skip';
+    predEl.innerHTML = '<div>SKIP THIS ROUND</div><div style="font-size:12px;font-weight:500;margin-top:4px;opacity:0.7">' + pred.reason + '</div>';
+  } else {
+    predEl.className = 'spin-predict ' + pred.pick;
+    predEl.innerHTML = '<div>BET ' + pred.pick.toUpperCase() + '</div><div style="font-size:13px;font-weight:600;margin-top:4px">' + pred.confidence + '% confidence</div><div style="font-size:11px;font-weight:500;margin-top:4px;opacity:0.7">' + esc(pred.reason) + '</div>';
+  }
+
+  // Analysis
+  const analysisEl = document.getElementById('spin-analysis');
+  if (stats.total < 5) {
+    analysisEl.innerHTML = 'Record at least 5 spins to see analysis.';
+  } else {
+    let html = '';
+    html += `<div>Current streak: <b style="color:${stats.streak === 'up' ? 'var(--green)' : stats.streak === 'down' ? 'var(--amber)' : 'var(--red)'}">${stats.streakLen}x ${stats.streak.toUpperCase()}</b></div>`;
+    html += `<div>Last 20: <b style="color:var(--green)">${stats.lastN.filter(r => r === 'up').length}U</b> / <b style="color:var(--red)">${stats.lastN.filter(r => r === 'mid').length}M</b> / <b style="color:var(--amber)">${stats.lastN.filter(r => r === 'down').length}D</b></div>`;
+    html += `<div>All time: <b>${stats.up}U / ${stats.mid}M / ${stats.down}D</b> (${stats.total} total)</div>`;
+
+    // Streak analysis
+    if (stats.streakLen >= 3) html += `<div style="color:var(--amber);font-weight:700;margin-top:6px">Long streak detected — reversal probability increasing</div>`;
+    if (stats.midPct > 12) html += `<div style="color:var(--red)">MIDDLE rate ${stats.midPct}% — above average, be cautious</div>`;
+    if (stats.midPct < 8 && stats.total >= 20) html += `<div style="color:var(--green)">MIDDLE rate ${stats.midPct}% — below average, good session</div>`;
+
+    analysisEl.innerHTML = html;
+  }
+
+  // Staking advice
+  const stakingEl = document.getElementById('spin-staking');
+  if (stats.total < 10) {
+    stakingEl.innerHTML = 'Record at least 10 spins for staking advice.';
+  } else {
+    let html = '';
+    if (pred.confidence >= 50) {
+      html += '<div style="color:var(--green);font-weight:700">Strong signal — bet 3-5% of bankroll</div>';
+    } else if (pred.confidence >= 30) {
+      html += '<div style="color:var(--amber);font-weight:700">Moderate signal — bet 1-2% of bankroll</div>';
+    } else {
+      html += '<div style="color:var(--red);font-weight:700">Weak/no signal — skip or bet minimum</div>';
+    }
+    html += '<div style="margin-top:6px">Flat staking only. Never chase losses with double-up.</div>';
+    html += '<div>Set a stop-loss: quit after 5 consecutive losses or 20% bankroll drop.</div>';
+    if (stats.midPct > 15) html += '<div style="color:var(--red);margin-top:4px">High MIDDLE rate — consider stopping this session.</div>';
+    stakingEl.innerHTML = html;
+  }
+}
+
+// Init spin UI
+updateSpinUI();
 
 // ===== PWA INSTALL PROMPT =====
 let deferredInstallPrompt = null;
