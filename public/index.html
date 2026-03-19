@@ -2923,54 +2923,155 @@ function getFormString(matches, teamId) {
   }).join('');
 }
 
+function getGoalsFromMatches(matches, teamId) {
+  if (!matches||!matches.length) return { scored: [], conceded: [], totals: [] };
+  const scored = [], conceded = [], totals = [];
+  for (const m of matches) {
+    const isHome = m.homeTeamId === teamId;
+    const s = isHome ? (m.homeScore||0) : (m.awayScore||0);
+    const c = isHome ? (m.awayScore||0) : (m.homeScore||0);
+    scored.push(s);
+    conceded.push(c);
+    totals.push(s + c);
+  }
+  return { scored, conceded, totals };
+}
+
+function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+
 function predictVirtualMatch(data) {
   const home = data.homeTeam, away = data.awayTeam, h2h = data.headToHead;
   const reasons = [];
-  let hs = 50;
-  const probGap = (home.probability||50) - (away.probability||50);
-  hs += probGap * 0.5;
-  if (Math.abs(probGap) >= 30) reasons.push('Probability: ' + home.probability + '% vs ' + away.probability + '%');
-  const formGap = (home.form||50) - (away.form||50);
-  hs += formGap * 0.2;
-  if (Math.abs(formGap) >= 30) reasons.push('Form: ' + home.teamName + ' ' + home.form + ' vs ' + away.teamName + ' ' + away.form);
-  const rankGap = (away.rank||10) - (home.rank||10);
-  hs += rankGap * 1.5;
-  if (Math.abs(rankGap) >= 5) reasons.push('Rank: #' + home.rank + ' vs #' + away.rank);
-  const goalAdv = (home.homeAvgScore||0) - (away.awayAvgScore||0);
-  hs += goalAdv * 8;
-  if (goalAdv > 0.5) reasons.push(home.teamName + ' home avg ' + home.homeAvgScore + ' vs ' + away.teamName + ' away avg ' + away.awayAvgScore);
-  const hf = getFormString(home.recentMatches, home.teamId), af = getFormString(away.recentMatches, away.teamId);
-  const hw = (hf.match(/W/g)||[]).length, aw = (af.match(/W/g)||[]).length;
-  const hl = (hf.match(/L/g)||[]).length, al = (af.match(/L/g)||[]).length;
-  hs += (hw - hl) * 3 - (aw - al) * 3;
-  reasons.push(home.teamName + ' form: ' + hf + ' | ' + away.teamName + ' form: ' + af);
-  if (h2h && h2h.matches && h2h.matches.length) {
-    hs += ((h2h.homeTeamWins||0) - (h2h.awayTeamWins||0)) * 5;
-    reasons.push('H2H: ' + home.teamName + ' ' + h2h.homeTeamWins + 'W ' + h2h.draws + 'D ' + h2h.awayTeamWins + 'L');
+
+  // ===== USE SPORTYBET'S OWN PROBABILITY (the truth for virtuals) =====
+  const homeWinPct = home.probability || 33;
+  const awayWinPct = away.probability || 33;
+  const drawPct = Math.max(0, 100 - homeWinPct - awayWinPct);
+  reasons.push('Sportybet probability: ' + home.teamName + ' ' + homeWinPct + '% | Draw ' + drawPct + '% | ' + away.teamName + ' ' + awayWinPct + '%');
+
+  // ===== DEEP GOALS ANALYSIS =====
+  const homeGoals = getGoalsFromMatches(home.recentMatches, home.teamId);
+  const awayGoals = getGoalsFromMatches(away.recentMatches, away.teamId);
+
+  // Actual goals per game from recent matches
+  const homeAvgScored = avg(homeGoals.scored);
+  const homeAvgConceded = avg(homeGoals.conceded);
+  const awayAvgScored = avg(awayGoals.scored);
+  const awayAvgConceded = avg(awayGoals.conceded);
+
+  // Expected goals for THIS match
+  // Home team's attack vs away team's defense, and vice versa
+  const homeExpGoals = (homeAvgScored + awayAvgConceded) / 2;
+  const awayExpGoals = (awayAvgScored + homeAvgConceded) / 2;
+  const totalExpGoals = homeExpGoals + awayExpGoals;
+
+  // Also weight Sportybet's own averages
+  const sbHomeGoals = home.homeAvgScore || home.overallAvgScore || 1;
+  const sbAwayGoals = away.awayAvgScore || away.overallAvgScore || 0.8;
+  const sbTotalGoals = sbHomeGoals + sbAwayGoals;
+
+  // Blend: 60% from actual recent scores, 40% from Sportybet averages
+  const expectedTotal = totalExpGoals * 0.6 + sbTotalGoals * 0.4;
+  const expectedHome = homeExpGoals * 0.6 + sbHomeGoals * 0.4;
+  const expectedAway = awayExpGoals * 0.6 + sbAwayGoals * 0.4;
+
+  reasons.push('Expected goals: ' + home.teamName + ' ' + expectedHome.toFixed(1) + ' — ' + away.teamName + ' ' + expectedAway.toFixed(1) + ' (total ' + expectedTotal.toFixed(1) + ')');
+
+  // Recent total goals per match
+  const allTotals = [...homeGoals.totals, ...awayGoals.totals];
+  const avgTotalRecent = avg(allTotals);
+  const over15Rate = allTotals.filter(t => t > 1.5).length / Math.max(allTotals.length, 1);
+  const over25Rate = allTotals.filter(t => t > 2.5).length / Math.max(allTotals.length, 1);
+  const under25Rate = allTotals.filter(t => t < 2.5).length / Math.max(allTotals.length, 1);
+  const under35Rate = allTotals.filter(t => t < 3.5).length / Math.max(allTotals.length, 1);
+  const bttsRate = homeGoals.totals.length ? homeGoals.scored.filter((s,i) => s > 0 && homeGoals.conceded[i] > 0).length / homeGoals.scored.length : 0.5;
+
+  reasons.push('Recent avg total goals: ' + avgTotalRecent.toFixed(1) + ' per match');
+  reasons.push('Over 1.5 rate: ' + Math.round(over15Rate*100) + '% | Over 2.5 rate: ' + Math.round(over25Rate*100) + '%');
+
+  // Clean sheet analysis
+  const homeCleanSheets = homeGoals.conceded.filter(g => g === 0).length;
+  const awayCleanSheets = awayGoals.conceded.filter(g => g === 0).length;
+  const homeFailedToScore = homeGoals.scored.filter(g => g === 0).length;
+  const awayFailedToScore = awayGoals.scored.filter(g => g === 0).length;
+
+  // H2H goals
+  let h2hTotalGoals = 0, h2hCount = 0;
+  if (h2h && h2h.matches) {
+    for (const m of h2h.matches) {
+      h2hTotalGoals += (m.homeScore||0) + (m.awayScore||0);
+      h2hCount++;
+    }
+    if (h2hCount) reasons.push('H2H avg goals: ' + (h2hTotalGoals/h2hCount).toFixed(1) + ' per match (' + h2hCount + ' games)');
   }
-  hs += ((home.avgPoints||1) - (away.avgPoints||1)) * 8;
-  hs = Math.max(10, Math.min(90, hs));
-  const drawPct = Math.max(15, 35 - Math.abs(hs - 50) * 0.5);
-  const rem = 100 - drawPct;
-  const homeWinPct = Math.round((hs / 100) * rem), awayWinPct = rem - homeWinPct;
-  const eg = (home.homeAvgScore||home.overallAvgScore||1) + (away.awayAvgScore||away.overallAvgScore||0.8);
+
+  // Form
+  const hf = getFormString(home.recentMatches, home.teamId);
+  const af = getFormString(away.recentMatches, away.teamId);
+  reasons.push(home.teamName + ' form: ' + hf + ' (Form ' + home.form + ') | ' + away.teamName + ' form: ' + af + ' (Form ' + away.form + ')');
+  reasons.push(home.teamName + ' rank #' + home.rank + ' | ' + away.teamName + ' rank #' + away.rank);
+
+  if (h2h) reasons.push('H2H: ' + home.teamName + ' ' + (h2h.homeTeamWins||0) + 'W ' + (h2h.draws||0) + 'D ' + (h2h.awayTeamWins||0) + 'L');
+
+  // Score pattern analysis
+  const homeScorePattern = homeGoals.scored.join('-');
+  const awayScorePattern = awayGoals.scored.join('-');
+  reasons.push(home.teamName + ' recent goals scored: ' + homeScorePattern + ' (avg ' + homeAvgScored.toFixed(1) + ')');
+  reasons.push(away.teamName + ' recent goals scored: ' + awayScorePattern + ' (avg ' + awayAvgScored.toFixed(1) + ')');
+
+  // ===== BUILD BETS =====
   const bets = [];
-  if (homeWinPct >= 45) bets.push({market:home.teamName+' Win',confidence:homeWinPct,color:'var(--green)'});
-  if (awayWinPct >= 45) bets.push({market:away.teamName+' Win',confidence:awayWinPct,color:'var(--green)'});
-  const hd = homeWinPct + Math.round(drawPct), ad = awayWinPct + Math.round(drawPct);
-  if (hd >= 55) bets.push({market:home.teamName+' or Draw',confidence:hd,color:'var(--blue)'});
-  if (ad >= 55) bets.push({market:away.teamName+' or Draw',confidence:ad,color:'var(--blue)'});
-  if (eg >= 2) bets.push({market:'Over 1.5',confidence:Math.min(85,Math.round(eg*35)),color:'var(--amber)'});
-  if (eg >= 2.8) bets.push({market:'Over 2.5',confidence:Math.min(75,Math.round(eg*22)),color:'var(--amber)'});
-  if (eg < 2.5) bets.push({market:'Under 2.5',confidence:Math.min(75,Math.round((4-eg)*25)),color:'var(--purple)'});
-  if (eg < 3.5) bets.push({market:'Under 3.5',confidence:Math.min(85,Math.round((5-eg)*20)),color:'var(--purple)'});
+
+  // 1X2 — use Sportybet's probabilities directly
+  if (homeWinPct >= 35) bets.push({market:home.teamName+' Win',confidence:homeWinPct,color:'var(--green)'});
+  if (awayWinPct >= 35) bets.push({market:away.teamName+' Win',confidence:awayWinPct,color:'var(--green)'});
+  if (drawPct >= 30) bets.push({market:'Draw',confidence:drawPct,color:'var(--text-2)'});
+
+  // Double Chance — from Sportybet probs
+  const dcHD = homeWinPct + drawPct;
+  const dcDA = drawPct + awayWinPct;
+  const dcHA = homeWinPct + awayWinPct;
+  bets.push({market:home.teamName+' or Draw',confidence:dcHD,color:'var(--blue)'});
+  bets.push({market:away.teamName+' or Draw',confidence:dcDA,color:'var(--blue)'});
+
+  // Over/Under — from actual goal history
+  const o15Conf = Math.round(((over15Rate * 0.6) + (expectedTotal > 1.5 ? 0.4 : 0.1)) * 100);
+  const o25Conf = Math.round(((over25Rate * 0.6) + (expectedTotal > 2.5 ? 0.4 : 0.1)) * 100);
+  const u25Conf = Math.round(((under25Rate * 0.6) + (expectedTotal < 2.5 ? 0.4 : 0.1)) * 100);
+  const u35Conf = Math.round(((under35Rate * 0.6) + (expectedTotal < 3.5 ? 0.4 : 0.1)) * 100);
+  bets.push({market:'Over 1.5 Goals',confidence:Math.min(90, o15Conf),color:'var(--amber)'});
+  bets.push({market:'Over 2.5 Goals',confidence:Math.min(85, o25Conf),color:'var(--amber)'});
+  bets.push({market:'Under 2.5 Goals',confidence:Math.min(85, u25Conf),color:'var(--purple)'});
+  bets.push({market:'Under 3.5 Goals',confidence:Math.min(90, u35Conf),color:'var(--purple)'});
+
+  // BTTS
+  const bttsConf = Math.round(bttsRate * 100);
+  bets.push({market:'Both Teams Score',confidence:bttsConf,color:'var(--amber)'});
+  bets.push({market:'No BTTS',confidence:100-bttsConf,color:'var(--purple)'});
+
+  // Most likely scoreline
+  const likelyHomeGoals = Math.round(expectedHome);
+  const likelyAwayGoals = Math.round(expectedAway);
+  reasons.push('Most likely score: ' + likelyHomeGoals + '-' + likelyAwayGoals);
+
   bets.sort((a,b) => b.confidence - a.confidence);
-  let mainPick, mainConf, mainColor;
-  if (homeWinPct >= awayWinPct + 15) { mainPick = home.teamName + ' Win'; mainConf = homeWinPct; mainColor = 'var(--green)'; }
-  else if (awayWinPct >= homeWinPct + 15) { mainPick = away.teamName + ' Win'; mainConf = awayWinPct; mainColor = 'var(--green)'; }
-  else if (homeWinPct > awayWinPct) { mainPick = home.teamName + ' or Draw'; mainConf = hd; mainColor = 'var(--blue)'; }
-  else { mainPick = away.teamName + ' or Draw'; mainConf = ad; mainColor = 'var(--blue)'; }
-  return { home, away, h2h, homeWinPct, drawPct: Math.round(drawPct), awayWinPct, mainPick, mainConf, mainColor, bets: bets.slice(0,6), reasons, homeForm: hf, awayForm: af, totalExpectedGoals: Math.round(eg*10)/10 };
+
+  // Main prediction — use the HIGHEST confidence bet
+  const mainBet = bets[0] || {market:'Skip',confidence:0,color:'var(--text-3)'};
+  const mainColor = mainBet.color;
+
+  return {
+    home, away, h2h,
+    homeWinPct, drawPct, awayWinPct,
+    mainPick: mainBet.market, mainConf: mainBet.confidence, mainColor,
+    bets: bets.slice(0,8),
+    reasons,
+    homeForm: hf, awayForm: af,
+    totalExpectedGoals: Math.round(expectedTotal*10)/10,
+    expectedHome: Math.round(expectedHome*10)/10,
+    expectedAway: Math.round(expectedAway*10)/10,
+    likelyScore: likelyHomeGoals + '-' + likelyAwayGoals,
+  };
 }
 
 function vpReset() {
@@ -3027,7 +3128,7 @@ document.getElementById('vp-predict-btn').onclick = () => {
           <span style="color:var(--text-3)">Draw ${pred.drawPct}%</span>
           <span style="color:var(--amber)">${pred.away.teamName} ${pred.awayWinPct}%</span>
         </div>
-        <div class="goals">Expected goals: ${pred.totalExpectedGoals}</div>
+        <div class="goals">Expected: ${pred.expectedHome} — ${pred.expectedAway} (${pred.totalExpectedGoals} total) | Likely score: ${pred.likelyScore}</div>
       </div>`;
 
     document.getElementById('vp-bets').innerHTML = pred.bets.map(b => `
