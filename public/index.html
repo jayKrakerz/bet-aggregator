@@ -2141,18 +2141,23 @@ function formScore(form) {
 }
 
 async function generateSafeCode(targetOdds, btn) {
-  // Auto-discover codes if not done yet (adds ~200 codes to pool)
-  if (!discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) {
-    // Silent background discovery — don't block, just fire and continue
-    runDiscoverySilent();
-  }
-  // Fetch enrichment data before generating (only first time)
-  await fetchEnrichment();
-
-  const sets = pickDiversifiedSets(targetOdds);
-  if (!sets.length) return;
   const resultsDiv = document.getElementById('auto-gen-results');
   btnLoad(btn);
+
+  // Auto-discover codes if not done yet — WAIT for it so pool is full before picking
+  if (!discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) {
+    await runDiscoverySilent();
+  }
+  // Fetch enrichment data (only first time)
+  await fetchEnrichment();
+
+  const poolBefore = gamePool.length;
+  const sets = pickDiversifiedSets(targetOdds);
+  if (!sets.length) {
+    btnDone(btn);
+    resultsDiv.innerHTML = '<div style="padding:12px;color:var(--amber);font-size:13px">Not enough games in the pool. Load more codes or try a lower target.</div>';
+    return;
+  }
 
   const loading = document.createElement('div');
   loading.className = 'gen-loading';
