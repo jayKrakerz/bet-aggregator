@@ -1886,6 +1886,36 @@ async function runDiscovery() {
 
 document.getElementById('discover-btn').onclick = runDiscovery;
 
+// Silent discovery — runs in background when generating, only feeds the pool
+async function runDiscoverySilent() {
+  if (discoveryRunning || discoveredCodes.length > 0) return;
+  discoveryRunning = true;
+  const seeds = allBookingCodes.slice(0, 30).map(c => c.code);
+  try {
+    const res = await fetch('/predictions/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seeds, maxResults: 100 }),
+    });
+    const data = await res.json();
+    const codes = data.data || [];
+    discoveredCodes = codes.map(c => ({
+      code: c.code, source: 'Sportybet Network', sourceUrl: '', events: c.events,
+      totalOdds: c.totalOdds, market: null, date: null, status: 'pending', postedAgo: null,
+      validated: true, isValid: true, selections: c.selections,
+      wonCount: c.selections.filter(s => s.isWinning === 1).length,
+      lostCount: c.selections.filter(s => s.isWinning === 0).length,
+      pendingCount: c.selections.filter(s => s.isWinning === null).length,
+    }));
+    for (const c of discoveredCodes) {
+      recordConsensus(c.selections, c.code);
+      addToGamePool(c.selections);
+    }
+    document.getElementById('discovered-badge').textContent = '(' + discoveredCodes.length + ')';
+  } catch {}
+  discoveryRunning = false;
+}
+
 // Generate page sub-tabs
 document.querySelectorAll('#gen-tabs .chip').forEach(btn => {
   btn.onclick = () => {
@@ -1978,21 +2008,26 @@ function pickDiversifiedSets(targetOdds) {
       g._prob > 0.01
     );
 
-    // Calculate ideal odds per pick to reach target in ~maxLegs/2 picks
-    const idealOddsPerPick = Math.pow(targetOdds, 1 / Math.max(3, C.maxLegs * 0.7));
+    // Ideal odds per pick: what each pick should contribute to reach target
+    const idealOdds = Math.pow(targetOdds, 1 / Math.max(3, C.maxLegs * 0.75));
 
-    // Sort based on strategy
     if (sortMode === 'efficiency') {
-      // Prioritize picks whose odds are closest to idealOddsPerPick AND have high probability
+      // Sort by closeness to ideal odds (primary), then probability (tiebreaker)
       eligible.sort((a, b) => {
-        const aCloseness = 1 / (1 + Math.abs(Math.log(a.odds) - Math.log(idealOddsPerPick)));
-        const bCloseness = 1 / (1 + Math.abs(Math.log(b.odds) - Math.log(idealOddsPerPick)));
-        const aScore = aCloseness * a._prob;
-        const bScore = bCloseness * b._prob;
-        return bScore - aScore;
+        const aDist = Math.abs(a.odds - idealOdds);
+        const bDist = Math.abs(b.odds - idealOdds);
+        if (Math.abs(aDist - bDist) > 0.1) return aDist - bDist; // closer to ideal wins
+        return b._prob - a._prob; // tiebreak by probability
       });
     } else if (sortMode === 'probability') {
-      eligible.sort((a, b) => b._prob - a._prob);
+      // For value: sort by probability but exclude very low odds that waste legs
+      const minUseful = Math.max(C.minOdds, idealOdds * 0.5);
+      eligible.sort((a, b) => {
+        const aUseful = a.odds >= minUseful ? 1 : 0;
+        const bUseful = b.odds >= minUseful ? 1 : 0;
+        if (aUseful !== bUseful) return bUseful - aUseful;
+        return b._prob - a._prob;
+      });
     } else if (sortMode === 'odds') {
       eligible.sort((a, b) => b.odds - a.odds || b._prob - a._prob);
     }
@@ -2106,6 +2141,11 @@ function formScore(form) {
 }
 
 async function generateSafeCode(targetOdds, btn) {
+  // Auto-discover codes if not done yet (adds ~200 codes to pool)
+  if (!discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) {
+    // Silent background discovery — don't block, just fire and continue
+    runDiscoverySilent();
+  }
   // Fetch enrichment data before generating (only first time)
   await fetchEnrichment();
 
