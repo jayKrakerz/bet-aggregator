@@ -1438,15 +1438,28 @@ function oddsMovement(g) {
   return { dropped: pct < -2, pctChange: Math.round(pct*10)/10, isSharpMoney: pct <= -5 };
 }
 
+// FIX 4: Track code families so mutated codes from same parent count as 1 source
+const codeFamily = new Map(); // code -> parentCode (or self if scraped)
+
+function getCodeFamily(codeId) {
+  return codeFamily.get(codeId) || codeId;
+}
+
 function recordConsensus(selections, codeId) {
   if (!selections) return;
   totalCodesLoaded++;
+  const familyId = getCodeFamily(codeId);
   for (const s of selections) {
     if (!s.eventId) continue;
     const key = s.eventId+':'+(s.marketId||'')+':'+(s.outcomeId||'');
-    if (!consensusMap.has(key)) consensusMap.set(key, {count:0, sources:new Set(), eventId:s.eventId});
+    if (!consensusMap.has(key)) consensusMap.set(key, {count:0, sources:new Set(), families:new Set(), eventId:s.eventId});
     const e = consensusMap.get(key);
-    if (!e.sources.has(codeId)) { e.sources.add(codeId); e.count++; }
+    // Only count as new consensus if from a DIFFERENT family (independent source)
+    if (!e.families.has(familyId)) {
+      e.families.add(familyId);
+      e.count++;
+    }
+    e.sources.add(codeId);
   }
 }
 
@@ -1456,7 +1469,11 @@ function addToGamePool(selections) {
   if (!selections) return;
   for (const s of selections) {
     if (!s.eventId || s.isWinning !== null) continue;
-    if (s.matchStatus === 'Ended' || s.matchStatus === 'Cancelled') continue;
+    // FIX 3: Exclude ended, cancelled, AND live games
+    const status = (s.matchStatus || '').toLowerCase();
+    if (status === 'ended' || status === 'cancelled' || status === 'live' ||
+        status === '1h' || status === '2h' || status === 'ht' ||
+        status === 'in progress' || status === 'second half' || status === 'first half') continue;
     if (!s.odds || s.odds <= 1) continue;
     const key = s.eventId+':'+s.marketId+':'+s.outcomeId;
     if (gamePool.some(g => g._key === key)) continue;
@@ -1521,14 +1538,38 @@ function detectTraps(s) {
   for (const d of DERBY_PAIRS) { const [a,b] = d.split('|'); if (pair.includes(a) && pair.includes(b)) { traps.push({type:'derby',severity:'high',label:'Derby'}); break; } }
   const mkt = (s.market||'').toLowerCase();
   if ((mkt === '1x2' || mkt === 'match winner') && s.odds && s.odds <= 1.15) traps.push({type:'trap-odds',severity:'medium',label:'Trap odds'});
-  if (s.estimateStartTime) { const h = new Date(s.estimateStartTime).getHours(); if (h >= 22 || h <= 4) traps.push({type:'late',severity:'low',label:'Late'}); }
+  // FIX 11: Use UTC hour instead of local to avoid timezone mismatch
+  if (s.estimateStartTime) { const h = new Date(s.estimateStartTime).getUTCHours(); if (h >= 22 || h <= 3) traps.push({type:'late',severity:'low',label:'Late (UTC)'}); }
   if (mkt.includes('correct score')) traps.push({type:'correct-score',severity:'high',label:'Correct score'});
   return traps;
 }
 
 // ===== SAFETY SCORING =====
-const TOP_LEAGUES = ['premier league','laliga','la liga','bundesliga','serie a','ligue 1','eredivisie','championship'];
-const MID_LEAGUES = ['2. bundesliga','la liga 2','serie b','champions league','europa league','mls','liga mx'];
+const TOP_LEAGUES = ['premier league','laliga','la liga','bundesliga','serie a','ligue 1','eredivisie','championship','champions league','europa league'];
+const MID_LEAGUES = ['2. bundesliga','la liga 2','serie b','conference league','mls','liga mx','super lig','pro league','liga portugal','super league'];
+
+// FIX 12: Better league normalization — handle tournament IDs and various formats
+function normalizeLeague(leagueStr) {
+  if (!leagueStr) return '';
+  // If it's a raw Betradar ID like "sr:tournament:679", treat as unknown
+  if (leagueStr.includes('sr:tournament')) return '';
+  // Take the last segment after " - " (e.g. "England - Premier League" → "Premier League")
+  const parts = leagueStr.split(' - ');
+  return (parts[parts.length - 1] || '').toLowerCase().trim();
+}
+
+// FIX 2: Parse Double Chance pick direction from Sportybet's English descriptions
+function getDCDirection(pickStr) {
+  const p = (pickStr || '').toLowerCase();
+  if (p.includes('home') && p.includes('draw')) return 'home-draw';  // "Home or Draw"
+  if (p.includes('away') && p.includes('draw')) return 'away-draw';  // "Draw or Away"
+  if (p.includes('home') && p.includes('away')) return 'home-away';  // "Home or Away"
+  // Fallback to 1X2 notation
+  if (p.includes('1x') || p.includes('x1')) return 'home-draw';
+  if (p.includes('x2') || p.includes('2x')) return 'away-draw';
+  if (p.includes('12')) return 'home-away';
+  return 'unknown';
+}
 
 function safetyScore(g) {
   let s = 50;
@@ -1540,8 +1581,11 @@ function safetyScore(g) {
     const minsUntil = (g.estimateStartTime - Date.now()) / 60000;
     if (minsUntil < 20) return 0;
   }
+  // FIX 3: Also exclude by match status
+  const status = (g.matchStatus || '').toLowerCase();
+  if (status === 'live' || status === '1h' || status === '2h' || status === 'ht' || status === 'ended') return 0;
 
-  // MARKET TYPE — only reward genuinely safe markets
+  // MARKET TYPE
   if (mkt.includes('over/under')||mkt.includes('total')) {
     if (pick.includes('over 0.5')) s+=18;
     else if (pick.includes('over 1.5')) s+=10;
@@ -1565,13 +1609,14 @@ function safetyScore(g) {
     s-=2;
   }
 
-  // LEAGUE QUALITY — unknown leagues are dangerous
-  const league = ((g.league||'').split(' - ').pop()||'').toLowerCase();
-  if (TOP_LEAGUES.some(l => league.includes(l))) s+=12;
-  else if (MID_LEAGUES.some(l => league.includes(l))) s+=6;
-  else s-=8;
+  // FIX 12: LEAGUE QUALITY with better normalization
+  const league = normalizeLeague(g.league);
+  if (league && TOP_LEAGUES.some(l => league.includes(l))) s+=12;
+  else if (league && MID_LEAGUES.some(l => league.includes(l))) s+=6;
+  else if (!league) s-=4;  // unknown/unresolved — mild penalty, not harsh
+  else s-=8;  // known but obscure league
 
-  // ODDS — bookmaker's implied probability is king
+  // ODDS
   const odds = g.odds||1;
   if (odds<=1.05) s+=5;
   else if (odds<=1.10) s+=8;
@@ -1586,7 +1631,7 @@ function safetyScore(g) {
   // TRAP DETECTION
   for (const t of detectTraps(g)) { if (t.severity==='high') s-=20; else if (t.severity==='medium') s-=10; else s-=4; }
 
-  // CONSENSUS — strongest signal when high
+  // CONSENSUS
   const con = getConsensus(g);
   if (con>=6) s+=22; else if (con>=5) s+=18; else if (con>=4) s+=14; else if (con>=3) s+=10; else if (con>=2) s+=5;
 
@@ -1594,14 +1639,14 @@ function safetyScore(g) {
   const mv = oddsMovement(g);
   if (mv.isSharpMoney) s+=10; else if (mv.dropped) s+=4;
 
-  // TIME — prefer games 2+ hours away (more stable info)
+  // TIME — prefer games 2+ hours away
   if (g.estimateStartTime) {
     const hoursUntil = (g.estimateStartTime - Date.now()) / 3600000;
     if (hoursUntil >= 3) s+=3;
     else if (hoursUntil < 1) s-=4;
   }
 
-  // LEARNED ADJUSTMENT — boost/penalize based on user's own history
+  // LEARNED ADJUSTMENT
   const learned = getLearnedRates();
   if (learned) {
     const lowRate = learned.byOddsBand.low;
@@ -1612,70 +1657,67 @@ function safetyScore(g) {
     }
   }
 
-  // EXTERNAL DATA — real form, H2H, and prediction confidence from API-Football
+  // EXTERNAL DATA (API-Football)
   const enrich = getEnrichment(g.eventId);
   if (enrich) {
-    // FORM: Check both teams' recent form
     const hForm = formScore(enrich.homeForm);
     const aForm = formScore(enrich.awayForm);
 
-    // For Double Chance "Home or Draw" — home team form matters most
+    // FIX 1+2+8: Correct Double Chance form analysis using proper pick direction
     if (mkt.includes('double chance')) {
-      if (pick.includes('home') || pick.includes('1x') || pick.includes('x2') === false) {
+      const dcDir = getDCDirection(g.pick);
+      if (dcDir === 'home-draw' || dcDir === 'home-away') {
+        // Home team is backed — check HOME form
         if (hForm !== null) {
-          if (hForm >= 12) s += 10;      // 4+ wins in last 5
-          else if (hForm >= 9) s += 5;   // 3 wins
-          else if (hForm <= 3) s -= 10;  // terrible form
+          if (hForm >= 12) s += 10; else if (hForm >= 9) s += 5; else if (hForm <= 3) s -= 10;
+        }
+      }
+      if (dcDir === 'away-draw' || dcDir === 'home-away') {
+        // Away team is backed — check AWAY form
+        if (aForm !== null) {
+          if (aForm >= 12) s += 10; else if (aForm >= 9) s += 5; else if (aForm <= 3) s -= 10;
         }
       }
     }
 
-    // For Over/Under — use goals stats
+    // Over/Under — goals stats
     if (mkt.includes('over/under') || mkt.includes('total')) {
       const avgGoals = (enrich.homeGoalsFor + enrich.awayGoalsFor) / 2;
       if (pick.includes('over 0.5') && avgGoals >= 1.2) s += 5;
       if (pick.includes('over 1.5') && avgGoals >= 1.5) s += 5;
       if (pick.includes('under 3.5') && avgGoals <= 1.5) s += 5;
-      if (pick.includes('over 2.5') && avgGoals < 1.2) s -= 8;  // low-scoring teams
+      if (pick.includes('over 2.5') && avgGoals < 1.2) s -= 8;
     }
 
-    // PREDICTION CONFIDENCE — API-Football's own analysis
-    // If their predicted winner aligns with our pick, boost confidence
-    const homeConfidence = enrich.homeWinPct || 0;
-    const drawConfidence = enrich.drawPct || 0;
-    const awayConfidence = enrich.awayWinPct || 0;
+    // PREDICTION CONFIDENCE
+    const homeConf = enrich.homeWinPct || 0;
+    const drawConf = enrich.drawPct || 0;
+    const awayConf = enrich.awayWinPct || 0;
 
     if (mkt.includes('double chance')) {
-      const dcPct = pick.includes('home') || pick.includes('1x')
-        ? homeConfidence + drawConfidence
-        : pick.includes('away') || pick.includes('x2')
-          ? awayConfidence + drawConfidence
-          : homeConfidence + awayConfidence;
-      if (dcPct >= 75) s += 8;
-      else if (dcPct >= 60) s += 4;
-      else if (dcPct < 40) s -= 8;
+      const dcDir = getDCDirection(g.pick);
+      let dcPct = 0;
+      if (dcDir === 'home-draw') dcPct = homeConf + drawConf;
+      else if (dcDir === 'away-draw') dcPct = awayConf + drawConf;
+      else if (dcDir === 'home-away') dcPct = homeConf + awayConf;
+      if (dcPct >= 75) s += 8; else if (dcPct >= 60) s += 4; else if (dcPct < 40) s -= 8;
     }
 
-    // H2H — if historically one side dominates
+    // H2H
     const totalH2H = enrich.h2hHomeWins + enrich.h2hAwayWins + enrich.h2hDraws;
-    if (totalH2H >= 3) {
-      if (mkt.includes('double chance')) {
-        const homeH2HPct = (enrich.h2hHomeWins + enrich.h2hDraws) / totalH2H;
-        const awayH2HPct = (enrich.h2hAwayWins + enrich.h2hDraws) / totalH2H;
-        if (pick.includes('home') || pick.includes('1x')) {
-          if (homeH2HPct >= 0.7) s += 6;
-          else if (homeH2HPct < 0.3) s -= 6;
-        } else if (pick.includes('away') || pick.includes('x2')) {
-          if (awayH2HPct >= 0.7) s += 6;
-          else if (awayH2HPct < 0.3) s -= 6;
-        }
+    if (totalH2H >= 3 && mkt.includes('double chance')) {
+      const dcDir = getDCDirection(g.pick);
+      const homeH2HPct = (enrich.h2hHomeWins + enrich.h2hDraws) / totalH2H;
+      const awayH2HPct = (enrich.h2hAwayWins + enrich.h2hDraws) / totalH2H;
+      if (dcDir === 'home-draw') {
+        if (homeH2HPct >= 0.7) s += 6; else if (homeH2HPct < 0.3) s -= 6;
+      } else if (dcDir === 'away-draw') {
+        if (awayH2HPct >= 0.7) s += 6; else if (awayH2HPct < 0.3) s -= 6;
       }
     }
 
-    // GENERAL FORM QUALITY — penalize if both teams in bad form (unpredictable)
-    if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) {
-      s -= 5;  // both teams struggling = volatile match
-    }
+    // Both teams in bad form = volatile
+    if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) s -= 5;
   }
 
   return Math.max(0, Math.min(100, s));
@@ -1693,37 +1735,48 @@ function estimateProb(g) {
   const mkt = (g.market || '').toLowerCase();
   const pick = (g.pick || '').toLowerCase();
 
-  // Start with bookmaker implied probability, remove ~5% margin
-  let prob = Math.min(0.98, (1 / odds) / 0.94);
+  // FIX 3: Exclude live/ended games
+  const status = (g.matchStatus || '').toLowerCase();
+  if (status === 'live' || status === '1h' || status === '2h' || status === 'ht' || status === 'ended') return 0;
 
-  // Market type adjustments (based on historical outperformance data)
+  // FIX 10: Per-market margin stripping (Sportybet margins vary by market)
+  let margin = 0.94; // default 6%
+  if (mkt.includes('over/under') || mkt.includes('total')) margin = 0.95;  // O/U ~5%
+  else if (mkt.includes('double chance')) margin = 0.94;  // DC ~6%
+  else if (mkt === '1x2' || mkt === 'match winner') margin = 0.92;  // 1X2 ~8%
+  else if (mkt.includes('handicap')) margin = 0.93;  // Handicap ~7%
+
+  let prob = Math.min(0.98, (1 / odds) / margin);
+
+  // Market type adjustments
   if (mkt.includes('over/under') || mkt.includes('total')) {
-    if (pick.includes('over 0.5')) prob = Math.min(0.98, prob * 1.04);      // historically 3-4% above implied
+    if (pick.includes('over 0.5')) prob = Math.min(0.98, prob * 1.04);
     else if (pick.includes('over 1.5')) prob = Math.min(0.98, prob * 1.02);
     else if (pick.includes('under 4.5') || pick.includes('under 5.5')) prob = Math.min(0.98, prob * 1.03);
     else if (pick.includes('under 3.5')) prob = Math.min(0.98, prob * 1.01);
-    else if (pick.includes('over 2.5')) prob *= 0.98;   // slight underperformance
+    else if (pick.includes('over 2.5')) prob *= 0.98;
     else if (pick.includes('under 2.5')) prob *= 0.98;
   } else if (mkt.includes('double chance')) {
-    prob = Math.min(0.98, prob * 1.02);  // slight historical outperformance
+    prob = Math.min(0.98, prob * 1.02);
   } else if (mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2')) {
-    prob *= 0.96;  // outright winners underperform implied odds
+    prob *= 0.96;
   } else if (mkt.includes('both teams') || mkt.includes('btts') || mkt.includes('gg')) {
-    prob *= 0.97;  // BTTS slightly underperforms
+    prob *= 0.97;
   } else if (mkt.includes('correct score')) {
-    prob *= 0.85;  // correct score massively underperforms
+    prob *= 0.85;
   } else if (mkt.includes('handicap')) {
     if (pick.includes('0:2') || pick.includes('2:0') || pick.includes('0:3') || pick.includes('3:0')) {
-      prob = Math.min(0.98, prob * 1.02);  // large handicaps outperform
+      prob = Math.min(0.98, prob * 1.02);
     }
   }
 
-  // League quality
-  const league = ((g.league || '').split(' - ').pop() || '').toLowerCase();
-  if (TOP_LEAGUES.some(l => league.includes(l))) prob = Math.min(0.98, prob * 1.01);
-  else if (!MID_LEAGUES.some(l => league.includes(l))) prob *= 0.97;  // unknown league
+  // FIX 12: League quality with proper normalization
+  const league = normalizeLeague(g.league);
+  if (league && TOP_LEAGUES.some(l => league.includes(l))) prob = Math.min(0.98, prob * 1.01);
+  else if (!league) prob *= 0.98;  // unknown — mild penalty
+  else if (!MID_LEAGUES.some(l => league.includes(l))) prob *= 0.97;
 
-  // Consensus — multiple sources agreeing is a real positive signal
+  // Consensus
   const con = getConsensus(g);
   if (con >= 6) prob = Math.min(0.98, prob * 1.05);
   else if (con >= 4) prob = Math.min(0.98, prob * 1.03);
@@ -1734,40 +1787,42 @@ function estimateProb(g) {
   if (mv.isSharpMoney) prob = Math.min(0.98, prob * 1.03);
 
   // Trap detection
-  const traps = detectTraps(g);
-  for (const t of traps) {
+  for (const t of detectTraps(g)) {
     if (t.severity === 'high') prob *= 0.88;
     else if (t.severity === 'medium') prob *= 0.94;
     else prob *= 0.97;
   }
 
-  // Time — imminent games are riskier
+  // Time
   if (g.estimateStartTime) {
     const minsUntil = (g.estimateStartTime - Date.now()) / 60000;
-    if (minsUntil < 20) return 0;  // exclude
+    if (minsUntil < 20) return 0;
     if (minsUntil < 60) prob *= 0.98;
   }
 
-  // Enrichment data
+  // FIX 1+2+8: Enrichment with correct DC direction
   const enrich = getEnrichment(g.eventId);
   if (enrich) {
     const hForm = formScore(enrich.homeForm);
     const aForm = formScore(enrich.awayForm);
 
-    if (mkt.includes('double chance') && hForm !== null) {
-      if (hForm >= 12) prob = Math.min(0.98, prob * 1.04);
-      else if (hForm <= 3) prob *= 0.92;
+    if (mkt.includes('double chance')) {
+      const dcDir = getDCDirection(g.pick);
+      // Use the RELEVANT team's form
+      const relevantForm = (dcDir === 'away-draw') ? aForm : hForm;
+      if (relevantForm !== null) {
+        if (relevantForm >= 12) prob = Math.min(0.98, prob * 1.04);
+        else if (relevantForm <= 3) prob *= 0.92;
+      }
     }
 
-    if ((mkt.includes('over/under') || mkt.includes('total'))) {
+    if (mkt.includes('over/under') || mkt.includes('total')) {
       const avgGoals = (enrich.homeGoalsFor + enrich.awayGoalsFor) / 2;
       if (pick.includes('over 0.5') && avgGoals >= 1.2) prob = Math.min(0.98, prob * 1.02);
       if (pick.includes('over 2.5') && avgGoals < 1.2) prob *= 0.90;
     }
 
-    if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) {
-      prob *= 0.96;  // both teams in bad form = volatile
-    }
+    if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) prob *= 0.96;
   }
 
   return Math.max(0.01, Math.min(0.98, prob));
@@ -1850,8 +1905,10 @@ async function runDiscovery() {
       pendingCount: c.selections.filter(s => s.isWinning === null).length,
     }));
 
-    // Add discovered games to game pool for generation
+    // Register parent-child families, then add to pool
     for (const c of discoveredCodes) {
+      // Mark this code as belonging to its parent's family
+      if (c._parentCode) codeFamily.set(c.code, c._parentCode);
       recordConsensus(c.selections, c.code);
       addToGamePool(c.selections);
     }
@@ -1900,7 +1957,7 @@ async function runDiscoverySilent() {
     const data = await res.json();
     const codes = data.data || [];
     discoveredCodes = codes.map(c => ({
-      code: c.code, source: 'Sportybet Network', sourceUrl: '', events: c.events,
+      code: c.code, _parentCode: c.parentCode, source: 'Sportybet Network', sourceUrl: '', events: c.events,
       totalOdds: c.totalOdds, market: null, date: null, status: 'pending', postedAgo: null,
       validated: true, isValid: true, selections: c.selections,
       wonCount: c.selections.filter(s => s.isWinning === 1).length,
@@ -1908,6 +1965,7 @@ async function runDiscoverySilent() {
       pendingCount: c.selections.filter(s => s.isWinning === null).length,
     }));
     for (const c of discoveredCodes) {
+      if (c._parentCode) codeFamily.set(c.code, c._parentCode);
       recordConsensus(c.selections, c.code);
       addToGamePool(c.selections);
     }
@@ -2001,11 +2059,13 @@ function pickDiversifiedSets(targetOdds) {
    * For low targets (x2): prefers many safe picks (high prob, low odds)
    * For high targets (x20): prefers fewer riskier picks (higher odds, fewer legs)
    */
-  function pickSet(pool, sortMode) {
+  function pickSet(pool, sortMode, minSafety) {
+    const safetyCutoff = minSafety || 0;
     const eligible = pool.filter(g =>
       g.odds >= C.minOdds &&
       g.odds <= C.maxOdds &&
-      g._prob > 0.01
+      g._prob > 0.01 &&
+      g._safety >= safetyCutoff
     );
 
     // Ideal odds per pick: what each pick should contribute to reach target
@@ -2077,24 +2137,23 @@ function pickDiversifiedSets(targetOdds) {
   }
 
   // Strategy A: CONSENSUS — low odds picks backed by most sources
-  // Only picks with consensus 3+ and odds under 1.35 — maximum agreement, minimum risk
   const consensusPool = scored
     .filter(g => g._consensus >= 3 && g.odds <= 1.35 && g.odds >= 1.05)
     .sort((a, b) => b._consensus - a._consensus || b._prob - a._prob);
-  const setA = pickSet(consensusPool.length >= 3 ? consensusPool : scored.filter(g => g._consensus >= 2).sort((a, b) => b._consensus - a._consensus), 'probability');
+  const setA = pickSet(consensusPool.length >= 3 ? consensusPool : scored.filter(g => g._consensus >= 2).sort((a, b) => b._consensus - a._consensus), 'probability', C.safeMin);
   if (setA.length) { setA._strategy = 'consensus'; allSets.push(setA); }
 
   // Strategy B: SAFE — balance odds contribution with probability
-  const setB = pickSet(scored, 'efficiency');
+  const setB = pickSet(scored, 'efficiency', C.safeMin);
   if (setB.length) { setB._strategy = 'safe'; allSets.push(setB); }
 
   // Strategy C: VALUE — consensus-backed, highest probability picks
   const valuePool = scored.filter(g => g._consensus >= 2);
-  let setC = pickSet(valuePool.length >= 3 ? valuePool : scored, 'probability');
+  let setC = pickSet(valuePool.length >= 3 ? valuePool : scored, 'probability', C.valueMin);
   if (setC.length) { setC._strategy = 'value'; allSets.push(setC); }
 
   // Strategy D: HIGH-RISK — fewer legs, higher individual odds
-  const setD = pickSet(scored, 'odds');
+  const setD = pickSet(scored, 'odds', C.riskMin);
   if (setD.length) { setD._strategy = 'high-risk'; allSets.push(setD); }
 
   return allSets;
