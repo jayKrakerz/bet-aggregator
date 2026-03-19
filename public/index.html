@@ -1644,6 +1644,8 @@ function safetyScore(g) {
     const hoursUntil = (g.estimateStartTime - Date.now()) / 3600000;
     if (hoursUntil >= 3) s+=3;
     else if (hoursUntil < 1) s-=4;
+  } else {
+    s-=2; // no timestamp — can't verify it hasn't started
   }
 
   // LEARNED ADJUSTMENT
@@ -1798,6 +1800,8 @@ function estimateProb(g) {
     const minsUntil = (g.estimateStartTime - Date.now()) / 60000;
     if (minsUntil < 20) return 0;
     if (minsUntil < 60) prob *= 0.98;
+  } else {
+    prob *= 0.99; // no timestamp — mild uncertainty
   }
 
   // FIX 1+2+8: Enrichment with correct DC direction
@@ -1808,11 +1812,16 @@ function estimateProb(g) {
 
     if (mkt.includes('double chance')) {
       const dcDir = getDCDirection(g.pick);
-      // Use the RELEVANT team's form
-      const relevantForm = (dcDir === 'away-draw') ? aForm : hForm;
-      if (relevantForm !== null) {
-        if (relevantForm >= 12) prob = Math.min(0.98, prob * 1.04);
-        else if (relevantForm <= 3) prob *= 0.92;
+      if (dcDir === 'home-draw') {
+        if (hForm !== null) { if (hForm >= 12) prob = Math.min(0.98, prob * 1.04); else if (hForm <= 3) prob *= 0.92; }
+      } else if (dcDir === 'away-draw') {
+        if (aForm !== null) { if (aForm >= 12) prob = Math.min(0.98, prob * 1.04); else if (aForm <= 3) prob *= 0.92; }
+      } else if (dcDir === 'home-away') {
+        // Both teams matter — check both, average the effect
+        if (hForm !== null && aForm !== null) {
+          const avgForm = (hForm + aForm) / 2;
+          if (avgForm >= 12) prob = Math.min(0.98, prob * 1.03); else if (avgForm <= 3) prob *= 0.93;
+        }
       }
     }
 
@@ -2040,7 +2049,7 @@ function pickDiversifiedSets(targetOdds) {
   const C = getConstraints(targetOdds);
 
   function getLeagueKey(g) {
-    return ((g.league||'').split(' - ').pop()||'unknown').toLowerCase().trim();
+    return normalizeLeague(g.league) || 'unknown';
   }
 
   function getTeams(g) {
