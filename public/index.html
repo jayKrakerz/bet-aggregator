@@ -1186,7 +1186,7 @@ function createCodeCard(c) {
   };
 
   card.onclick = e => {
-    if (e.target.closest('.code-copy') || e.target.closest('.sel-check') || e.target.closest('.sel-row')) return;
+    if (e.target.closest('.code-copy') || e.target.closest('.sel-check') || e.target.closest('.sel-row') || e.target.closest('.show-more-btn') || e.target.closest('.show-less-btn')) return;
     if (isMobile()) {
       openDrawer(c.code, c);
     } else {
