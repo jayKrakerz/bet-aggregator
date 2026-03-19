@@ -203,13 +203,13 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     const seeds = body.seeds
       .map(s => String(s).trim().toUpperCase())
       .filter(s => /^[A-Z0-9]{6}$/.test(s))
-      .slice(0, 10); // max 10 seeds per request
+      .slice(0, 50); // max 50 seeds per request
 
     if (!seeds.length) {
       return reply.status(400).send({ error: 'No valid 6-character codes' });
     }
 
-    const maxResults = Math.min(body.maxResults || 15, 30);
+    const maxResults = Math.min(body.maxResults || 15, 200);
     const discovered = await discoverCodes(seeds, maxResults);
 
     return {
