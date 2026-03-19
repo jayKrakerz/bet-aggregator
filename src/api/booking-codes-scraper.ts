@@ -314,6 +314,85 @@ async function scrapeConvertBetCodes(): Promise<BookingCode[]> {
   }
 }
 
+/** Scrape betloy.com — free converted codes for Sportybet */
+async function scrapeBetloy(): Promise<BookingCode[]> {
+  const allCodes: BookingCode[] = [];
+  const regions = ['Sportybet%20Nigeria', 'Sportybet%20Ghana', 'Sportybet%20Kenya'];
+
+  for (const region of regions) {
+    try {
+      const res = await fetch(`https://betloy.com/free-betcodes?bookie=${region}`, {
+        headers: HEADERS,
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const $ = cheerio.load(html);
+
+      // Each code card: <div class="col-lg-4 col-md-6 code-card" data-destination-bookie="Sportybet Nigeria">
+      $('div.code-card').each((_, card) => {
+        const destBookie = $(card).attr('data-destination-bookie') || '';
+        if (!destBookie.toLowerCase().includes('sportybet')) return;
+
+        // The second .site-info contains the Sportybet code
+        const siteInfos = $(card).find('.site-info');
+        if (siteInfos.length < 2) return;
+
+        const sportyInfo = $(siteInfos[1]!);
+        // Code is in h2 or h1 inside the second site-info
+        const codeText = (sportyInfo.find('h2').text().trim() || sportyInfo.find('h1').text().trim()).toUpperCase();
+        if (!codeText || !isValidCode(codeText)) return;
+        if (allCodes.some(c => c.code === codeText)) return;
+
+        // Odds from the spans
+        const oddsText = sportyInfo.find('span').first().text().trim();
+        const oddsMatch = oddsText.match(/([\d,.]+)\s*odds/i);
+        const odds = oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null;
+
+        // Events count
+        const eventsText = sportyInfo.text();
+        const eventsMatch = eventsText.match(/(\d{1,3})\s*events?/i);
+        const events = eventsMatch ? parseInt(eventsMatch[1]!) : null;
+
+        // Source bookmaker (first site-info)
+        const sourceInfo = $(siteInfos[0]!);
+        const sourceOddsText = sourceInfo.find('span').first().text().trim();
+        const sourceCode = (sourceInfo.find('h1').text().trim() || sourceInfo.find('h2').text().trim());
+
+        // Timestamp
+        const timeText = $(card).find('.gen-time span').text().trim() || null;
+
+        // Like/dislike for quality signal
+        const likes = parseInt($(card).find('.like-count').text().trim()) || 0;
+        const dislikes = parseInt($(card).find('.dislike-count').text().trim()) || 0;
+
+        allCodes.push({
+          code: codeText,
+          source: `Betloy (${destBookie})`,
+          sourceUrl: `https://betloy.com/free-betcodes?bookie=${region}`,
+          events,
+          totalOdds: odds,
+          market: null,
+          date: todayLocal(),
+          status: 'pending',
+          postedAgo: timeText,
+          validated: false,
+          isValid: false,
+          selections: [],
+          wonCount: 0,
+          lostCount: 0,
+          pendingCount: 0,
+        });
+      });
+    } catch (err) {
+      logger.warn({ err, region }, 'Failed to scrape Betloy');
+    }
+  }
+
+  logger.info({ count: allCodes.length }, 'Betloy: codes scraped');
+  return allCodes;
+}
+
 // Sportybet country codes that have a working Code Hub API
 const SPORTYBET_COUNTRIES = [
   { code: 'ng', name: 'Nigeria' },
@@ -532,12 +611,13 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
     return codesCache;
   }
 
-  const [sportPremi, paqBet, convertBet, social, codeHub] = await Promise.allSettled([
+  const [sportPremi, paqBet, convertBet, social, codeHub, betloy] = await Promise.allSettled([
     scrapeSportPremi(),
     scrapePaqBet(),
     scrapeConvertBetCodes(),
     scrapeSocialMediaCodes(),
     scrapeSportyBetCodeHub(),
+    scrapeBetloy(),
   ]);
 
   const allCodes: BookingCode[] = [];
@@ -546,6 +626,7 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
   if (convertBet.status === 'fulfilled') allCodes.push(...convertBet.value);
   if (social.status === 'fulfilled') allCodes.push(...social.value);
   if (codeHub.status === 'fulfilled') allCodes.push(...codeHub.value);
+  if (betloy.status === 'fulfilled') allCodes.push(...betloy.value);
 
   // Deduplicate
   const byCode = new Map<string, BookingCode>();
