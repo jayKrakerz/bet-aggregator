@@ -596,7 +596,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
         </div>
         <div style="flex:1">
           <div style="font-size:15px;font-weight:700">Generate Code</div>
-          <div style="font-size:12px;color:var(--text-3)">3 strategies: Safe, Value, High-Risk</div>
+          <div style="font-size:12px;color:var(--text-3)">4 strategies: Consensus, Safe, Value, High-Risk</div>
         </div>
         <span class="sec-badge" id="pool-count">--</span>
       </div>
@@ -2076,18 +2076,26 @@ function pickDiversifiedSets(targetOdds) {
     return picked;
   }
 
-  // Strategy A: SAFE — balance odds contribution with probability
-  const setA = pickSet(scored, 'efficiency');
-  if (setA.length) { setA._strategy = 'safe'; allSets.push(setA); }
+  // Strategy A: CONSENSUS — low odds picks backed by most sources
+  // Only picks with consensus 3+ and odds under 1.35 — maximum agreement, minimum risk
+  const consensusPool = scored
+    .filter(g => g._consensus >= 3 && g.odds <= 1.35 && g.odds >= 1.05)
+    .sort((a, b) => b._consensus - a._consensus || b._prob - a._prob);
+  const setA = pickSet(consensusPool.length >= 3 ? consensusPool : scored.filter(g => g._consensus >= 2).sort((a, b) => b._consensus - a._consensus), 'probability');
+  if (setA.length) { setA._strategy = 'consensus'; allSets.push(setA); }
 
-  // Strategy B: VALUE — consensus-backed, highest probability picks
-  const consensusPool = scored.filter(g => g._consensus >= 2);
-  let setB = pickSet(consensusPool.length >= 3 ? consensusPool : scored, 'probability');
-  if (setB.length) { setB._strategy = 'value'; allSets.push(setB); }
+  // Strategy B: SAFE — balance odds contribution with probability
+  const setB = pickSet(scored, 'efficiency');
+  if (setB.length) { setB._strategy = 'safe'; allSets.push(setB); }
 
-  // Strategy C: HIGH-RISK — fewer legs, higher individual odds
-  const setC = pickSet(scored, 'odds');
-  if (setC.length) { setC._strategy = 'high-risk'; allSets.push(setC); }
+  // Strategy C: VALUE — consensus-backed, highest probability picks
+  const valuePool = scored.filter(g => g._consensus >= 2);
+  let setC = pickSet(valuePool.length >= 3 ? valuePool : scored, 'probability');
+  if (setC.length) { setC._strategy = 'value'; allSets.push(setC); }
+
+  // Strategy D: HIGH-RISK — fewer legs, higher individual odds
+  const setD = pickSet(scored, 'odds');
+  if (setD.length) { setD._strategy = 'high-risk'; allSets.push(setD); }
 
   return allSets;
 }
@@ -2161,7 +2169,7 @@ async function generateSafeCode(targetOdds, btn) {
 
   const loading = document.createElement('div');
   loading.className = 'gen-loading';
-  const names = ['Safe','Value','High-Risk'];
+  const names = ['Consensus','Safe','Value','High-Risk'];
   loading.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px"><div class="spinner"></div><div style="font-size:14px;font-weight:700;color:var(--blue)">Generating ${sets.length} codes...</div></div><div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap">${sets.map((_,i) => `<span id="gen-step-${i}" style="font-size:11px;padding:4px 10px;border-radius:20px;border:1px solid rgba(59,130,246,0.2);color:var(--blue);background:var(--blue-soft)">${names[i]||'Code '+(i+1)}</span>`).join('')}</div>`;
   resultsDiv.prepend(loading);
   loading.scrollIntoView({behavior:'smooth',block:'start'});
@@ -2196,7 +2204,7 @@ async function generateSafeCode(targetOdds, btn) {
       codeHistory.push({code, strategy, targetOdds, actualOdds:Math.round(actualOdds*100)/100, gamesCount:picked.length, createdAt:new Date().toISOString(), status:'pending', wonCount:0, lostCount:0, pendingCount:picked.length, lastChecked:null});
       saveCHistory();
 
-      const sc = {safe:{border:'rgba(34,197,94,0.25)',bg:'var(--green-soft)',text:'var(--green)'}, value:{border:'rgba(59,130,246,0.25)',bg:'var(--blue-soft)',text:'var(--blue)'}, 'high-risk':{border:'rgba(168,85,247,0.25)',bg:'var(--purple-soft)',text:'var(--purple)'}}[strategy] || {border:'var(--border)',bg:'transparent',text:'var(--text)'};
+      const sc = {consensus:{border:'rgba(247,183,49,0.3)',bg:'var(--amber-soft)',text:'var(--amber)'}, safe:{border:'rgba(34,197,94,0.25)',bg:'var(--green-soft)',text:'var(--green)'}, value:{border:'rgba(59,130,246,0.25)',bg:'var(--blue-soft)',text:'var(--blue)'}, 'high-risk':{border:'rgba(168,85,247,0.25)',bg:'var(--purple-soft)',text:'var(--purple)'}}[strategy] || {border:'var(--border)',bg:'transparent',text:'var(--text)'};
 
       // Build reason tags per pick
       const reasonsHTML = picked.map(g => {
