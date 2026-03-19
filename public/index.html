@@ -297,28 +297,32 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .rollover-stat{display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:var(--r-xs);border:1px solid var(--border);font-size:13px;margin-bottom:6px}
 .rollover-stat b{font-variant-numeric:tabular-nums}
 
-/* ===== VIRTUAL PREDICTOR ===== */
-.vp-team{display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);margin-bottom:6px}
-.vp-team img{width:32px;height:32px;border-radius:6px;object-fit:contain}
-.vp-team-name{font-size:15px;font-weight:700;flex:1}
-.vp-team-stat{font-size:12px;color:var(--text-2);text-align:right}
-.vp-vs{text-align:center;font-size:12px;font-weight:700;color:var(--text-3);padding:4px 0}
-.vp-prediction{padding:20px;border-radius:var(--r-sm);text-align:center;margin:14px 0}
-.vp-prediction .pick{font-size:20px;font-weight:800}
-.vp-prediction .conf{font-size:14px;font-weight:600;margin-top:4px}
-.vp-prediction .reason{font-size:12px;margin-top:6px;opacity:0.8;line-height:1.5}
-.vp-bets{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:14px 0}
-.vp-bet{padding:12px;border-radius:var(--r-xs);border:1px solid var(--border);text-align:center;font-size:13px}
-.vp-bet .market{font-weight:700;margin-bottom:2px}
-.vp-bet .conf-bar{height:4px;border-radius:2px;background:rgba(255,255,255,0.08);margin-top:6px;overflow:hidden}
-.vp-bet .conf-fill{height:100%;border-radius:2px}
-.vp-form{display:flex;gap:3px}
-.vp-form span{width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff}
-.vp-form .W{background:var(--green)}
-.vp-form .D{background:var(--text-3)}
-.vp-form .L{background:var(--red)}
-textarea.vp-input{width:100%;min-height:80px;padding:10px;font-size:12px;font-family:'SF Mono','Fira Code',monospace;border:1px solid var(--border);border-radius:var(--r-xs);background:var(--bg-subtle);color:var(--text);outline:none;resize:vertical}
-textarea.vp-input:focus{border-color:var(--blue)}
+/* ===== SPIN PREDICTOR ===== */
+.spin-bottle{width:120px;height:120px;margin:0 auto 16px;position:relative}
+.spin-wheel{width:120px;height:120px;border-radius:50%;background:conic-gradient(var(--green) 0deg 150deg,var(--amber) 150deg 210deg,var(--red) 210deg 240deg,var(--amber) 240deg 330deg,var(--green) 330deg 360deg);border:3px solid rgba(255,255,255,0.15);position:relative;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.spin-wheel::after{content:'';width:4px;height:44px;background:#fff;border-radius:2px;position:absolute;box-shadow:0 0 8px rgba(255,255,255,0.5)}
+.spin-result-row{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:12px}
+.spin-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0}
+.spin-dot.up{background:var(--green)}
+.spin-dot.down{background:var(--amber)}
+.spin-dot.mid{background:var(--red)}
+.spin-predict{text-align:center;padding:20px;border-radius:var(--r-sm);margin-bottom:14px;font-size:18px;font-weight:800}
+.spin-predict.up{background:var(--green-soft);color:var(--green);border:2px solid rgba(52,212,114,0.3)}
+.spin-predict.down{background:var(--amber-soft);color:var(--amber);border:2px solid rgba(247,183,49,0.3)}
+.spin-predict.skip{background:var(--red-soft);color:var(--red);border:2px solid rgba(240,96,96,0.3)}
+.spin-stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.spin-stat{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px;text-align:center}
+.spin-stat .num{font-size:20px;font-weight:800}
+.spin-stat .label{font-size:10px;color:var(--text-3);text-transform:uppercase;margin-top:2px}
+.spin-input-row{display:flex;gap:8px;margin-bottom:14px}
+.spin-input-btn{flex:1;padding:14px;font-size:15px;font-weight:800;border-radius:var(--r-xs);cursor:pointer;border:2px solid;font-family:inherit;transition:all .15s var(--ease-out);touch-action:manipulation}
+.spin-input-btn:active{transform:scale(0.96)}
+.spin-input-btn.up{background:var(--green-soft);color:var(--green);border-color:rgba(52,212,114,0.3)}
+.spin-input-btn.up:hover{background:rgba(52,212,114,0.2)}
+.spin-input-btn.mid{background:var(--red-soft);color:var(--red);border-color:rgba(240,96,96,0.3)}
+.spin-input-btn.mid:hover{background:rgba(240,96,96,0.2)}
+.spin-input-btn.down{background:var(--amber-soft);color:var(--amber);border-color:rgba(247,183,49,0.3)}
+.spin-input-btn.down:hover{background:rgba(247,183,49,0.2)}
 
 /* ===== FOCUS / A11Y ===== */
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
@@ -457,7 +461,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <button class="chip active" data-page="codes">Codes</button>
       <button class="chip" data-page="generate">Generate</button>
       <button class="chip" data-page="tools">Tools</button>
-      <button class="chip" data-page="spin">Virtual</button>
+      <button class="chip" data-page="spin">Spin</button>
       <button class="chip" data-page="history">History</button>
     </div>
     <div class="hdr-status" id="health">
@@ -815,54 +819,64 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   </div>
 </div>
 
-<!-- ===== PAGE: VIRTUAL PREDICTOR ===== -->
+<!-- ===== PAGE: SPIN ===== -->
 <div class="page" id="page-spin">
 
-  <div class="card">
-    <div style="font-size:17px;font-weight:800;margin-bottom:4px">Virtual Match Predictor</div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Paste match stats JSON, enter odds, get EV-based recommendations</div>
+  <div class="card" style="text-align:center">
+    <div style="font-size:17px;font-weight:800;margin-bottom:4px">Spin da' Bottle</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">Track results and get predictions based on patterns</div>
 
-    <textarea class="vp-input" id="vp-match-input" placeholder='Paste match stats JSON here (homeTeam, awayTeam, headToHead)...'></textarea>
-
-    <button class="btn btn-blue" id="vp-predict-btn" style="width:100%;margin-top:10px;padding:14px;font-size:15px">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      Predict Match
-    </button>
-  </div>
-
-  <!-- Results -->
-  <div id="vp-result" style="display:none">
-
-    <!-- Teams -->
-    <div id="vp-teams"></div>
+    <!-- Visual wheel -->
+    <div class="spin-bottle">
+      <div class="spin-wheel"></div>
+    </div>
 
     <!-- Prediction -->
-    <div id="vp-prediction"></div>
-
-    <!-- Recommended bets -->
-    <div class="card">
-      <div style="font-size:14px;font-weight:700;margin-bottom:10px">All Markets</div>
-      <div id="vp-bets" class="vp-bets"></div>
+    <div class="spin-predict up" id="spin-prediction">
+      Record at least 10 spins to get predictions
     </div>
 
-    <!-- Analysis -->
-    <div class="card">
-      <div style="font-size:14px;font-weight:700;margin-bottom:10px">Analysis</div>
-      <div id="vp-analysis" style="font-size:13px;color:var(--text-2);line-height:1.8"></div>
+    <!-- Input buttons -->
+    <div style="font-size:11px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;font-weight:700;letter-spacing:.5px">Record last result:</div>
+    <div class="spin-input-row">
+      <button class="spin-input-btn up" onclick="recordSpin('up')">UP</button>
+      <button class="spin-input-btn mid" onclick="recordSpin('mid')">MID</button>
+      <button class="spin-input-btn down" onclick="recordSpin('down')">DOWN</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="undoSpin()" style="margin-bottom:10px">Undo last</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="spin-stat-grid" id="spin-stats">
+    <div class="spin-stat"><div class="num" style="color:var(--green)" id="sp-up-pct">--</div><div class="label">UP %</div></div>
+    <div class="spin-stat"><div class="num" style="color:var(--red)" id="sp-mid-pct">--</div><div class="label">MID %</div></div>
+    <div class="spin-stat"><div class="num" style="color:var(--amber)" id="sp-down-pct">--</div><div class="label">DOWN %</div></div>
+  </div>
+
+  <!-- Streak info -->
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:10px">Pattern Analysis</div>
+    <div id="spin-analysis" style="font-size:13px;color:var(--text-2);line-height:1.8">Record spins to see patterns...</div>
+  </div>
+
+  <!-- History dots -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span style="font-size:14px;font-weight:700">History</span>
+      <span style="font-size:12px;color:var(--text-3)" id="spin-total">0 spins</span>
+    </div>
+    <div class="spin-result-row" id="spin-history"></div>
+    <div style="margin-top:10px;text-align:right">
+      <button class="btn btn-red btn-sm" onclick="if(confirm('Clear all spin history?')){spinHistory=[];saveSpinHistory();updateSpinUI();}">Clear</button>
     </div>
   </div>
 
-  <!-- League table (optional) -->
-  <div class="collapse" style="margin-top:14px">
-    <div class="collapse-head" onclick="this.parentElement.classList.toggle('open')">
-      <span style="font-size:14px;font-weight:700;flex:1">Load League Table (optional)</span>
-      <span class="arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+  <!-- Bankroll strategy -->
+  <div class="card">
+    <div style="font-size:14px;font-weight:700;margin-bottom:10px">Staking Strategy</div>
+    <div id="spin-staking" style="font-size:13px;color:var(--text-2);line-height:1.8">
+      Record spins to get staking advice...
     </div>
-    <div class="collapse-body"><div class="collapse-inner">
-      <textarea class="vp-input" id="vp-league-input" placeholder='Paste league table JSON here (optional — improves predictions)...' style="min-height:60px"></textarea>
-      <button class="btn btn-ghost btn-sm" onclick="loadLeagueTable()" style="margin-top:8px">Load Table</button>
-      <div id="vp-league-status" style="font-size:12px;color:var(--text-3);margin-top:6px"></div>
-    </div></div>
   </div>
 </div>
 
@@ -883,8 +897,8 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     Tools
   </button>
   <button class="nav-btn" data-page="spin">
-    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></span>
-    Virtual
+    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/><circle cx="12" cy="12" r="3"/></svg></span>
+    Spin
   </button>
   <button class="nav-btn" data-page="history">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
@@ -2811,218 +2825,229 @@ document.getElementById('rv-target').onchange = updateRolloverUI;
 // Init rollover UI
 updateRolloverUI();
 
-// ===== VIRTUAL MATCH PREDICTOR =====
-let vpLeagueData = null;
+// ===== SPIN DA BOTTLE PREDICTOR =====
+let spinHistory = [];
+try { spinHistory = JSON.parse(localStorage.getItem('spinHistory') || '[]'); } catch { spinHistory = []; }
+function saveSpinHistory() { if (spinHistory.length > 500) spinHistory = spinHistory.slice(-500); localStorage.setItem('spinHistory', JSON.stringify(spinHistory)); }
 
-function loadLeagueTable() {
-  try {
-    const raw = document.getElementById('vp-league-input').value.trim();
-    const data = JSON.parse(raw);
-    vpLeagueData = data;
-    const count = (data.leagues || []).reduce((s, l) => s + (l.values || []).length, 0);
-    document.getElementById('vp-league-status').innerHTML = '<span style="color:var(--green)">' + (data.leagues || []).length + ' leagues, ' + count + ' teams loaded</span>';
-  } catch {
-    document.getElementById('vp-league-status').innerHTML = '<span style="color:var(--red)">Invalid JSON</span>';
-  }
+function recordSpin(result) {
+  spinHistory.push({ result, ts: Date.now() });
+  saveSpinHistory();
+  updateSpinUI();
 }
 
-function getFormString(recentMatches, teamId) {
-  if (!recentMatches || !recentMatches.length) return '';
-  return recentMatches.map(m => {
-    const isHome = m.homeTeamId === teamId;
-    const scored = isHome ? m.homeScore : m.awayScore;
-    const conceded = isHome ? m.awayScore : m.homeScore;
-    if (scored > conceded) return 'W';
-    if (scored === conceded) return 'D';
-    return 'L';
-  }).join('');
+function undoSpin() {
+  if (!spinHistory.length) return;
+  spinHistory.pop();
+  saveSpinHistory();
+  updateSpinUI();
 }
 
-function predictVirtualMatch(data) {
-  const home = data.homeTeam;
-  const away = data.awayTeam;
-  const h2h = data.headToHead;
+function getSpinStats() {
+  const total = spinHistory.length;
+  if (!total) return { total: 0, up: 0, down: 0, mid: 0, upPct: 0, downPct: 0, midPct: 0, streak: '', streakLen: 0, lastN: [] };
+  const up = spinHistory.filter(s => s.result === 'up').length;
+  const down = spinHistory.filter(s => s.result === 'down').length;
+  const mid = spinHistory.filter(s => s.result === 'mid').length;
 
-  const reasons = [];
-  let homeScore = 50; // start neutral
-
-  // 1. Sportybet's own probability (strongest signal — the game engine uses this)
-  const probGap = (home.probability || 50) - (away.probability || 50);
-  homeScore += probGap * 0.5;
-  if (Math.abs(probGap) >= 30) reasons.push('Probability gap: ' + home.probability + '% vs ' + away.probability + '%');
-
-  // 2. Form rating
-  const formGap = (home.form || 50) - (away.form || 50);
-  homeScore += formGap * 0.2;
-  if (Math.abs(formGap) >= 30) reasons.push('Form: ' + home.teamName + ' ' + home.form + ' vs ' + away.teamName + ' ' + away.form);
-
-  // 3. League position (rank)
-  const rankGap = (away.rank || 10) - (home.rank || 10); // lower rank = better
-  homeScore += rankGap * 1.5;
-  if (Math.abs(rankGap) >= 5) reasons.push('Rank: #' + home.rank + ' vs #' + away.rank);
-
-  // 4. Home advantage — home team scores more at home
-  const homeGoalAdv = (home.homeAvgScore || 0) - (away.awayAvgScore || 0);
-  homeScore += homeGoalAdv * 8;
-  if (homeGoalAdv > 0.5) reasons.push(home.teamName + ' home avg ' + home.homeAvgScore + ' vs ' + away.teamName + ' away avg ' + away.awayAvgScore);
-
-  // 5. Recent form (W/D/L from last 5)
-  const homeForm = getFormString(home.recentMatches, home.teamId);
-  const awayForm = getFormString(away.recentMatches, away.teamId);
-  const homeWins = (homeForm.match(/W/g) || []).length;
-  const awayWins = (awayForm.match(/W/g) || []).length;
-  const homeLosses = (homeForm.match(/L/g) || []).length;
-  const awayLosses = (awayForm.match(/L/g) || []).length;
-  homeScore += (homeWins - homeLosses) * 3;
-  homeScore -= (awayWins - awayLosses) * 3;
-  reasons.push(home.teamName + ' form: ' + homeForm + ' | ' + away.teamName + ' form: ' + awayForm);
-
-  // 6. Head to head
-  if (h2h && h2h.matches && h2h.matches.length > 0) {
-    const h2hAdv = (h2h.homeTeamWins || 0) - (h2h.awayTeamWins || 0);
-    homeScore += h2hAdv * 5;
-    reasons.push('H2H: ' + home.teamName + ' ' + h2h.homeTeamWins + 'W ' + h2h.draws + 'D ' + h2h.awayTeamWins + 'L');
+  // Current streak
+  let streakResult = spinHistory[total - 1].result;
+  let streakLen = 0;
+  for (let i = total - 1; i >= 0; i--) {
+    if (spinHistory[i].result === streakResult) streakLen++;
+    else break;
   }
 
-  // 7. Average points per game
-  const ptsGap = (home.avgPoints || 1) - (away.avgPoints || 1);
-  homeScore += ptsGap * 8;
-
-  // 8. Trend
-  if (vpLeagueData) {
-    for (const league of vpLeagueData.leagues || []) {
-      const ht = (league.values || []).find(t => t.teamId === home.teamId);
-      const at = (league.values || []).find(t => t.teamId === away.teamId);
-      if (ht && ht.trend === '+') homeScore += 3;
-      if (ht && ht.trend === '-') homeScore -= 3;
-      if (at && at.trend === '+') homeScore -= 3;
-      if (at && at.trend === '-') homeScore += 3;
-    }
-  }
-
-  // Clamp and convert to probabilities
-  homeScore = Math.max(10, Math.min(90, homeScore));
-  const drawChance = Math.max(15, 35 - Math.abs(homeScore - 50) * 0.5);
-  const remaining = 100 - drawChance;
-  const homeWinPct = Math.round((homeScore / 100) * remaining);
-  const awayWinPct = remaining - homeWinPct;
-
-  // Goals prediction
-  const expectedHomeGoals = home.homeAvgScore || home.overallAvgScore || 1;
-  const expectedAwayGoals = away.awayAvgScore || away.overallAvgScore || 0.8;
-  const totalExpectedGoals = expectedHomeGoals + expectedAwayGoals;
-
-  // Generate bet recommendations
-  const bets = [];
-
-  // 1X2
-  if (homeWinPct >= 45) bets.push({ market: home.teamName + ' Win', confidence: homeWinPct, color: 'var(--green)' });
-  if (awayWinPct >= 45) bets.push({ market: away.teamName + ' Win', confidence: awayWinPct, color: 'var(--green)' });
-
-  // Double Chance
-  const homeDraw = homeWinPct + Math.round(drawChance);
-  const awayDraw = awayWinPct + Math.round(drawChance);
-  if (homeDraw >= 55) bets.push({ market: home.teamName + ' or Draw', confidence: homeDraw, color: 'var(--blue)' });
-  if (awayDraw >= 55) bets.push({ market: away.teamName + ' or Draw', confidence: awayDraw, color: 'var(--blue)' });
-
-  // Over/Under
-  if (totalExpectedGoals >= 2.0) bets.push({ market: 'Over 1.5 Goals', confidence: Math.min(85, Math.round(totalExpectedGoals * 35)), color: 'var(--amber)' });
-  if (totalExpectedGoals >= 2.8) bets.push({ market: 'Over 2.5 Goals', confidence: Math.min(75, Math.round(totalExpectedGoals * 22)), color: 'var(--amber)' });
-  if (totalExpectedGoals < 2.5) bets.push({ market: 'Under 2.5 Goals', confidence: Math.min(75, Math.round((4 - totalExpectedGoals) * 25)), color: 'var(--purple)' });
-  if (totalExpectedGoals < 3.5) bets.push({ market: 'Under 3.5 Goals', confidence: Math.min(85, Math.round((5 - totalExpectedGoals) * 20)), color: 'var(--purple)' });
-
-  // Sort bets by confidence
-  bets.sort((a, b) => b.confidence - a.confidence);
-
-  // Main prediction
-  let mainPick, mainConf, mainColor;
-  if (homeWinPct >= awayWinPct + 15) {
-    mainPick = home.teamName + ' Win'; mainConf = homeWinPct; mainColor = 'var(--green)';
-  } else if (awayWinPct >= homeWinPct + 15) {
-    mainPick = away.teamName + ' Win'; mainConf = awayWinPct; mainColor = 'var(--green)';
-  } else if (homeWinPct > awayWinPct) {
-    mainPick = home.teamName + ' or Draw'; mainConf = homeDraw; mainColor = 'var(--blue)';
-  } else {
-    mainPick = away.teamName + ' or Draw'; mainConf = awayDraw; mainColor = 'var(--blue)';
-  }
+  // Last 20 results
+  const lastN = spinHistory.slice(-20).map(s => s.result);
 
   return {
-    home, away, h2h,
-    homeWinPct, drawPct: Math.round(drawChance), awayWinPct,
-    mainPick, mainConf, mainColor,
-    bets: bets.slice(0, 6),
-    reasons,
-    homeForm, awayForm,
-    totalExpectedGoals: Math.round(totalExpectedGoals * 10) / 10,
+    total, up, down, mid,
+    upPct: Math.round((up / total) * 100),
+    downPct: Math.round((down / total) * 100),
+    midPct: Math.round((mid / total) * 100),
+    streak: streakResult,
+    streakLen,
+    lastN,
   };
 }
 
-document.getElementById('vp-predict-btn').onclick = () => {
-  try {
-    const raw = document.getElementById('vp-match-input').value.trim();
-    const data = JSON.parse(raw);
-    if (!data.homeTeam || !data.awayTeam) throw new Error('Missing homeTeam/awayTeam');
+/**
+ * PREDICTION ENGINE for Spin da' Bottle
+ *
+ * Virtual games use PRNGs with forced distribution balancing.
+ * After a long streak, the opposite becomes more likely.
+ * After MIDDLE, the game tends to "compensate" with the underrepresented side.
+ *
+ * Strategy:
+ * 1. Track UP/DOWN distribution — bet on the underrepresented side
+ * 2. After 3+ streak, bet against the streak
+ * 3. After MIDDLE, bet on whichever side has fewer recent results
+ * 4. If no clear signal, skip (don't bet)
+ */
+function predictNextSpin() {
+  const stats = getSpinStats();
+  if (stats.total < 10) return { pick: 'wait', confidence: 0, reason: 'Need at least 10 spins to analyze patterns' };
 
-    const pred = predictVirtualMatch(data);
-    const resultEl = document.getElementById('vp-result');
-    resultEl.style.display = 'block';
+  let pick = 'skip';
+  let confidence = 0;
+  let reasons = [];
 
-    // Teams display
-    document.getElementById('vp-teams').innerHTML = `
-      <div class="vp-team">
-        <img src="${esc(pred.home.teamLogoUrl || '')}" alt="" onerror="this.style.display='none'">
-        <div class="vp-team-name">${esc(pred.home.teamName)} <span style="font-size:11px;color:var(--text-3)">(Home)</span></div>
-        <div class="vp-team-stat">
-          <div>Rank #${pred.home.rank} | Form ${pred.home.form} | Prob ${pred.home.probability}%</div>
-          <div class="vp-form">${pred.homeForm.split('').map(r => '<span class="'+r+'">'+r+'</span>').join('')}</div>
-        </div>
-      </div>
-      <div class="vp-vs">VS</div>
-      <div class="vp-team">
-        <img src="${esc(pred.away.teamLogoUrl || '')}" alt="" onerror="this.style.display='none'">
-        <div class="vp-team-name">${esc(pred.away.teamName)} <span style="font-size:11px;color:var(--text-3)">(Away)</span></div>
-        <div class="vp-team-stat">
-          <div>Rank #${pred.away.rank} | Form ${pred.away.form} | Prob ${pred.away.probability}%</div>
-          <div class="vp-form">${pred.awayForm.split('').map(r => '<span class="'+r+'">'+r+'</span>').join('')}</div>
-        </div>
-      </div>
-    `;
+  const last = stats.lastN;
+  const recent20Up = last.filter(r => r === 'up').length;
+  const recent20Down = last.filter(r => r === 'down').length;
+  const recent20Mid = last.filter(r => r === 'mid').length;
 
-    // Main prediction
-    document.getElementById('vp-prediction').innerHTML = `
-      <div class="vp-prediction" style="background:${pred.mainColor}22;color:${pred.mainColor};border:2px solid ${pred.mainColor}44">
-        <div class="pick">${esc(pred.mainPick)}</div>
-        <div class="conf">${pred.mainConf}% confidence</div>
-        <div style="display:flex;justify-content:center;gap:16px;margin-top:10px;font-size:13px">
-          <span style="color:var(--green)">${pred.home.teamName} ${pred.homeWinPct}%</span>
-          <span style="color:var(--text-3)">Draw ${pred.drawPct}%</span>
-          <span style="color:var(--amber)">${pred.away.teamName} ${pred.awayWinPct}%</span>
-        </div>
-        <div style="font-size:12px;margin-top:6px;color:var(--text-2)">Expected goals: ${pred.totalExpectedGoals}</div>
-      </div>
-    `;
-
-    // All markets bets
-    document.getElementById('vp-bets').innerHTML = pred.bets.map(b => `
-      <div class="vp-bet">
-        <div class="market" style="color:${b.color}">${esc(b.market)}</div>
-        <div style="font-size:12px;color:var(--text-2)">${b.confidence}%</div>
-        <div class="conf-bar"><div class="conf-fill" style="width:${b.confidence}%;background:${b.color}"></div></div>
-      </div>
-    `).join('');
-
-    // Analysis
-    document.getElementById('vp-analysis').innerHTML = pred.reasons.map(r => '<div>' + esc(r) + '</div>').join('');
-
-    resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  } catch (e) {
-    document.getElementById('vp-result').style.display = 'block';
-    document.getElementById('vp-teams').innerHTML = '';
-    document.getElementById('vp-prediction').innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Invalid JSON — paste the full match stats with homeTeam, awayTeam, headToHead.</div>';
-    document.getElementById('vp-bets').innerHTML = '';
-    document.getElementById('vp-analysis').innerHTML = '';
+  // Signal 1: Streak reversal (strongest signal)
+  if (stats.streakLen >= 4) {
+    pick = stats.streak === 'up' ? 'down' : 'up';
+    confidence += 35;
+    reasons.push(stats.streakLen + 'x ' + stats.streak.toUpperCase() + ' streak — reversal likely');
+  } else if (stats.streakLen >= 3) {
+    pick = stats.streak === 'up' ? 'down' : 'up';
+    confidence += 25;
+    reasons.push('3x ' + stats.streak.toUpperCase() + ' streak');
   }
-};
+
+  // Signal 2: Distribution imbalance in last 20
+  const upDownOnly = recent20Up + recent20Down;
+  if (upDownOnly >= 10) {
+    const upRatio = recent20Up / upDownOnly;
+    if (upRatio > 0.65) {
+      if (pick === 'down' || pick === 'skip') { pick = 'down'; confidence += 20; }
+      reasons.push('UP overrepresented (' + Math.round(upRatio * 100) + '%) — DOWN due');
+    } else if (upRatio < 0.35) {
+      if (pick === 'up' || pick === 'skip') { pick = 'up'; confidence += 20; }
+      reasons.push('DOWN overrepresented (' + Math.round((1 - upRatio) * 100) + '%) — UP due');
+    }
+  }
+
+  // Signal 3: Post-MIDDLE compensation
+  if (last.length >= 2 && last[last.length - 1] === 'mid') {
+    // After MIDDLE, game tends to give the underrepresented side
+    const recentUp = last.slice(-10).filter(r => r === 'up').length;
+    const recentDown = last.slice(-10).filter(r => r === 'down').length;
+    if (recentUp < recentDown) {
+      if (pick === 'up' || pick === 'skip') { pick = 'up'; confidence += 15; }
+      reasons.push('Post-MIDDLE + UP underrepresented');
+    } else {
+      if (pick === 'down' || pick === 'skip') { pick = 'down'; confidence += 15; }
+      reasons.push('Post-MIDDLE + DOWN underrepresented');
+    }
+  }
+
+  // Signal 4: Alternating pattern (UP-DOWN-UP-DOWN)
+  if (last.length >= 4) {
+    const lastFour = last.slice(-4).filter(r => r !== 'mid');
+    if (lastFour.length >= 4) {
+      const isAlternating = lastFour.every((r, i) => i === 0 || r !== lastFour[i - 1]);
+      if (isAlternating) {
+        const nextExpected = lastFour[lastFour.length - 1] === 'up' ? 'down' : 'up';
+        if (pick === nextExpected || pick === 'skip') { pick = nextExpected; confidence += 15; }
+        reasons.push('Alternating pattern detected');
+      }
+    }
+  }
+
+  // Signal 5: Long-term distribution correction
+  if (stats.total >= 30) {
+    const longUpRatio = stats.up / (stats.up + stats.down);
+    if (longUpRatio > 0.58) {
+      if (pick === 'down' || pick === 'skip') { pick = 'down'; confidence += 10; }
+      reasons.push('Long-term UP heavy (' + stats.upPct + '%)');
+    } else if (longUpRatio < 0.42) {
+      if (pick === 'up' || pick === 'skip') { pick = 'up'; confidence += 10; }
+      reasons.push('Long-term DOWN heavy (' + stats.downPct + '%)');
+    }
+  }
+
+  // High MIDDLE rate warning
+  if (stats.total >= 20 && stats.midPct > 15) {
+    confidence -= 10;
+    reasons.push('High MIDDLE rate (' + stats.midPct + '%) — risky session');
+  }
+
+  // Cap confidence
+  confidence = Math.max(0, Math.min(90, confidence));
+
+  // If no strong signal, suggest skip
+  if (confidence < 20) {
+    return { pick: 'skip', confidence, reason: 'No clear pattern — skip this round' };
+  }
+
+  return { pick, confidence, reason: reasons.join('. ') };
+}
+
+function updateSpinUI() {
+  const stats = getSpinStats();
+  const pred = predictNextSpin();
+
+  // Stats
+  document.getElementById('sp-up-pct').textContent = stats.total ? stats.upPct + '%' : '--';
+  document.getElementById('sp-mid-pct').textContent = stats.total ? stats.midPct + '%' : '--';
+  document.getElementById('sp-down-pct').textContent = stats.total ? stats.downPct + '%' : '--';
+  document.getElementById('spin-total').textContent = stats.total + ' spins';
+
+  // History dots (last 50)
+  const histEl = document.getElementById('spin-history');
+  const showing = spinHistory.slice(-50);
+  histEl.innerHTML = showing.map(s =>
+    `<div class="spin-dot ${s.result}">${s.result === 'up' ? 'U' : s.result === 'down' ? 'D' : 'M'}</div>`
+  ).join('');
+
+  // Prediction
+  const predEl = document.getElementById('spin-prediction');
+  if (pred.pick === 'wait') {
+    predEl.className = 'spin-predict skip';
+    predEl.innerHTML = '<div style="font-size:14px">Record more spins</div><div style="font-size:12px;font-weight:500;margin-top:4px;opacity:0.7">' + pred.reason + '</div>';
+  } else if (pred.pick === 'skip') {
+    predEl.className = 'spin-predict skip';
+    predEl.innerHTML = '<div>SKIP THIS ROUND</div><div style="font-size:12px;font-weight:500;margin-top:4px;opacity:0.7">' + pred.reason + '</div>';
+  } else {
+    predEl.className = 'spin-predict ' + pred.pick;
+    predEl.innerHTML = '<div>BET ' + pred.pick.toUpperCase() + '</div><div style="font-size:13px;font-weight:600;margin-top:4px">' + pred.confidence + '% confidence</div><div style="font-size:11px;font-weight:500;margin-top:4px;opacity:0.7">' + esc(pred.reason) + '</div>';
+  }
+
+  // Analysis
+  const analysisEl = document.getElementById('spin-analysis');
+  if (stats.total < 5) {
+    analysisEl.innerHTML = 'Record at least 5 spins to see analysis.';
+  } else {
+    let html = '';
+    html += `<div>Current streak: <b style="color:${stats.streak === 'up' ? 'var(--green)' : stats.streak === 'down' ? 'var(--amber)' : 'var(--red)'}">${stats.streakLen}x ${stats.streak.toUpperCase()}</b></div>`;
+    html += `<div>Last 20: <b style="color:var(--green)">${stats.lastN.filter(r => r === 'up').length}U</b> / <b style="color:var(--red)">${stats.lastN.filter(r => r === 'mid').length}M</b> / <b style="color:var(--amber)">${stats.lastN.filter(r => r === 'down').length}D</b></div>`;
+    html += `<div>All time: <b>${stats.up}U / ${stats.mid}M / ${stats.down}D</b> (${stats.total} total)</div>`;
+
+    // Streak analysis
+    if (stats.streakLen >= 3) html += `<div style="color:var(--amber);font-weight:700;margin-top:6px">Long streak detected — reversal probability increasing</div>`;
+    if (stats.midPct > 12) html += `<div style="color:var(--red)">MIDDLE rate ${stats.midPct}% — above average, be cautious</div>`;
+    if (stats.midPct < 8 && stats.total >= 20) html += `<div style="color:var(--green)">MIDDLE rate ${stats.midPct}% — below average, good session</div>`;
+
+    analysisEl.innerHTML = html;
+  }
+
+  // Staking advice
+  const stakingEl = document.getElementById('spin-staking');
+  if (stats.total < 10) {
+    stakingEl.innerHTML = 'Record at least 10 spins for staking advice.';
+  } else {
+    let html = '';
+    if (pred.confidence >= 50) {
+      html += '<div style="color:var(--green);font-weight:700">Strong signal — bet 3-5% of bankroll</div>';
+    } else if (pred.confidence >= 30) {
+      html += '<div style="color:var(--amber);font-weight:700">Moderate signal — bet 1-2% of bankroll</div>';
+    } else {
+      html += '<div style="color:var(--red);font-weight:700">Weak/no signal — skip or bet minimum</div>';
+    }
+    html += '<div style="margin-top:6px">Flat staking only. Never chase losses with double-up.</div>';
+    html += '<div>Set a stop-loss: quit after 5 consecutive losses or 20% bankroll drop.</div>';
+    if (stats.midPct > 15) html += '<div style="color:var(--red);margin-top:4px">High MIDDLE rate — consider stopping this session.</div>';
+    stakingEl.innerHTML = html;
+  }
+}
+
+// Init spin UI
+updateSpinUI();
 
 // ===== PWA INSTALL PROMPT =====
 let deferredInstallPrompt = null;
