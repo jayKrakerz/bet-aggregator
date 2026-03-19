@@ -268,12 +268,12 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 /* ===== PICK REASON BADGES ===== */
 .reason-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;white-space:nowrap}
 
-/* ===== GEN SUB-TABS ===== */
-#gen-tabs .chip{border:none;background:transparent;transition:all .2s var(--ease-out)}
-#gen-tabs .chip.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(78,148,255,0.25)}
-#gen-tabs .chip:not(.active):hover{background:rgba(255,255,255,0.06)}
-.gen-tab{display:none}
-.gen-tab.active{display:block}
+/* ===== SUB-TABS (shared) ===== */
+#gen-tabs .chip,#source-tabs .chip{border:none;background:transparent;transition:all .2s var(--ease-out)}
+#gen-tabs .chip.active,#source-tabs .chip.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(78,148,255,0.25)}
+#gen-tabs .chip:not(.active):hover,#source-tabs .chip:not(.active):hover{background:rgba(255,255,255,0.06)}
+.gen-tab,.source-tab{display:none}
+.gen-tab.active,.source-tab.active{display:block}
 
 /* ===== GENERATED CODE DISPLAY ===== */
 .gen-code-val{font-size:28px;font-weight:900;font-family:'SF Mono','Fira Code',monospace;letter-spacing:3px;user-select:all;word-break:break-all;overflow-wrap:break-word}
@@ -541,15 +541,39 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     <span>Updated <span id="refresh-ago" class="countdown">just now</span></span>
   </div>
 
-  <!-- Codes list -->
-  <div class="sec-header">
-    <h2>Available Codes</h2>
-    <span class="sec-badge" id="codes-count">--</span>
+  <!-- Source tabs -->
+  <div style="display:flex;gap:4px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:4px" id="source-tabs">
+    <button class="chip active" data-stab="scraped" style="flex:1;text-align:center;border-radius:var(--r-xs)">Scraped <span id="scraped-badge" style="font-size:11px;opacity:0.7"></span></button>
+    <button class="chip" data-stab="discovered" style="flex:1;text-align:center;border-radius:var(--r-xs)">Discovered <span id="discovered-badge" style="font-size:11px;opacity:0.7"></span></button>
   </div>
-  <div id="codes-list">
-    <div class="skel skel-card"></div>
-    <div class="skel skel-card"></div>
-    <div class="skel skel-card"></div>
+
+  <!-- Scraped codes -->
+  <div class="source-tab active" id="stab-scraped">
+    <div class="sec-header">
+      <h2>Scraped Codes</h2>
+      <span class="sec-badge" id="codes-count">--</span>
+    </div>
+    <div id="codes-list">
+      <div class="skel skel-card"></div>
+      <div class="skel skel-card"></div>
+      <div class="skel skel-card"></div>
+    </div>
+  </div>
+
+  <!-- Discovered codes -->
+  <div class="source-tab" id="stab-discovered" style="display:none">
+    <div class="sec-header">
+      <h2>Discovered Codes</h2>
+      <span class="sec-badge" id="discovered-count">--</span>
+    </div>
+    <div id="discover-status" style="display:none;margin-bottom:12px"></div>
+    <div id="discovered-list">
+      <div class="empty">Click "Discover" to find new codes by mutating existing ones.</div>
+    </div>
+    <button class="btn btn-blue" id="discover-btn" style="width:100%;margin-top:12px;padding:14px;font-size:15px;border-radius:var(--r-sm)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      Discover New Codes
+    </button>
   </div>
 </div>
 
@@ -999,6 +1023,7 @@ async function loadBookingCodes() {
 
     document.getElementById('codes-count').textContent = codes.length ? codes.length + ' codes' : '--';
     document.getElementById('stat-codes').textContent = codes.length;
+    document.getElementById('scraped-badge').textContent = '(' + codes.length + ')';
 
     startRefreshCountdown();
 
@@ -1767,6 +1792,99 @@ document.getElementById('days-range-select').addEventListener('change', e => { s
 document.querySelectorAll('#market-filter-chips .chip').forEach(b => {
   b.onclick = () => { document.querySelectorAll('#market-filter-chips .chip').forEach(x=>x.classList.remove('active')); b.classList.add('active'); selectedMarketFilter = b.dataset.mf; };
 });
+
+// Source tabs (Scraped / Discovered)
+document.querySelectorAll('#source-tabs .chip').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#source-tabs .chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.source-tab').forEach(t => { t.classList.remove('active'); t.style.display = 'none'; });
+    const tab = document.getElementById('stab-' + btn.dataset.stab);
+    if (tab) { tab.classList.add('active'); tab.style.display = 'block'; }
+  };
+});
+
+// ===== CODE DISCOVERY =====
+let discoveredCodes = [];
+let discoveryRunning = false;
+
+async function runDiscovery() {
+  if (discoveryRunning || !allBookingCodes.length) return;
+  discoveryRunning = true;
+  const discoverBtn = document.getElementById('discover-btn');
+  const statusEl = document.getElementById('discover-status');
+  const listEl = document.getElementById('discovered-list');
+
+  btnLoad(discoverBtn);
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--blue-soft);border:1px solid rgba(78,148,255,0.2);border-radius:var(--r-xs)"><div class="spinner"></div><span style="font-size:13px;color:var(--blue);font-weight:600">Discovering codes — mutating ' + allBookingCodes.length + ' seeds...</span></div>';
+
+  // Send top 50 codes as seeds
+  const seeds = allBookingCodes.slice(0, 50).map(c => c.code);
+
+  try {
+    const res = await fetch('/predictions/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seeds, maxResults: 200 }),
+    });
+    const data = await res.json();
+    const codes = data.data || [];
+
+    // Convert discovered codes to BookingCode format for display
+    discoveredCodes = codes.map(c => ({
+      code: c.code,
+      source: 'Discovered (from ' + c.parentCode + ')',
+      sourceUrl: '',
+      events: c.events,
+      totalOdds: c.totalOdds,
+      market: null,
+      date: null,
+      status: 'pending',
+      postedAgo: null,
+      validated: true,
+      isValid: true,
+      selections: c.selections,
+      wonCount: c.selections.filter(s => s.isWinning === 1).length,
+      lostCount: c.selections.filter(s => s.isWinning === 0).length,
+      pendingCount: c.selections.filter(s => s.isWinning === null).length,
+    }));
+
+    // Add discovered games to game pool for generation
+    for (const c of discoveredCodes) {
+      recordConsensus(c.selections, c.code);
+      addToGamePool(c.selections);
+    }
+
+    // Update badge
+    document.getElementById('discovered-badge').textContent = '(' + discoveredCodes.length + ')';
+    document.getElementById('discovered-count').textContent = discoveredCodes.length + ' codes';
+
+    statusEl.innerHTML = '<div style="padding:10px;background:var(--green-soft);border:1px solid rgba(52,212,114,0.2);border-radius:var(--r-xs);font-size:13px;color:var(--green);font-weight:600">' + discoveredCodes.length + ' new codes discovered from ' + data.seeds + ' seeds (' + data.stats.checkedCount + ' mutations checked)</div>';
+
+    // Render discovered codes
+    if (discoveredCodes.length === 0) {
+      listEl.innerHTML = '<div class="empty">No new codes found. Try again later when more codes are available.</div>';
+    } else {
+      listEl.innerHTML = '';
+      // Sort: most pending first, then by odds
+      discoveredCodes.sort((a, b) => b.pendingCount - a.pendingCount || (a.totalOdds || 999) - (b.totalOdds || 999));
+      for (const c of discoveredCodes) {
+        listEl.appendChild(createCodeCard(c));
+      }
+    }
+
+    showToast(discoveredCodes.length + ' codes discovered!', 'success');
+  } catch {
+    statusEl.innerHTML = '<div style="padding:10px;color:var(--red);font-size:13px">Discovery failed. Check your connection.</div>';
+    listEl.innerHTML = '<div class="empty">Discovery failed.<div class="empty-action"><button class="btn btn-ghost" onclick="runDiscovery()">Retry</button></div></div>';
+  }
+
+  btnDone(discoverBtn);
+  discoveryRunning = false;
+}
+
+document.getElementById('discover-btn').onclick = runDiscovery;
 
 // Generate page sub-tabs
 document.querySelectorAll('#gen-tabs .chip').forEach(btn => {
