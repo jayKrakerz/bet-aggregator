@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { getAllBookingCodes } from '../booking-codes-scraper.js';
 import { enrichMatches, hasFootballApi } from '../football-enrichment.js';
+import { discoverCodes, getMutationStats } from '../code-mutator.js';
 
 // Strict alphanumeric pattern for booking codes
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
@@ -189,5 +190,33 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return { data, available: true, enriched: enrichments.size };
+  });
+
+  // POST /predictions/discover — discover new codes by mutating known codes
+  app.post('/discover', async (request, reply) => {
+    const body = request.body as { seeds?: string[]; maxResults?: number };
+    if (!body?.seeds || !Array.isArray(body.seeds) || !body.seeds.length) {
+      return reply.status(400).send({ error: 'No seed codes provided' });
+    }
+
+    // Validate seed codes
+    const seeds = body.seeds
+      .map(s => String(s).trim().toUpperCase())
+      .filter(s => /^[A-Z0-9]{6}$/.test(s))
+      .slice(0, 10); // max 10 seeds per request
+
+    if (!seeds.length) {
+      return reply.status(400).send({ error: 'No valid 6-character codes' });
+    }
+
+    const maxResults = Math.min(body.maxResults || 15, 30);
+    const discovered = await discoverCodes(seeds, maxResults);
+
+    return {
+      data: discovered,
+      count: discovered.length,
+      seeds: seeds.length,
+      stats: getMutationStats(),
+    };
   });
 };
