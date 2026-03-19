@@ -66,7 +66,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .hdr{position:sticky;top:0;z-index:100;height:var(--header-h);background:rgba(19,22,32,0.88);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(0,0,0,0.15);display:flex;align-items:center;padding:0 24px}
 .hdr-inner{display:flex;align-items:center;width:100%;max-width:960px;margin:0 auto}
 .logo{display:flex;align-items:center;gap:10px}
-.logo-mark{width:120px;height:auto;border-radius:10px;flex-shrink:0}
+.logo-mark{width:150px;height:auto;border-radius:50%;border:2.5px solid #d4a843;box-shadow:0 0 12px rgba(212,168,67,0.25);flex-shrink:0}
 .logo-text{font-size:19px;font-weight:800;letter-spacing:-0.3px}
 .hdr-spacer{flex:1}
 .hdr-status{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-2);padding:6px 14px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid var(--border)}
@@ -315,7 +315,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   :root{--header-h:52px}
   html{font-size:14px}
   .hdr{padding:0 14px}
-  .logo-mark{width:100px;border-radius:8px}
+  .logo-mark{width:120px}
   .container{padding:14px 14px 22px}
   .grid-2{grid-template-columns:1fr}
   .hero{grid-template-columns:repeat(3,1fr);gap:8px}
@@ -416,7 +416,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   .rollover-day .day-num{font-size:11px}
   .rollover-stat{font-size:11px}
   .hdr{padding:0 10px}
-  .logo-mark{width:90px}
+  .logo-mark{width:100px}
 }
 </style>
 </head>
