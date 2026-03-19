@@ -2877,7 +2877,7 @@ let vpLeagueData = null;
   window.fetch=function(){
     return origFetch.apply(this,arguments).then(function(r){
       var url=arguments[0]&&arguments[0].url?arguments[0].url:String(arguments[0]);
-      if(url&&(url.indexOf('teamStatistic')>-1||url.indexOf('headToHead')>-1||url.indexOf('leagueTable')>-1||url.indexOf('instant')>-1||url.indexOf('virtual')>-1)){
+      if(url&&(url.indexOf('team-stats')>-1||url.indexOf('teamStatistic')>-1||url.indexOf('headToHead')>-1||url.indexOf('leagueTable')>-1||url.indexOf('details?eventId')>-1)){
         r.clone().json().then(function(d){
           captured.push({url:url,data:d});
           document.title='[CAPTURED '+captured.length+'] '+document.title.replace(/\\[CAPTURED \\d+\\] /,'');
@@ -2895,7 +2895,7 @@ let vpLeagueData = null;
   XMLHttpRequest.prototype.send=function(){
     var xhr=this;
     this.addEventListener('load',function(){
-      if(xhr._vpUrl&&(xhr._vpUrl.indexOf('teamStatistic')>-1||xhr._vpUrl.indexOf('headToHead')>-1||xhr._vpUrl.indexOf('leagueTable')>-1||xhr._vpUrl.indexOf('instant')>-1||xhr._vpUrl.indexOf('virtual')>-1)){
+      if(xhr._vpUrl&&(xhr._vpUrl.indexOf('team-stats')>-1||xhr._vpUrl.indexOf('teamStatistic')>-1||xhr._vpUrl.indexOf('headToHead')>-1||xhr._vpUrl.indexOf('leagueTable')>-1||xhr._vpUrl.indexOf('details?eventId')>-1)){
         try{
           var d=JSON.parse(xhr.responseText);
           captured.push({url:xhr._vpUrl,data:d});
@@ -2924,29 +2924,46 @@ let vpLeagueData = null;
 document.getElementById('vp-match-input').addEventListener('paste', function(e) {
   setTimeout(() => {
     const val = this.value.trim();
-    // If pasted data is an array of captured responses, extract the match stats
     try {
       const parsed = JSON.parse(val);
+
+      // Direct match stats object
+      if (parsed.homeTeam && parsed.awayTeam) return; // already correct format
+
+      // Sportybet API wrapper: { code: 200, data: { homeTeam, awayTeam, ... } }
+      if (parsed.data && parsed.data.homeTeam && parsed.data.awayTeam) {
+        this.value = JSON.stringify(parsed.data, null, 2);
+        showToast('Match data extracted!', 'success');
+        return;
+      }
+
+      // Array of captured responses from bookmarklet
       if (Array.isArray(parsed)) {
-        // Find the match stats object (has homeTeam + awayTeam)
         for (const item of parsed) {
           const d = item.data || item;
+          // Direct match
           if (d.homeTeam && d.awayTeam) {
             this.value = JSON.stringify(d, null, 2);
             showToast('Match data extracted from capture!', 'success');
             return;
           }
-        }
-        // If no match stats found, check for nested data
-        for (const item of parsed) {
-          const d = item.data || item;
-          if (d.data && d.data.homeTeam) {
+          // Nested in API wrapper
+          if (d.data && d.data.homeTeam && d.data.awayTeam) {
             this.value = JSON.stringify(d.data, null, 2);
             showToast('Match data extracted!', 'success');
             return;
           }
+          // Check for code/data pattern
+          if (d.code === 200 && d.data) {
+            const inner = d.data;
+            if (inner.homeTeam && inner.awayTeam) {
+              this.value = JSON.stringify(inner, null, 2);
+              showToast('Match data extracted!', 'success');
+              return;
+            }
+          }
         }
-        showToast('No match stats found in captured data. Look for homeTeam/awayTeam.', 'error');
+        showToast('No match stats found. Make sure you captured the team-stats API call.', 'error');
       }
     } catch {}
   }, 100);
