@@ -838,28 +838,19 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <div style="font-size:13px;color:var(--text-3)">Paste match data from Sportybet Instant Virtuals</div>
     </div>
 
-    <!-- Quick capture info -->
-    <div class="card" style="border-color:rgba(52,212,114,0.15);background:linear-gradient(135deg,rgba(52,212,114,0.03),rgba(78,148,255,0.03));margin-bottom:12px">
-      <div style="font-size:14px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        Quick Capture
-      </div>
-      <div style="font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:10px">
-        Drag this button to your bookmarks bar. Click it on any Sportybet virtual match page to auto-capture the data.
-      </div>
-      <a id="vp-bookmarklet" href="#" onclick="return false" style="display:inline-block;padding:10px 20px;font-size:13px;font-weight:700;background:var(--green);color:#fff;border-radius:var(--r-xs);text-decoration:none;cursor:grab;text-align:center">
-        Grab Match Data
-      </a>
-      <div style="font-size:11px;color:var(--text-3);margin-top:8px">Or use the paste area below to manually input JSON</div>
+    <!-- How to get data -->
+    <div style="background:rgba(78,148,255,0.06);border:1px solid rgba(78,148,255,0.15);border-radius:var(--r-sm);padding:14px;margin-bottom:12px;font-size:12px;color:var(--text-2);line-height:1.7">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">How to get match data:</div>
+      <div><b style="color:var(--blue)">1.</b> Open a virtual match on Sportybet</div>
+      <div><b style="color:var(--blue)">2.</b> Click <b>Stats / H2H</b> to open team stats</div>
+      <div><b style="color:var(--blue)">3.</b> Open DevTools → <b>Network</b> tab → find <b>team-stats</b> request</div>
+      <div><b style="color:var(--blue)">4.</b> Click it → <b>Response</b> tab → copy the JSON</div>
+      <div><b style="color:var(--blue)">5.</b> Paste below and hit Predict</div>
     </div>
 
     <!-- Input card -->
     <div class="card" style="border-color:rgba(78,148,255,0.15)">
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>
-        Match Stats JSON
-      </div>
-      <textarea class="vp-input" id="vp-match-input" placeholder='{"homeTeam":{...},"awayTeam":{...},"headToHead":{...}}' style="min-height:100px"></textarea>
+      <textarea class="vp-input" id="vp-match-input" placeholder='Paste the team-stats JSON response here...' style="min-height:120px;font-size:13px"></textarea>
       <button class="btn btn-blue" id="vp-predict-btn" style="width:100%;margin-top:10px;padding:14px;font-size:15px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         Predict Match
@@ -2866,61 +2857,7 @@ updateRolloverUI();
 // ===== VIRTUAL MATCH PREDICTOR =====
 let vpLeagueData = null;
 
-// Build the bookmarklet — intercepts Sportybet virtual game API calls
-(function buildBookmarklet() {
-  const appUrl = location.origin;
-  // The bookmarklet code that runs on Sportybet's page
-  const code = `
-(function(){
-  var captured=[];
-  var origFetch=window.fetch;
-  window.fetch=function(){
-    return origFetch.apply(this,arguments).then(function(r){
-      var url=arguments[0]&&arguments[0].url?arguments[0].url:String(arguments[0]);
-      if(url&&(url.indexOf('team-stats')>-1||url.indexOf('teamStatistic')>-1||url.indexOf('headToHead')>-1||url.indexOf('leagueTable')>-1||url.indexOf('details?eventId')>-1)){
-        r.clone().json().then(function(d){
-          captured.push({url:url,data:d});
-          document.title='[CAPTURED '+captured.length+'] '+document.title.replace(/\\[CAPTURED \\d+\\] /,'');
-        }).catch(function(){});
-      }
-      return r;
-    });
-  };
-  var origXHR=XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open=function(m,u){
-    this._vpUrl=u;
-    return origXHR.apply(this,arguments);
-  };
-  var origSend=XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.send=function(){
-    var xhr=this;
-    this.addEventListener('load',function(){
-      if(xhr._vpUrl&&(xhr._vpUrl.indexOf('team-stats')>-1||xhr._vpUrl.indexOf('teamStatistic')>-1||xhr._vpUrl.indexOf('headToHead')>-1||xhr._vpUrl.indexOf('leagueTable')>-1||xhr._vpUrl.indexOf('details?eventId')>-1)){
-        try{
-          var d=JSON.parse(xhr.responseText);
-          captured.push({url:xhr._vpUrl,data:d});
-          document.title='[CAPTURED '+captured.length+'] '+document.title.replace(/\\[CAPTURED \\d+\\] /,'');
-        }catch(e){}
-      }
-    });
-    return origSend.apply(this,arguments);
-  };
-  window._vpGetCaptured=function(){return JSON.stringify(captured,null,2);};
-  window._vpCopy=function(){
-    var txt=window._vpGetCaptured();
-    navigator.clipboard.writeText(txt).then(function(){alert('Captured '+captured.length+' API responses! Paste into the predictor.')});
-  };
-  alert('Listening for Sportybet virtual data...\\nNavigate to a match, click a team stat, or browse games.\\nWhen the title shows [CAPTURED X], run: _vpCopy() in console or click the bookmarklet again.');
-  if(captured.length>0){window._vpCopy();}
-})();
-  `.trim().replace(/\n/g,'');
-
-  const href = 'javascript:' + encodeURIComponent(code);
-  const el = document.getElementById('vp-bookmarklet');
-  if (el) el.href = href;
-})();
-
-// Listen for paste events that might contain captured data
+// Listen for paste events — auto-extract match data from various formats
 document.getElementById('vp-match-input').addEventListener('paste', function(e) {
   setTimeout(() => {
     const val = this.value.trim();
