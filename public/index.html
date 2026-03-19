@@ -268,6 +268,13 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 /* ===== PICK REASON BADGES ===== */
 .reason-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;white-space:nowrap}
 
+/* ===== GEN SUB-TABS ===== */
+#gen-tabs .chip{border:none;background:transparent;transition:all .2s var(--ease-out)}
+#gen-tabs .chip.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(78,148,255,0.25)}
+#gen-tabs .chip:not(.active):hover{background:rgba(255,255,255,0.06)}
+.gen-tab{display:none}
+.gen-tab.active{display:block}
+
 /* ===== GENERATED CODE DISPLAY ===== */
 .gen-code-val{font-size:28px;font-weight:900;font-family:'SF Mono','Fira Code',monospace;letter-spacing:3px;user-select:all;word-break:break-all;overflow-wrap:break-word}
 .gen-code-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
@@ -552,131 +559,136 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 <!-- ===== PAGE: GENERATE ===== -->
 <div class="page" id="page-generate">
 
-  <!-- Rollover Mode -->
-  <div class="card" style="border-color:rgba(52,212,114,0.2);background:linear-gradient(135deg,rgba(52,212,114,0.04),rgba(78,148,255,0.04))">
-    <div class="card-header">
-      <div class="card-icon" style="background:var(--green-soft)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-      </div>
-      <div class="card-title">5-Day Rollover</div>
-    </div>
+  <!-- Sub-tabs -->
+  <div style="display:flex;gap:4px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:4px" id="gen-tabs">
+    <button class="chip active" data-gtab="quick" style="flex:1;text-align:center;border-radius:var(--r-xs)">Generate</button>
+    <button class="chip" data-gtab="rollover" style="flex:1;text-align:center;border-radius:var(--r-xs)">Rollover</button>
+    <button class="chip" data-gtab="check" style="flex:1;text-align:center;border-radius:var(--r-xs)">Check Code</button>
+  </div>
 
-    <!-- Progress tracker -->
-    <div class="rollover-progress" id="rollover-progress">
-      <div class="rollover-day" id="rday-1"><span class="day-num">1</span><span class="day-label">Day 1</span></div>
-      <div class="rollover-day" id="rday-2"><span class="day-num">2</span><span class="day-label">Day 2</span></div>
-      <div class="rollover-day" id="rday-3"><span class="day-num">3</span><span class="day-label">Day 3</span></div>
-      <div class="rollover-day" id="rday-4"><span class="day-num">4</span><span class="day-label">Day 4</span></div>
-      <div class="rollover-day" id="rday-5"><span class="day-num">5</span><span class="day-label">Day 5</span></div>
-    </div>
-
-    <!-- Config -->
-    <div class="flex-wrap" style="gap:10px;margin-bottom:10px">
-      <div style="flex:1;min-width:90px">
-        <label class="input-label">Starting Stake</label>
-        <input type="number" id="rv-stake" value="5000" min="100" step="500" class="input-sm" />
+  <!-- TAB: Quick Generate -->
+  <div class="gen-tab active" id="gtab-quick">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div class="card-icon" style="background:var(--amber-soft)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Generate Code</div>
+          <div style="font-size:12px;color:var(--text-3)">3 strategies: Safe, Value, High-Risk</div>
+        </div>
+        <span class="sec-badge" id="pool-count">--</span>
       </div>
-      <div style="flex:1;min-width:80px">
-        <label class="input-label">Daily Target</label>
-        <select id="rv-target" class="input-sm" style="cursor:pointer">
-          <option value="1.2">x1.2 (safest)</option>
-          <option value="1.3" selected>x1.3 (recommended)</option>
-          <option value="1.5">x1.5 (risky)</option>
-          <option value="2.0">x2.0 (very risky)</option>
+
+      <div class="gen-pills" id="auto-gen-btns" style="margin-bottom:12px">
+        <button type="button" class="auto-gen-btn gen-pill gen-pill-safe" data-target="2">x2</button>
+        <button type="button" class="auto-gen-btn gen-pill gen-pill-safe" data-target="3">x3</button>
+        <button type="button" class="auto-gen-btn gen-pill gen-pill-mid" data-target="5">x5</button>
+        <button type="button" class="auto-gen-btn gen-pill gen-pill-mid" data-target="10">x10</button>
+        <button type="button" class="auto-gen-btn gen-pill gen-pill-risky" data-target="20">x20</button>
+        <button type="button" class="auto-gen-btn gen-pill gen-pill-risky" data-target="50">x50</button>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px">
+        <input type="number" id="custom-odds-input" placeholder="Custom odds" min="1.5" max="500" step="0.5" class="input-sm" style="flex:2;min-width:0" />
+        <select id="days-range-select" class="input-sm" style="flex:1;min-width:0;cursor:pointer">
+          <option value="0">Auto</option>
+          <option value="1">Today</option>
+          <option value="2">2 days</option>
+          <option value="3">3 days</option>
         </select>
+        <button id="custom-odds-btn" class="btn btn-blue" style="flex-shrink:0">Go</button>
+      </div>
+
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--text-3);font-weight:600">Market:</span>
+        <span id="market-filter-chips" style="display:inline-flex;gap:3px;flex-wrap:wrap">
+          <button class="chip active" data-mf="" style="padding:4px 10px;font-size:11px">All</button>
+          <button class="chip" data-mf="over/under" style="padding:4px 10px;font-size:11px">O/U</button>
+          <button class="chip" data-mf="gg" style="padding:4px 10px;font-size:11px">GG</button>
+          <button class="chip" data-mf="1x2" style="padding:4px 10px;font-size:11px">1X2</button>
+          <button class="chip" data-mf="double chance" style="padding:4px 10px;font-size:11px">DC</button>
+          <button class="chip" data-mf="handicap" style="padding:4px 10px;font-size:11px">HC</button>
+        </span>
       </div>
     </div>
 
-    <!-- Projections -->
-    <div id="rv-projections"></div>
+    <div id="auto-gen-results"></div>
+    <div id="auto-gen-clear-wrap" style="display:none;text-align:right;margin-bottom:14px">
+      <button id="auto-gen-clear" class="btn btn-red btn-sm">Clear generated</button>
+    </div>
+  </div>
 
-    <!-- Action -->
-    <div style="margin-top:10px">
-      <button class="btn btn-green" id="rv-generate" style="width:100%;font-size:15px;padding:14px">
+  <!-- TAB: Rollover -->
+  <div class="gen-tab" id="gtab-rollover" style="display:none">
+    <div class="card" style="border-color:rgba(52,212,114,0.15);background:linear-gradient(135deg,rgba(52,212,114,0.03),rgba(78,148,255,0.03))">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        5-Day Rollover Challenge
+      </div>
+
+      <div class="rollover-progress" id="rollover-progress">
+        <div class="rollover-day" id="rday-1"><span class="day-num">1</span><span class="day-label">Day 1</span></div>
+        <div class="rollover-day" id="rday-2"><span class="day-num">2</span><span class="day-label">Day 2</span></div>
+        <div class="rollover-day" id="rday-3"><span class="day-num">3</span><span class="day-label">Day 3</span></div>
+        <div class="rollover-day" id="rday-4"><span class="day-num">4</span><span class="day-label">Day 4</span></div>
+        <div class="rollover-day" id="rday-5"><span class="day-num">5</span><span class="day-label">Day 5</span></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:80px">
+          <label class="input-label">Stake</label>
+          <input type="number" id="rv-stake" value="5000" min="100" step="500" class="input-sm" />
+        </div>
+        <div style="flex:1;min-width:80px">
+          <label class="input-label">Daily Target</label>
+          <select id="rv-target" class="input-sm" style="cursor:pointer">
+            <option value="1.2">x1.2 safest</option>
+            <option value="1.3" selected>x1.3 recommended</option>
+            <option value="1.5">x1.5 risky</option>
+            <option value="2.0">x2.0 very risky</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="rv-projections"></div>
+
+      <button class="btn btn-green" id="rv-generate" style="width:100%;margin-top:10px;font-size:15px;padding:14px">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         Generate Today's Rollover Code
       </button>
-    </div>
 
-    <!-- Result -->
-    <div id="rv-result" style="margin-top:10px"></div>
+      <div id="rv-result" style="margin-top:10px"></div>
 
-    <!-- Controls -->
-    <div id="rv-controls" style="display:none;margin-top:10px;display:flex;gap:8px">
-      <button class="btn btn-green btn-sm" id="rv-mark-won" style="flex:1">Mark Won</button>
-      <button class="btn btn-red btn-sm" id="rv-mark-lost" style="flex:1">Mark Lost</button>
-      <button class="btn btn-ghost btn-sm" id="rv-reset">Reset</button>
-    </div>
-
-    <div class="card-hint">Ultra-conservative mode: only Over 0.5, Double Chance, Under 4.5 from top leagues. Max 3 picks at highest safety. Track your 5-day streak.</div>
-  </div>
-
-  <!-- Check a code -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon" style="background:var(--blue-soft)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <div id="rv-controls" style="display:none;margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-green btn-sm" id="rv-mark-won" style="flex:1">Mark Won</button>
+        <button class="btn btn-red btn-sm" id="rv-mark-lost" style="flex:1">Mark Lost</button>
+        <button class="btn btn-ghost btn-sm" id="rv-reset">Reset</button>
       </div>
-      <div class="card-title">Check a Code</div>
     </div>
-    <div class="flex">
-      <input type="text" id="load-code-input" placeholder="e.g. Z4PMH3" maxlength="8" class="input flex-1" />
-      <button id="load-code-btn" class="btn btn-blue">Load</button>
-    </div>
-    <div class="card-hint">Validate any Sportybet booking code</div>
+    <div style="font-size:12px;color:var(--text-3);padding:0 4px;line-height:1.6">Ultra-conservative: Over 0.5, Double Chance, Under 4.5 from top leagues only. Max 3 picks per day, 1 per league.</div>
   </div>
-  <div id="loaded-code-result" style="display:none;margin-bottom:12px"></div>
 
-  <!-- Generate codes -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon" style="background:var(--amber-soft)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+  <!-- TAB: Check Code -->
+  <div class="gen-tab" id="gtab-check" style="display:none">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div class="card-icon" style="background:var(--blue-soft)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Check a Code</div>
+          <div style="font-size:12px;color:var(--text-3)">Validate any Sportybet booking code</div>
+        </div>
       </div>
-      <div class="card-title">Generate Code</div>
-      <span class="sec-badge" id="pool-count">--</span>
+      <div class="flex">
+        <input type="text" id="load-code-input" placeholder="e.g. Z4PMH3" maxlength="8" class="input flex-1" />
+        <button id="load-code-btn" class="btn btn-blue">Load</button>
+      </div>
     </div>
-
-    <div class="flex" style="margin-bottom:8px">
-      <input type="number" id="custom-odds-input" placeholder="Target odds e.g. 7.5" min="1.5" max="500" step="0.5" class="input-sm flex-1" />
-      <select id="days-range-select" class="input-sm" style="width:auto;min-width:90px;cursor:pointer">
-        <option value="0">Auto days</option>
-        <option value="1">Today only</option>
-        <option value="2">2 days</option>
-        <option value="3">3 days</option>
-        <option value="5">5 days</option>
-        <option value="7">7 days</option>
-      </select>
-      <button id="custom-odds-btn" class="btn btn-blue">Go</button>
-    </div>
-
-    <div class="gen-pills" id="auto-gen-btns">
-      <button type="button" class="auto-gen-btn gen-pill gen-pill-safe" data-target="2">x2</button>
-      <button type="button" class="auto-gen-btn gen-pill gen-pill-safe" data-target="3">x3</button>
-      <button type="button" class="auto-gen-btn gen-pill gen-pill-mid" data-target="5">x5</button>
-      <button type="button" class="auto-gen-btn gen-pill gen-pill-mid" data-target="10">x10</button>
-      <button type="button" class="auto-gen-btn gen-pill gen-pill-risky" data-target="20">x20</button>
-      <button type="button" class="auto-gen-btn gen-pill gen-pill-risky" data-target="50">x50</button>
-    </div>
-
-    <div style="margin-top:8px">
-      <span style="font-size:12px;color:var(--text-2);font-weight:600;margin-right:4px">Market:</span>
-      <span id="market-filter-chips" style="display:inline-flex;gap:4px;flex-wrap:wrap">
-        <button class="chip active" data-mf="" style="padding:5px 12px;font-size:12px">All</button>
-        <button class="chip" data-mf="over/under" style="padding:5px 12px;font-size:12px">O/U</button>
-        <button class="chip" data-mf="gg" style="padding:5px 12px;font-size:12px">GG/NG</button>
-        <button class="chip" data-mf="1x2" style="padding:5px 12px;font-size:12px">1X2</button>
-        <button class="chip" data-mf="double chance" style="padding:5px 12px;font-size:12px">DC</button>
-        <button class="chip" data-mf="handicap" style="padding:5px 12px;font-size:12px">Handicap</button>
-      </span>
-    </div>
-    <div class="card-hint">3 strategies per code: Safe, Value, High-Risk. Non-overlapping games.</div>
+    <div id="loaded-code-result" style="display:none;margin-bottom:12px"></div>
   </div>
 
-  <div id="auto-gen-results"></div>
-  <div id="auto-gen-clear-wrap" style="display:none;text-align:right;margin-bottom:14px">
-    <button id="auto-gen-clear" class="btn btn-red btn-sm">Clear generated</button>
-  </div>
 </div>
 
 <!-- ===== PAGE: TOOLS ===== -->
@@ -1757,6 +1769,17 @@ let selectedDaysRange = 0;
 document.getElementById('days-range-select').addEventListener('change', e => { selectedDaysRange = parseInt(e.target.value)||0; });
 document.querySelectorAll('#market-filter-chips .chip').forEach(b => {
   b.onclick = () => { document.querySelectorAll('#market-filter-chips .chip').forEach(x=>x.classList.remove('active')); b.classList.add('active'); selectedMarketFilter = b.dataset.mf; };
+});
+
+// Generate page sub-tabs
+document.querySelectorAll('#gen-tabs .chip').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#gen-tabs .chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.gen-tab').forEach(t => { t.classList.remove('active'); t.style.display = 'none'; });
+    const tab = document.getElementById('gtab-' + btn.dataset.gtab);
+    if (tab) { tab.classList.add('active'); tab.style.display = 'block'; }
+  };
 });
 
 function getEligibleGames(targetOdds) {
