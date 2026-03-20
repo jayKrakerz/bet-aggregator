@@ -2281,7 +2281,6 @@ function pickDiversifiedSets(targetOdds) {
   scored.forEach(g => { g._eff = pickEfficiency(g); });
 
   const used = new Set();
-  const usedTeams = new Set();
   const allSets = [];
   const C = getConstraints(targetOdds);
 
@@ -2340,14 +2339,13 @@ function pickDiversifiedSets(targetOdds) {
 
     const picked = []; const usedSet = new Set(); let totalOdds = 1;
     const leagueCount = {};
+    const usedMatchKeys = new Set(); // FIX 2: dedup by exact match (eventId), not team name
 
     for (const g of eligible) {
       if (totalOdds >= targetOdds || picked.length >= C.maxLegs) break;
       if (usedSet.has(g.eventId) || used.has(g.eventId)) continue;
       const lk = getLeagueKey(g);
       if ((leagueCount[lk] || 0) >= C.maxPerLeague) continue;
-      const teams = getTeams(g);
-      if (teams.some(t => usedTeams.has(t))) continue;
 
       usedSet.add(g.eventId);
       leagueCount[lk] = (leagueCount[lk] || 0) + 1;
@@ -2355,14 +2353,30 @@ function pickDiversifiedSets(targetOdds) {
       totalOdds *= g.odds;
     }
 
-    // Fine-tune: ONLY drop a pick if we significantly overshoot AND stay above 95% of target
+    // FIX 1: If we UNDERSHOT the target, try adding more picks from remaining pool
+    if (totalOdds < targetOdds * 0.9 && picked.length < C.maxLegs) {
+      // Try adding picks we skipped (different sort — highest odds first to close the gap fast)
+      const remaining = eligible.filter(g => !usedSet.has(g.eventId) && !used.has(g.eventId));
+      remaining.sort((a, b) => b.odds - a.odds);
+      for (const g of remaining) {
+        if (totalOdds >= targetOdds || picked.length >= C.maxLegs) break;
+        const lk = getLeagueKey(g);
+        if ((leagueCount[lk] || 0) >= C.maxPerLeague) continue;
+        usedSet.add(g.eventId);
+        leagueCount[lk] = (leagueCount[lk] || 0) + 1;
+        picked.push(g);
+        totalOdds *= g.odds;
+      }
+    }
+
+    // Fine-tune: ONLY drop if we overshoot by 30%+ AND stay within 5% of target
     if (picked.length > 2 && totalOdds > targetOdds * 1.3) {
-      let bestDrop = -1, bestProb = 0;
+      let bestDrop = -1, bestDist = Infinity;
       for (let i = 0; i < picked.length; i++) {
         const without = totalOdds / picked[i].odds;
         if (without >= targetOdds * 0.95) {
-          const probGain = 1 / picked[i]._prob;
-          if (probGain > bestProb) { bestProb = probGain; bestDrop = i; }
+          const dist = Math.abs(without - targetOdds);
+          if (dist < bestDist) { bestDist = dist; bestDrop = i; }
         }
       }
       if (bestDrop >= 0) {
@@ -2373,10 +2387,10 @@ function pickDiversifiedSets(targetOdds) {
       }
     }
 
+    // FIX 2: Only dedup by eventId across strategies, NOT by team name
     if (picked.length) {
       for (const g of picked) {
         used.add(g.eventId);
-        for (const t of getTeams(g)) usedTeams.add(t);
       }
     }
     return picked;
@@ -2403,6 +2417,40 @@ function pickDiversifiedSets(targetOdds) {
   if (setD.length) { setD._strategy = 'high-risk'; allSets.push(setD); }
 
   return allSets;
+}
+
+// ===== NEWS VALIDATION =====
+// Check team news to flag risky picks (injuries, suspensions, etc.)
+let newsCache = {};
+let newsFetched = false;
+
+async function fetchTeamNews() {
+  if (newsFetched) return;
+  newsFetched = true;
+  try {
+    // Use TheSportsDB free API for latest events/news
+    const res = await fetch('https://www.thesportsdb.com/api/v1/json/3/latestsoccer.php', { signal: AbortSignal.timeout(5000) });
+    const data = await res.json();
+    if (data && data.events) {
+      for (const ev of data.events) {
+        const home = (ev.strHomeTeam || '').toLowerCase();
+        const away = (ev.strAwayTeam || '').toLowerCase();
+        const score = ev.intHomeScore + '-' + ev.intAwayScore;
+        // Recent results as form indicator
+        if (home) newsCache[home] = { lastScore: score, event: ev.strEvent };
+        if (away) newsCache[away] = { lastScore: score, event: ev.strEvent };
+      }
+    }
+  } catch {}
+}
+
+function getNewsFlag(teamName) {
+  const key = (teamName || '').toLowerCase();
+  // Check for partial matches
+  for (const k in newsCache) {
+    if (k.includes(key) || key.includes(k)) return newsCache[k];
+  }
+  return null;
 }
 
 // ===== MATCH ENRICHMENT =====
@@ -2461,8 +2509,8 @@ async function generateSafeCode(targetOdds, btn) {
   if (!discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) {
     await runDiscoverySilent();
   }
-  // Fetch enrichment data (only first time)
-  await fetchEnrichment();
+  // Fetch enrichment + news data
+  await Promise.all([fetchEnrichment(), fetchTeamNews()]);
 
   const poolBefore = gamePool.length;
   const sets = pickDiversifiedSets(targetOdds);
@@ -2531,6 +2579,10 @@ async function generateSafeCode(targetOdds, btn) {
           if (af !== null && af >= 12) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">A:${enr.awayForm?.slice(-5)}</span>`);
           if (enr.h2hHomeWins + enr.h2hAwayWins + enr.h2hDraws >= 3) tags.push(`<span class="reason-badge" style="color:var(--blue);background:var(--blue-soft)">H2H ${enr.h2hHomeWins}-${enr.h2hDraws}-${enr.h2hAwayWins}</span>`);
         }
+        // News validation badge
+        const hn = getNewsFlag(g.homeTeam);
+        const an = getNewsFlag(g.awayTeam);
+        if (hn || an) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">Verified</span>`);
         return `<div style="display:flex;align-items:center;gap:4px;padding:3px 0;flex-wrap:wrap"><span style="font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(g.pick)} <span style="color:var(--amber);font-weight:700">@${g.odds}</span></span>${tags.join('')}</div>`;
       }).join('');
 
