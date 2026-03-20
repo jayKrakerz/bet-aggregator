@@ -931,6 +931,23 @@ const I = {
 const _escDiv = document.createElement('div');
 function esc(s) { if (!s) return ''; _escDiv.textContent = s; return _escDiv.innerHTML; }
 
+function fmtMatchTime(s) {
+  const ts = s.estimateStartTime;
+  const md = s.matchDate;
+  if (!ts && !md) return '';
+  const d = ts ? new Date(ts) : new Date(md + 'T12:00:00');
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+  const matchDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  let dayStr;
+  if (matchDay.getTime() === today.getTime()) dayStr = 'Today';
+  else if (matchDay.getTime() === tomorrow.getTime()) dayStr = 'Tmrw';
+  else dayStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (ts) return dayStr + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return dayStr;
+}
+
 async function api(path) {
   const res = await fetch(API + path);
   return res.json();
@@ -1041,6 +1058,7 @@ function buildSelectionsHTML(selections, expanded) {
       <span class="sel-col-pick" style="color:${color};font-weight:700;flex-shrink:0;min-width:70px">${esc(s.pick)}</span>
       <span class="sel-col-odds" style="font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0;min-width:40px;text-align:right;color:var(--amber)">@${s.odds}</span>
       ${s.score ? `<span class="sel-col-score" style="color:var(--text-3);flex-shrink:0;min-width:30px;text-align:center;font-weight:600">${s.score}</span>` : '<span class="sel-col-score" style="flex-shrink:0;min-width:30px"></span>'}
+      <span class="sel-col-time" style="color:var(--text-3);font-size:9px;flex-shrink:0;min-width:60px;text-align:right">${fmtMatchTime(s)}</span>
       ${(() => {
         let b = '';
         const mv = oddsMovement(s);
@@ -1072,6 +1090,7 @@ function buildSelectionsHTML(selections, expanded) {
       <span style="min-width:70px">Pick</span>
       <span style="min-width:40px;text-align:right">Odds</span>
       <span style="min-width:30px;text-align:center">Score</span>
+      <span style="min-width:60px;text-align:right">Time</span>
     </div>
     ${rows}
     ${toggle}
@@ -1232,6 +1251,7 @@ function createCodeCard(c) {
         ${c.events ? `<span>${c.events}g</span>` : ''}
         ${c.totalOdds ? `<span class="code-odds">@${oddsText}</span>` : ''}
         <span class="code-tally">${tally}</span>
+        ${(() => { const sels = c.selections || []; const earliest = sels.filter(s => s.estimateStartTime).sort((a,b) => a.estimateStartTime - b.estimateStartTime)[0]; return earliest ? '<span style="font-size:10px;color:var(--text-3)">' + fmtMatchTime(earliest) + '</span>' : ''; })()}
       </div>
       ${badge}
     </div>
@@ -2607,7 +2627,8 @@ async function generateSafeCode(targetOdds, btn) {
         const hn = getNewsFlag(g.homeTeam);
         const an = getNewsFlag(g.awayTeam);
         if (hn || an) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">Verified</span>`);
-        return `<div style="display:flex;align-items:center;gap:4px;padding:3px 0;flex-wrap:wrap"><span style="font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(g.pick)} <span style="color:var(--amber);font-weight:700">@${g.odds}</span></span>${tags.join('')}</div>`;
+        const mt = fmtMatchTime(g);
+        return `<div style="display:flex;align-items:center;gap:4px;padding:3px 0;flex-wrap:wrap"><span style="font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(g.pick)} <span style="color:var(--amber);font-weight:700">@${g.odds}</span></span>${tags.join('')}${mt ? '<span style="font-size:9px;color:var(--text-3)">'+esc(mt)+'</span>' : ''}</div>`;
       }).join('');
 
       const card = document.createElement('div');
