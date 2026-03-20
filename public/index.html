@@ -269,11 +269,11 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .reason-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;flex-shrink:0;white-space:nowrap}
 
 /* ===== SUB-TABS (shared) ===== */
-#gen-tabs .chip,#source-tabs .chip{border:none;background:transparent;transition:all .2s var(--ease-out)}
-#gen-tabs .chip.active,#source-tabs .chip.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(78,148,255,0.25)}
-#gen-tabs .chip:not(.active):hover,#source-tabs .chip:not(.active):hover{background:rgba(255,255,255,0.06)}
-.gen-tab,.source-tab{display:none}
-.gen-tab.active,.source-tab.active{display:block}
+#gen-tabs .chip,#source-tabs .chip,#tools-tabs .chip{border:none;background:transparent;transition:all .2s var(--ease-out)}
+#gen-tabs .chip.active,#source-tabs .chip.active,#tools-tabs .chip.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(78,148,255,0.25)}
+#gen-tabs .chip:not(.active):hover,#source-tabs .chip:not(.active):hover,#tools-tabs .chip:not(.active):hover{background:rgba(255,255,255,0.06)}
+.gen-tab,.source-tab,.tools-tab{display:none}
+.gen-tab.active,.source-tab.active,.tools-tab.active{display:block}
 
 /* ===== GENERATED CODE DISPLAY ===== */
 .gen-code-val{font-size:28px;font-weight:900;font-family:'SF Mono','Fira Code',monospace;letter-spacing:3px;user-select:all;word-break:break-all;overflow-wrap:break-word}
@@ -715,88 +715,120 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 <!-- ===== PAGE: TOOLS ===== -->
 <div class="page" id="page-tools">
 
-  <!-- Odds Movers -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon" style="background:var(--amber-soft)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
-      </div>
-      <div class="card-title">Odds Movers</div>
-      <button class="btn btn-ghost btn-sm" id="odds-movers-btn">Scan</button>
-    </div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Picks where odds changed across sources — indicates sharp money movement</div>
-    <div id="odds-movers-list"><div class="empty" style="padding:20px;font-size:13px">Hit Scan to find odds movers</div></div>
+  <!-- Sub-tabs -->
+  <div style="display:flex;gap:4px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:4px" id="tools-tabs">
+    <button class="chip active" data-ttab="insights" style="flex:1;text-align:center;border-radius:var(--r-xs)">Insights</button>
+    <button class="chip" data-ttab="tracker" style="flex:1;text-align:center;border-radius:var(--r-xs)">Tracker</button>
+    <button class="chip" data-ttab="utilities" style="flex:1;text-align:center;border-radius:var(--r-xs)">Utilities</button>
   </div>
 
-  <!-- Early Value -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon" style="background:var(--green-soft)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+  <!-- TAB: Insights -->
+  <div class="tools-tab active" id="ttab-insights">
+
+    <!-- Early Value -->
+    <div class="card" style="border-color:rgba(52,212,114,0.15)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="card-icon" style="background:var(--green-soft)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Early Value Picks</div>
+          <div style="font-size:12px;color:var(--text-3)">Games 2-3 days ahead with growing consensus</div>
+        </div>
+        <button class="btn btn-green btn-sm" id="early-value-btn">Scan</button>
       </div>
-      <div class="card-title">Early Value Picks</div>
-      <button class="btn btn-ghost btn-sm" id="early-value-btn">Scan</button>
+      <div id="early-value-list"><div class="empty" style="padding:16px;font-size:13px">Scan to find picks with early consensus — lock in odds before they drop</div></div>
     </div>
-    <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Games 2-3 days ahead with growing consensus — lock in higher odds before the crowd</div>
-    <div id="early-value-list"><div class="empty" style="padding:20px;font-size:13px">Hit Scan to find early value picks</div></div>
+
+    <!-- Odds Movers -->
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="card-icon" style="background:var(--amber-soft)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Odds Movers</div>
+          <div style="font-size:12px;color:var(--text-3)">Picks where odds shifted across sources</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="odds-movers-btn">Scan</button>
+      </div>
+      <div id="odds-movers-list"><div class="empty" style="padding:16px;font-size:13px">Scan to detect odds movement — sharp money indicator</div></div>
+    </div>
+
   </div>
 
-  <!-- Live Tracker -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon" style="background:var(--blue-soft)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+  <!-- TAB: Tracker -->
+  <div class="tools-tab" id="ttab-tracker" style="display:none">
+
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon" style="background:var(--blue-soft)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Live Code Tracker</div>
+          <div style="font-size:12px;color:var(--text-3)">Monitor your codes in real-time</div>
+        </div>
+        <span id="tracker-status" style="font-size:11px;color:var(--text-3)"></span>
       </div>
-      <div class="card-title">Live Tracker</div>
-      <span id="tracker-status" style="font-size:11px;color:var(--text-3)"></span>
+      <div class="flex" style="margin-bottom:10px">
+        <input type="text" id="tracker-input" placeholder="ABC123, DEF456, GHI789" class="input flex-1" style="font-size:13px;letter-spacing:1px" />
+        <button id="tracker-start-btn" class="btn btn-blue">Track</button>
+        <button id="tracker-stop-btn" class="btn btn-red" style="display:none">Stop</button>
+      </div>
+      <div id="tracker-summary" style="display:none;margin-bottom:10px"></div>
+      <div id="tracker-cards"></div>
     </div>
-    <div class="flex" style="margin-bottom:10px">
-      <input type="text" id="tracker-input" placeholder="ABC123, DEF456, GHI789" class="input flex-1" style="font-size:13px;letter-spacing:1px" />
-      <button id="tracker-start-btn" class="btn btn-blue">Track</button>
-      <button id="tracker-stop-btn" class="btn btn-red" style="display:none">Stop</button>
-    </div>
-    <div id="tracker-summary" style="display:none;margin-bottom:10px"></div>
-    <div id="tracker-cards"></div>
+
   </div>
 
-  <!-- Compare Codes -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon" style="background:var(--purple-soft)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
-      </div>
-      <div class="card-title">Compare Codes</div>
-    </div>
-    <div class="flex-wrap">
-      <input type="text" id="compare-code-a" placeholder="Code A" maxlength="8" class="input" style="flex:1;min-width:80px" />
-      <span style="color:var(--text-3);font-size:12px;font-weight:700">vs</span>
-      <input type="text" id="compare-code-b" placeholder="Code B" maxlength="8" class="input" style="flex:1;min-width:80px" />
-      <button id="compare-codes-btn" class="btn btn-blue">Compare</button>
-    </div>
-    <div id="compare-result" style="display:none;margin-top:12px"></div>
-  </div>
+  <!-- TAB: Utilities -->
+  <div class="tools-tab" id="ttab-utilities" style="display:none">
 
-  <!-- Bankroll Calculator -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-icon" style="background:var(--green-soft)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+    <!-- Compare Codes -->
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon" style="background:var(--purple-soft)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Compare Codes</div>
+          <div style="font-size:12px;color:var(--text-3)">Find repeated matches between two codes</div>
+        </div>
       </div>
-      <div class="card-title">Bankroll Strategy</div>
+      <div class="flex-wrap">
+        <input type="text" id="compare-code-a" placeholder="Code A" maxlength="8" class="input" style="flex:1;min-width:80px" />
+        <span style="color:var(--text-3);font-size:12px;font-weight:700">vs</span>
+        <input type="text" id="compare-code-b" placeholder="Code B" maxlength="8" class="input" style="flex:1;min-width:80px" />
+        <button id="compare-codes-btn" class="btn btn-blue">Compare</button>
+      </div>
+      <div id="compare-result" style="display:none;margin-top:12px"></div>
     </div>
-    <div class="flex-wrap" style="margin-bottom:12px;gap:10px">
-      <div style="flex:1;min-width:80px">
-        <label class="input-label">Bankroll</label>
-        <input type="number" id="br-bankroll" value="3000" min="100" step="100" class="input-sm" oninput="updateBankroll()" />
+
+    <!-- Bankroll Calculator -->
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div class="card-icon" style="background:var(--green-soft)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Bankroll Strategy</div>
+          <div style="font-size:12px;color:var(--text-3)">Calculate optimal stakes and returns</div>
+        </div>
       </div>
-      <div style="flex:1;min-width:60px">
-        <label class="input-label">Codes</label>
-        <input type="number" id="br-codes" value="3" min="1" max="10" class="input-sm" oninput="updateBankroll()" />
-      </div>
-      <div style="flex:1;min-width:60px">
-        <label class="input-label">Target Odds</label>
-        <input type="number" id="br-odds" value="5" min="1.5" max="100" step="0.5" class="input-sm" oninput="updateBankroll()" />
-      </div>
+      <div class="flex-wrap" style="margin-bottom:12px;gap:10px">
+        <div style="flex:1;min-width:80px">
+          <label class="input-label">Bankroll</label>
+          <input type="number" id="br-bankroll" value="3000" min="100" step="100" class="input-sm" oninput="updateBankroll()" />
+        </div>
+        <div style="flex:1;min-width:60px">
+          <label class="input-label">Codes</label>
+          <input type="number" id="br-codes" value="3" min="1" max="10" class="input-sm" oninput="updateBankroll()" />
+        </div>
+        <div style="flex:1;min-width:60px">
+          <label class="input-label">Target Odds</label>
+          <input type="number" id="br-odds" value="5" min="1.5" max="100" step="0.5" class="input-sm" oninput="updateBankroll()" />
+        </div>
     </div>
     <div id="br-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px"></div>
   </div>
@@ -2159,6 +2191,17 @@ async function runDiscoverySilent() {
   } catch {}
   discoveryRunning = false;
 }
+
+// Tools page sub-tabs
+document.querySelectorAll('#tools-tabs .chip').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#tools-tabs .chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tools-tab').forEach(t => { t.classList.remove('active'); t.style.display = 'none'; });
+    const tab = document.getElementById('ttab-' + btn.dataset.ttab);
+    if (tab) { tab.classList.add('active'); tab.style.display = 'block'; }
+  };
+});
 
 // Generate page sub-tabs
 document.querySelectorAll('#gen-tabs .chip').forEach(btn => {
