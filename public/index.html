@@ -611,7 +611,17 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       </div>
 
       <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px">
-        <input type="number" id="custom-odds-input" placeholder="Custom odds" min="1.5" max="500" step="0.5" class="input-sm" style="flex:2;min-width:0" />
+        <input type="number" id="custom-odds-input" placeholder="Odds" min="1.5" max="500" step="0.5" class="input-sm" style="flex:2;min-width:0" />
+        <select id="custom-games-select" class="input-sm" style="flex:1;min-width:0;cursor:pointer">
+          <option value="0">Auto games</option>
+          <option value="3">3 games</option>
+          <option value="5">5 games</option>
+          <option value="8">8 games</option>
+          <option value="10">10 games</option>
+          <option value="15">15 games</option>
+          <option value="20">20 games</option>
+          <option value="30">30 games</option>
+        </select>
         <select id="days-range-select" class="input-sm" style="flex:1;min-width:0;cursor:pointer">
           <option value="0">Auto</option>
           <option value="1">Today</option>
@@ -2256,14 +2266,28 @@ function getEligibleGames(targetOdds) {
  * Get constraints that SCALE with the target odds.
  * Low targets = ultra strict. High targets = relaxed to actually reach the odds.
  */
+let selectedGamesCount = 0; // 0 = auto
+document.getElementById('custom-games-select').addEventListener('change', e => { selectedGamesCount = parseInt(e.target.value) || 0; });
+
 function getConstraints(targetOdds) {
-  if (targetOdds <= 2)  return { maxLegs: 3,  minOdds: 1.08, safeMin: 55, valueMin: 45, riskMin: 35, maxPerLeague: 2, maxOdds: 1.40 };
-  if (targetOdds <= 3)  return { maxLegs: 4,  minOdds: 1.08, safeMin: 55, valueMin: 45, riskMin: 35, maxPerLeague: 2, maxOdds: 1.50 };
-  if (targetOdds <= 5)  return { maxLegs: 5,  minOdds: 1.08, safeMin: 50, valueMin: 40, riskMin: 30, maxPerLeague: 2, maxOdds: 1.80 };
-  if (targetOdds <= 10) return { maxLegs: 7,  minOdds: 1.08, safeMin: 45, valueMin: 35, riskMin: 25, maxPerLeague: 2, maxOdds: 2.50 };
-  if (targetOdds <= 20) return { maxLegs: 10, minOdds: 1.10, safeMin: 40, valueMin: 30, riskMin: 20, maxPerLeague: 3, maxOdds: 3.00 };
-  if (targetOdds <= 50) return { maxLegs: 14, minOdds: 1.10, safeMin: 35, valueMin: 25, riskMin: 15, maxPerLeague: 3, maxOdds: 4.00 };
-  return                        { maxLegs: 20, minOdds: 1.10, safeMin: 30, valueMin: 20, riskMin: 10, maxPerLeague: 4, maxOdds: 5.00 };
+  let c;
+  if (targetOdds <= 2)  c = { maxLegs: 3,  minOdds: 1.08, safeMin: 55, valueMin: 45, riskMin: 35, maxPerLeague: 2, maxOdds: 1.40 };
+  else if (targetOdds <= 3)  c = { maxLegs: 4,  minOdds: 1.08, safeMin: 55, valueMin: 45, riskMin: 35, maxPerLeague: 2, maxOdds: 1.50 };
+  else if (targetOdds <= 5)  c = { maxLegs: 5,  minOdds: 1.08, safeMin: 50, valueMin: 40, riskMin: 30, maxPerLeague: 2, maxOdds: 1.80 };
+  else if (targetOdds <= 10) c = { maxLegs: 7,  minOdds: 1.08, safeMin: 45, valueMin: 35, riskMin: 25, maxPerLeague: 2, maxOdds: 2.50 };
+  else if (targetOdds <= 20) c = { maxLegs: 10, minOdds: 1.10, safeMin: 40, valueMin: 30, riskMin: 20, maxPerLeague: 3, maxOdds: 3.00 };
+  else if (targetOdds <= 50) c = { maxLegs: 14, minOdds: 1.10, safeMin: 35, valueMin: 25, riskMin: 15, maxPerLeague: 3, maxOdds: 4.00 };
+  else c = { maxLegs: 20, minOdds: 1.10, safeMin: 30, valueMin: 20, riskMin: 10, maxPerLeague: 4, maxOdds: 5.00 };
+
+  // Override maxLegs if user selected custom games count
+  if (selectedGamesCount > 0) {
+    c.maxLegs = selectedGamesCount;
+    // Scale maxOdds up for more legs (each leg needs lower individual odds)
+    if (selectedGamesCount >= 20) { c.maxOdds = Math.max(c.maxOdds, 3.00); c.maxPerLeague = 4; c.safeMin = Math.min(c.safeMin, 30); }
+    else if (selectedGamesCount >= 10) { c.maxOdds = Math.max(c.maxOdds, 2.50); c.maxPerLeague = 3; c.safeMin = Math.min(c.safeMin, 35); }
+  }
+
+  return c;
 }
 
 function pickDiversifiedSets(targetOdds) {
