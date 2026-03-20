@@ -2092,17 +2092,26 @@ async function runDiscovery() {
   statusEl.style.display = 'block';
   statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--blue-soft);border:1px solid rgba(78,148,255,0.2);border-radius:var(--r-xs)"><div class="spinner"></div><span style="font-size:13px;color:var(--blue);font-weight:600">Scanning the Sportybet network for new codes...</span></div>';
 
-  // Send top 50 codes as seeds
-  const seeds = allBookingCodes.slice(0, 50).map(c => c.code);
+  // Run multiple small batches (10 seeds each) to stay within serverless timeout
+  const allSeeds = allBookingCodes.slice(0, 100).map(c => c.code);
+  const batchSize = 10;
+  let allFound = [];
 
   try {
-    const res = await fetch('/predictions/discover', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seeds, maxResults: 200 }),
-    });
-    const data = await res.json();
-    const codes = data.data || [];
+    for (let i = 0; i < allSeeds.length; i += batchSize) {
+      const batch = allSeeds.slice(i, i + batchSize);
+      statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--blue-soft);border:1px solid rgba(78,148,255,0.2);border-radius:var(--r-xs)"><div class="spinner"></div><span style="font-size:13px;color:var(--blue);font-weight:600">Scanning batch ' + Math.floor(i/batchSize+1) + '/' + Math.ceil(allSeeds.length/batchSize) + ' — ' + allFound.length + ' found so far...</span></div>';
+      try {
+        const res = await fetch('/predictions/discover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seeds: batch, maxResults: 50 }),
+        });
+        const data = await res.json();
+        if (data.data) allFound.push(...data.data);
+      } catch {}
+    }
+    const codes = allFound;
 
     // Convert discovered codes to BookingCode format for display
     discoveredCodes = codes.map(c => ({
@@ -2165,15 +2174,23 @@ document.getElementById('discover-btn').onclick = runDiscovery;
 async function runDiscoverySilent() {
   if (discoveryRunning || discoveredCodes.length > 0) return;
   discoveryRunning = true;
-  const seeds = allBookingCodes.slice(0, 30).map(c => c.code);
+  const allSeeds = allBookingCodes.slice(0, 50).map(c => c.code);
+  const batchSize = 10;
+  let allFound = [];
   try {
-    const res = await fetch('/predictions/discover', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seeds, maxResults: 100 }),
-    });
-    const data = await res.json();
-    const codes = data.data || [];
+    for (let i = 0; i < allSeeds.length; i += batchSize) {
+      const batch = allSeeds.slice(i, i + batchSize);
+      try {
+        const res = await fetch('/predictions/discover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seeds: batch, maxResults: 30 }),
+        });
+        const data = await res.json();
+        if (data.data) allFound.push(...data.data);
+      } catch {}
+    }
+    const codes = allFound;
     discoveredCodes = codes.map(c => ({
       code: c.code, _parentCode: c.parentCode, source: 'Sportybet Network', sourceUrl: '', events: c.events,
       totalOdds: c.totalOdds, market: null, date: null, status: 'pending', postedAgo: null,

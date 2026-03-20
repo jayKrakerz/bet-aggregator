@@ -16,9 +16,9 @@ import { logger } from '../utils/logger.js';
 
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const VALIDATE_URL = 'https://www.sportybet.com/api/ng/orders/share/';
-const BATCH_SIZE = 5;
-const BATCH_DELAY_MS = 300;
-const MAX_MUTATIONS_PER_RUN = 500; // limit per API call to stay within rate limits
+const BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 100;
+const MAX_MUTATIONS_PER_RUN = 80; // keep low for serverless timeout limits
 
 // In-memory cache of already-checked codes (survives warm Vercel instances)
 const checkedCodes = new Set<string>();
