@@ -2571,45 +2571,71 @@ function pickRolloverCode(targetOdds) {
     if ((mkt.includes('over/under') || mkt.includes('total')) && pick.includes('over 1.5')) return true;
     // Under 4.5/5.5/6.5 — ~90% hit rate
     if ((mkt.includes('over/under') || mkt.includes('total')) && (pick.includes('under 4.5') || pick.includes('under 5.5') || pick.includes('under 6.5'))) return true;
-    // Double Chance — ~66% base but much higher with form
-    if (mkt.includes('double chance')) return true;
+    // Double Chance — ONLY when backed side has strong consensus
+    if (mkt.includes('double chance')) {
+      const con = getConsensus(g);
+      if (con < 2) return false; // require at least 2 sources agreeing
+      return true;
+    }
     // Handicap with large spread
     if (mkt.includes('handicap') && (pick.includes('0:2') || pick.includes('2:0') || pick.includes('0:3') || pick.includes('3:0'))) return true;
     return false;
   });
 
-  // Score and filter
-  const scored = pool.map(g => ({ ...g, _safety: safetyScore(g), _consensus: getConsensus(g) }));
+  // Score with calibrated probability + safety + consensus
+  const scored = pool.map(g => ({
+    ...g,
+    _safety: safetyScore(g),
+    _consensus: getConsensus(g),
+    _prob: estimateProb(g),
+  }));
 
-  // STRICT: safety >= 60, odds >= 1.05, top leagues preferred
+  // STRICT: probability >= 80%, consensus >= 2, safety >= 60, top leagues only
   const eligible = scored
-    .filter(g => g._safety >= 60 && g.odds >= 1.05 && g.odds <= 1.30)
-    .sort((a, b) => b._safety - a._safety);
+    .filter(g => g._prob >= 0.80 && g._consensus >= 2 && g._safety >= 60 && g.odds >= 1.05 && g.odds <= 1.30)
+    .sort((a, b) => b._prob - a._prob);
 
-  // Fallback: relax odds to 1.40 if not enough picks
-  const fallback = scored
-    .filter(g => g._safety >= 55 && g.odds >= 1.05 && g.odds <= 1.40)
-    .sort((a, b) => b._safety - a._safety);
+  // Fallback 1: relax probability to 75%, consensus to 1
+  const fallback1 = scored
+    .filter(g => g._prob >= 0.75 && g._safety >= 55 && g.odds >= 1.05 && g.odds <= 1.35)
+    .sort((a, b) => b._prob - a._prob);
 
-  const candidates = eligible.length >= 2 ? eligible : fallback;
+  // Fallback 2: relax further
+  const fallback2 = scored
+    .filter(g => g._prob >= 0.65 && g._safety >= 50 && g.odds >= 1.05 && g.odds <= 1.40)
+    .sort((a, b) => b._prob - a._prob);
+
+  const candidates = eligible.length >= 2 ? eligible : fallback1.length >= 2 ? fallback1 : fallback2;
 
   // Pick max 3 legs, with league diversity
   const picked = [];
   const usedEvents = new Set();
+  const usedTeams = new Set();
   const leagueCount = {};
   let total = 1;
 
   for (const g of candidates) {
     if (total >= targetOdds || picked.length >= 3) break;
     if (usedEvents.has(g.eventId)) continue;
-    const lk = ((g.league || '').split(' - ').pop() || '').toLowerCase().trim();
+
+    // FIX: use normalizeLeague
+    const lk = normalizeLeague(g.league) || 'unknown';
     if ((leagueCount[lk] || 0) >= 1) continue; // max 1 per league for rollover
+
+    // Team dedup — no same team in multiple picks
+    const teams = [(g.homeTeam||'').toLowerCase(), (g.awayTeam||'').toLowerCase()].filter(Boolean);
+    if (teams.some(t => usedTeams.has(t))) continue;
 
     // Skip games starting in < 30 min
     if (g.estimateStartTime && (g.estimateStartTime - Date.now()) < 30 * 60000) continue;
 
+    // Skip live/ended
+    const status = (g.matchStatus || '').toLowerCase();
+    if (status === 'live' || status === '1h' || status === '2h' || status === 'ht' || status === 'ended') continue;
+
     usedEvents.add(g.eventId);
     leagueCount[lk] = (leagueCount[lk] || 0) + 1;
+    for (const t of teams) usedTeams.add(t);
     picked.push(g);
     total *= g.odds;
   }
@@ -2624,10 +2650,18 @@ document.getElementById('rv-generate').onclick = async () => {
   const currentDay = getRolloverDay();
   if (currentDay < 0) return;
 
+  btnLoad(btn);
+
+  // Load discovered codes + enrichment for maximum pool
+  if (!discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) {
+    await runDiscoverySilent();
+  }
   await fetchEnrichment();
+
   const picked = pickRolloverCode(target);
 
   if (!picked.length) {
+    btnDone(btn);
     document.getElementById('rv-result').innerHTML = '<div style="padding:10px;color:var(--amber);font-size:13px">Not enough safe games available right now. Try later when more top-league games are scheduled.</div>';
     return;
   }
