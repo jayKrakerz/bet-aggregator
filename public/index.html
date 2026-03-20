@@ -715,6 +715,19 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 <!-- ===== PAGE: TOOLS ===== -->
 <div class="page" id="page-tools">
 
+  <!-- Odds Movers -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--amber-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+      </div>
+      <div class="card-title">Odds Movers</div>
+      <button class="btn btn-ghost btn-sm" id="odds-movers-btn">Scan</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Picks where odds changed across sources — indicates sharp money movement</div>
+    <div id="odds-movers-list"><div class="empty" style="padding:20px;font-size:13px">Hit Scan to find odds movers</div></div>
+  </div>
+
   <!-- Live Tracker -->
   <div class="card">
     <div class="card-header">
@@ -1343,6 +1356,82 @@ document.getElementById('compare-codes-btn').onclick = async () => {
 };
 document.getElementById('compare-code-a').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('compare-codes-btn').click(); });
 document.getElementById('compare-code-b').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('compare-codes-btn').click(); });
+
+// ===== ODDS MOVERS =====
+document.getElementById('odds-movers-btn').onclick = () => {
+  const btn = document.getElementById('odds-movers-btn');
+  const listEl = document.getElementById('odds-movers-list');
+  btnLoad(btn);
+
+  // Scan all codes for same pick with different odds
+  const pickMap = {};
+  for (const c of allBookingCodes) {
+    for (const s of (c.selections || [])) {
+      if (!s.eventId || s.isWinning !== null) continue;
+      if (s.matchStatus === 'Ended' || s.matchStatus === 'Cancelled') continue;
+      const key = s.eventId + ':' + (s.marketId || '') + ':' + (s.outcomeId || '');
+      if (!pickMap[key]) pickMap[key] = { pick: s, entries: [] };
+      pickMap[key].entries.push({ odds: s.odds, source: c.source, code: c.code });
+    }
+  }
+
+  // Also scan discovered codes
+  for (const c of discoveredCodes) {
+    for (const s of (c.selections || [])) {
+      if (!s.eventId || s.isWinning !== null) continue;
+      const key = s.eventId + ':' + (s.marketId || '') + ':' + (s.outcomeId || '');
+      if (!pickMap[key]) pickMap[key] = { pick: s, entries: [] };
+      pickMap[key].entries.push({ odds: s.odds, source: c.source, code: c.code });
+    }
+  }
+
+  // Find discrepancies with significant gap
+  const movers = [];
+  for (const key in pickMap) {
+    const { pick, entries } = pickMap[key];
+    if (entries.length < 2) continue;
+    const odds = entries.map(e => e.odds).filter(o => o > 0);
+    if (odds.length < 2) continue;
+    const min = Math.min(...odds);
+    const max = Math.max(...odds);
+    const gap = ((max - min) / min) * 100;
+    if (gap >= 3) { // at least 3% difference
+      movers.push({ pick, entries, min, max, gap: Math.round(gap), count: entries.length });
+    }
+  }
+
+  movers.sort((a, b) => b.gap - a.gap);
+
+  if (!movers.length) {
+    listEl.innerHTML = '<div class="empty" style="padding:20px;font-size:13px">No significant odds movements found across sources.</div>';
+    btnDone(btn);
+    return;
+  }
+
+  listEl.innerHTML = '<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:10px">' + movers.length + ' picks with odds movement detected</div>' +
+    movers.slice(0, 20).map(m => {
+      const p = m.pick;
+      const direction = m.entries[m.entries.length - 1].odds <= m.entries[0].odds ? 'dropped' : 'rose';
+      const dirColor = direction === 'dropped' ? 'var(--green)' : 'var(--red)';
+      const dirIcon = direction === 'dropped' ? '&darr;' : '&uarr;';
+      return `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-xs);margin-bottom:6px;background:var(--surface)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:14px;font-weight:700">${esc(p.homeTeam)} vs ${esc(p.awayTeam)}</span>
+          <span style="font-size:12px;color:var(--blue);font-weight:600">${esc(p.market)}</span>
+          <span style="font-size:12px;font-weight:700;color:var(--amber)">${esc(p.pick)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px">
+          <span style="color:${dirColor};font-weight:700">${dirIcon} Odds ${direction}: ${m.max} → ${m.min}</span>
+          <span style="color:var(--text-3)">|</span>
+          <span style="color:var(--text-2)">${m.gap}% shift</span>
+          <span style="color:var(--text-3)">|</span>
+          <span style="color:var(--text-2)">${m.count} sources</span>
+        </div>
+      </div>`;
+    }).join('');
+
+  btnDone(btn);
+};
 
 // ===== HISTORY =====
 let codeHistory = [];
