@@ -763,6 +763,13 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
         <button class="btn btn-ghost btn-sm" id="odds-movers-btn">Scan</button>
       </div>
       <div id="odds-movers-list"><div class="empty" style="padding:16px;font-size:13px">Scan to detect odds movement — sharp money indicator</div></div>
+      <div id="odds-movers-bar" style="display:none;margin-top:10px;padding:10px 12px;background:var(--surface-2);border-radius:var(--r-xs);display:none;align-items:center;gap:8px">
+        <span id="odds-movers-count" style="font-size:12px;font-weight:600;color:var(--text-2)">0 selected</span>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost btn-sm" id="odds-movers-clear-btn">Clear</button>
+        <button class="btn btn-green btn-sm" id="odds-movers-gen-btn">Generate Code</button>
+      </div>
+      <div id="odds-movers-result" style="display:none;margin-top:10px"></div>
     </div>
 
   </div>
@@ -1559,16 +1566,19 @@ document.getElementById('odds-movers-btn').onclick = () => {
   }
 
   listEl.innerHTML = '<div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:10px">' + movers.length + ' picks with odds movement detected</div>' +
-    movers.slice(0, 20).map(m => {
+    movers.slice(0, 20).map((m, i) => {
       const p = m.pick;
       const direction = m.entries[m.entries.length - 1].odds <= m.entries[0].odds ? 'dropped' : 'rose';
       const dirColor = direction === 'dropped' ? 'var(--green)' : 'var(--red)';
       const dirIcon = direction === 'dropped' ? '&darr;' : '&uarr;';
-      return `<div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-xs);margin-bottom:6px;background:var(--surface)">
+      const selData = JSON.stringify({eventId:p.eventId,marketId:p.marketId||'',outcomeId:p.outcomeId||'',specifier:p.specifier||'',sportId:p.sportId||''});
+      return `<div class="mover-row" data-mover-sel='${esc(selData)}' data-mover-odds="${p.odds||m.min}" style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-xs);margin-bottom:6px;background:var(--surface);cursor:pointer">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input type="checkbox" class="mover-check" style="width:16px;height:16px;cursor:pointer">
           <span style="font-size:14px;font-weight:700">${esc(p.homeTeam)} vs ${esc(p.awayTeam)}</span>
           <span style="font-size:12px;color:var(--blue);font-weight:600">${esc(p.market)}</span>
           <span style="font-size:12px;font-weight:700;color:var(--amber)">${esc(p.pick)}</span>
+          <span style="font-size:12px;font-weight:700;color:var(--amber)">@${p.odds||m.min}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px">
           <span style="color:${dirColor};font-weight:700">${dirIcon} Odds ${direction}: ${m.max} → ${m.min}</span>
@@ -1579,8 +1589,57 @@ document.getElementById('odds-movers-btn').onclick = () => {
         </div>
       </div>`;
     }).join('');
+  updateMoversBar();
 
   btnDone(btn);
+};
+
+function updateMoversBar() {
+  const checks = document.querySelectorAll('.mover-check:checked');
+  const bar = document.getElementById('odds-movers-bar');
+  if (checks.length) {
+    bar.style.display = 'flex';
+    document.getElementById('odds-movers-count').textContent = checks.length + ' selected';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+document.addEventListener('change', e => { if (e.target.classList?.contains('mover-check')) updateMoversBar(); });
+document.addEventListener('click', e => { const row = e.target.closest('.mover-row'); if (!row || e.target.classList?.contains('mover-check')) return; const c = row.querySelector('.mover-check'); if (c) { c.checked = !c.checked; updateMoversBar(); } });
+document.getElementById('odds-movers-clear-btn').onclick = () => { document.querySelectorAll('.mover-check:checked').forEach(c => c.checked=false); updateMoversBar(); };
+
+document.getElementById('odds-movers-gen-btn').onclick = async () => {
+  const genBtn = document.getElementById('odds-movers-gen-btn');
+  const checks = document.querySelectorAll('.mover-check:checked');
+  const sels = [];
+  let totalOdds = 1;
+  checks.forEach(c => {
+    const row = c.closest('.mover-row');
+    if (!row) return;
+    const raw = row.getAttribute('data-mover-sel');
+    if (raw) try { sels.push(JSON.parse(raw)); } catch {}
+    const o = parseFloat(row.getAttribute('data-mover-odds') || '0');
+    if (o > 0) totalOdds *= o;
+  });
+  if (!sels.length) return;
+  const rd = document.getElementById('odds-movers-result');
+  rd.style.display = 'block';
+  rd.innerHTML = '';
+  btnLoad(genBtn);
+  try {
+    const res = await fetch('/predictions/create-code', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selections:sels})});
+    const data = await res.json();
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      codeHistory.push({code,strategy:'movers',targetOdds:null,actualOdds:Math.round(totalOdds*100)/100,gamesCount:sels.length,createdAt:new Date().toISOString(),status:'pending',wonCount:0,lostCount:0,pendingCount:sels.length,lastChecked:null});
+      saveCHistory();
+      rd.innerHTML = `<div style="border:2px solid rgba(34,197,94,0.4);border-radius:var(--r-sm);background:var(--green-soft);padding:16px;text-align:center"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">MOVERS CODE</div><div class="gen-code-val" style="color:var(--green);margin-bottom:8px">${esc(code)}</div><button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',2000)})" class="btn btn-green">Copy Code</button><div style="font-size:11px;color:var(--text-3);margin-top:8px">${sels.length} games &bull; ${Math.round(totalOdds*100)/100} total odds</div></div>`;
+    } else {
+      rd.innerHTML = `<div style="padding:12px;border:1px solid rgba(239,68,68,0.2);border-radius:var(--r-sm);background:var(--red-soft)"><span style="color:var(--red);font-weight:700;font-size:12px">Failed: ${esc(data.message||'Unknown error')}</span><div style="font-size:11px;color:var(--text-3);margin-top:6px">Try selecting different picks.</div></div>`;
+    }
+  } catch { rd.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px">Connection error</div>'; }
+  btnDone(genBtn);
 };
 
 // ===== HISTORY =====
