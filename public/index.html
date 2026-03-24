@@ -1776,6 +1776,7 @@ const SOURCE_GROUPS = {
   'convertbet': ['ConvertBetCodes (bet9ja)','ConvertBetCodes (betika)','ConvertBetCodes (all)','ConvertBetCodes (22bet)','ConvertBetCodes (betwinner)','ConvertBetCodes (melbet)','ConvertBetCodes (1xbet)','ConvertBetCodes (betway)','ConvertBetCodes (msport)','ConvertBetCodes (betpawa)','ConvertBetCodes (hollywoodbet)','ConvertBetCodes (merrybet)','ConvertBetCodes (linebet)','ConvertBetCodes (bangbet)','ConvertBetCodes (megapari)'],
   'sportpremi': ['SportPremi'],
   'discovered': ['Sportybet Network'],
+  'stats-engine': ['Stats Engine'],
 };
 function getSourceGroup(sourceName) {
   for (const [group, members] of Object.entries(SOURCE_GROUPS)) {
@@ -2819,10 +2820,131 @@ async function fetchEnrichment() {
     const json = await res.json();
     if (json.available && json.data) {
       enrichmentData = json.data;
+      // Generate stat-based picks from enrichment data
+      generateStatPicks();
       // Re-sort the game pool now that we have enrichment data
       gamePool.sort((a, b) => safetyScore(b) - safetyScore(a));
     }
   } catch {}
+}
+
+/**
+ * Generate synthetic picks from enrichment stats.
+ * Scans all enriched matches and creates high-confidence picks
+ * for markets the tipsters may have missed.
+ */
+function generateStatPicks() {
+  const existingKeys = new Set(gamePool.map(g => g._key));
+  let added = 0;
+
+  // Group pool entries by eventId to get match metadata
+  const matchMap = {};
+  for (const g of gamePool) {
+    if (!matchMap[g.eventId]) matchMap[g.eventId] = g;
+  }
+
+  for (const [eventId, enrich] of Object.entries(enrichmentData)) {
+    const ref = matchMap[eventId];
+    if (!ref) continue; // no match metadata available
+    if (!ref.homeTeam || !ref.awayTeam) continue;
+
+    const hForm = formScore(enrich.homeForm);
+    const aForm = formScore(enrich.awayForm);
+    const expectedGoals = (enrich.homeGoalsFor + enrich.awayGoalsAgainst) / 2 + (enrich.awayGoalsFor + enrich.homeGoalsAgainst) / 2;
+    const homeConf = enrich.homeWinPct || 0;
+    const awayConf = enrich.awayWinPct || 0;
+    const drawConf = enrich.drawPct || 0;
+    const totalH2H = enrich.h2hHomeWins + enrich.h2hAwayWins + enrich.h2hDraws;
+
+    const picks = [];
+
+    // --- OVER 1.5 GOALS: strong when expected goals high ---
+    if (expectedGoals >= 2.2) {
+      picks.push({ market: 'Over/Under', pick: 'Over 1.5', minOdds: 1.10, maxOdds: 1.50, confidence: 0.85 });
+    }
+
+    // --- OVER 2.5 GOALS: both teams attack well ---
+    if (expectedGoals >= 3.0 && enrich.homeGoalsFor >= 1.3 && enrich.awayGoalsFor >= 1.2) {
+      picks.push({ market: 'Over/Under', pick: 'Over 2.5', minOdds: 1.50, maxOdds: 2.20, confidence: 0.60 });
+    }
+
+    // --- UNDER 2.5: both teams low-scoring ---
+    if (expectedGoals <= 1.8 && enrich.homeGoalsFor <= 1.0 && enrich.awayGoalsFor <= 1.0) {
+      picks.push({ market: 'Over/Under', pick: 'Under 2.5', minOdds: 1.50, maxOdds: 2.20, confidence: 0.65 });
+    }
+
+    // --- BTTS YES: both teams score regularly ---
+    if (enrich.homeGoalsFor >= 1.3 && enrich.awayGoalsFor >= 1.3 && enrich.homeGoalsAgainst >= 0.8 && enrich.awayGoalsAgainst >= 0.8) {
+      picks.push({ market: 'GG/NG', pick: 'Yes', minOdds: 1.50, maxOdds: 2.10, confidence: 0.58 });
+    }
+
+    // --- BTTS NO: one team rarely scores ---
+    if (enrich.homeGoalsFor < 0.7 || enrich.awayGoalsFor < 0.7) {
+      picks.push({ market: 'GG/NG', pick: 'No', minOdds: 1.50, maxOdds: 2.10, confidence: 0.60 });
+    }
+
+    // --- DOUBLE CHANCE home-draw: strong home team ---
+    if (homeConf >= 50 && hForm !== null && hForm >= 9 && enrich.homeLeaguePos && enrich.awayLeaguePos && enrich.homeLeaguePos < enrich.awayLeaguePos) {
+      picks.push({ market: 'Double Chance', pick: 'Home or Draw', minOdds: 1.05, maxOdds: 1.40, confidence: 0.80 });
+    }
+
+    // --- DOUBLE CHANCE away-draw: strong away team ---
+    if (awayConf >= 50 && aForm !== null && aForm >= 9 && enrich.homeLeaguePos && enrich.awayLeaguePos && enrich.awayLeaguePos < enrich.homeLeaguePos) {
+      picks.push({ market: 'Double Chance', pick: 'Draw or Away', minOdds: 1.05, maxOdds: 1.40, confidence: 0.80 });
+    }
+
+    // --- 1X2 HOME: dominant home team ---
+    if (homeConf >= 60 && hForm !== null && hForm >= 12 && enrich.homeLeaguePos && enrich.homeLeaguePos <= 5 && totalH2H >= 3 && enrich.h2hHomeWins >= totalH2H * 0.5) {
+      picks.push({ market: '1X2', pick: 'Home', minOdds: 1.20, maxOdds: 1.80, confidence: 0.65 });
+    }
+
+    // --- 1X2 AWAY: dominant away team ---
+    if (awayConf >= 60 && aForm !== null && aForm >= 12 && enrich.awayLeaguePos && enrich.awayLeaguePos <= 5 && totalH2H >= 3 && enrich.h2hAwayWins >= totalH2H * 0.5) {
+      picks.push({ market: '1X2', pick: 'Away', minOdds: 1.20, maxOdds: 1.80, confidence: 0.65 });
+    }
+
+    // Find matching pool entries with the right market to get Sportybet IDs
+    for (const statPick of picks) {
+      // Look for an existing pool entry for this match + market combo we can clone IDs from
+      const matching = gamePool.filter(g =>
+        g.eventId === eventId &&
+        (g.market || '').toLowerCase().includes(statPick.market.toLowerCase().split('/')[0]) &&
+        (g.pick || '').toLowerCase().includes(statPick.pick.toLowerCase().split(' ').pop())
+      );
+
+      if (!matching.length) continue; // can't create without Sportybet IDs
+      const donor = matching[0];
+      if (donor.odds < statPick.minOdds || donor.odds > statPick.maxOdds) continue;
+
+      const key = donor.eventId + ':' + donor.marketId + ':' + donor.outcomeId;
+      if (existingKeys.has(key)) continue; // already in pool
+
+      // Add synthetic pick to pool
+      existingKeys.add(key);
+      const synth = {
+        ...donor,
+        _key: key,
+        _statGenerated: true,
+        _statConfidence: statPick.confidence,
+      };
+      gamePool.push(synth);
+
+      // Record consensus from stats engine
+      currentCodeSource = 'Stats Engine';
+      const ckey = synth.eventId + ':' + (synth.marketId || '') + ':' + (synth.outcomeId || '');
+      if (!consensusMap.has(ckey)) consensusMap.set(ckey, { count: 0, sources: new Set(), families: new Set(), sourceGroups: new Set(), eventId: synth.eventId });
+      const ce = consensusMap.get(ckey);
+      if (!ce.sourceGroups.has('stats-engine')) {
+        ce.sourceGroups.add('stats-engine');
+        ce.families.add('stats-engine');
+        ce.count++;
+      }
+      ce.sources.add('STATS');
+      added++;
+    }
+  }
+
+  if (added > 0) console.log('[Stats Engine]', added, 'picks generated from enrichment data');
 }
 
 function getEnrichment(eventId) {
