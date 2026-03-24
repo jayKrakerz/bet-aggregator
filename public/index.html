@@ -1160,6 +1160,9 @@ async function loadBookingCodes() {
 
     renderFilteredCodes();
     showToast(codes.length + ' codes loaded', 'success');
+
+    // Auto-fetch enrichment in background so stats are ready for code generation
+    fetchEnrichment();
   } catch {
     grid.innerHTML = '<div class="empty">Unable to load codes. Check your connection.<div class="empty-action"><button class="btn btn-ghost" onclick="document.getElementById(\'refresh-btn\').click()">Retry</button></div></div>';
     startRefreshCountdown();
@@ -1979,43 +1982,90 @@ function safetyScore(g) {
     }
   }
 
-  // EXTERNAL DATA (API-Football)
+  // EXTERNAL STATS — ESPN + TheSportsDB enrichment
   const enrich = getEnrichment(g.eventId);
   if (enrich) {
     const hForm = formScore(enrich.homeForm);
     const aForm = formScore(enrich.awayForm);
-
-    // FIX 1+2+8: Correct Double Chance form analysis using proper pick direction
-    if (mkt.includes('double chance')) {
-      const dcDir = getDCDirection(g.pick);
-      if (dcDir === 'home-draw' || dcDir === 'home-away') {
-        // Home team is backed — check HOME form
-        if (hForm !== null) {
-          if (hForm >= 12) s += 10; else if (hForm >= 9) s += 5; else if (hForm <= 3) s -= 10;
-        }
-      }
-      if (dcDir === 'away-draw' || dcDir === 'home-away') {
-        // Away team is backed — check AWAY form
-        if (aForm !== null) {
-          if (aForm >= 12) s += 10; else if (aForm >= 9) s += 5; else if (aForm <= 3) s -= 10;
-        }
-      }
-    }
-
-    // Over/Under — goals stats
-    if (mkt.includes('over/under') || mkt.includes('total')) {
-      const avgGoals = (enrich.homeGoalsFor + enrich.awayGoalsFor) / 2;
-      if (pick.includes('over 0.5') && avgGoals >= 1.2) s += 5;
-      if (pick.includes('over 1.5') && avgGoals >= 1.5) s += 5;
-      if (pick.includes('under 3.5') && avgGoals <= 1.5) s += 5;
-      if (pick.includes('over 2.5') && avgGoals < 1.2) s -= 8;
-    }
-
-    // PREDICTION CONFIDENCE
     const homeConf = enrich.homeWinPct || 0;
     const drawConf = enrich.drawPct || 0;
     const awayConf = enrich.awayWinPct || 0;
+    const totalH2H = enrich.h2hHomeWins + enrich.h2hAwayWins + enrich.h2hDraws;
+    const expectedGoals = (enrich.homeGoalsFor + enrich.awayGoalsAgainst) / 2 + (enrich.awayGoalsFor + enrich.homeGoalsAgainst) / 2;
 
+    // --- FORM (all markets) ---
+    if (mkt.includes('double chance')) {
+      const dcDir = getDCDirection(g.pick);
+      if (dcDir === 'home-draw' || dcDir === 'home-away') {
+        if (hForm !== null) { if (hForm >= 12) s += 10; else if (hForm >= 9) s += 5; else if (hForm <= 3) s -= 10; }
+      }
+      if (dcDir === 'away-draw' || dcDir === 'home-away') {
+        if (aForm !== null) { if (aForm >= 12) s += 10; else if (aForm >= 9) s += 5; else if (aForm <= 3) s -= 10; }
+      }
+    } else if (mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2')) {
+      // 1X2: form of the team being backed
+      if (pick.includes('home') || pick === '1' || pick.startsWith('1')) {
+        if (hForm !== null) { if (hForm >= 12) s += 8; else if (hForm >= 9) s += 4; else if (hForm <= 4) s -= 8; }
+      } else if (pick.includes('away') || pick === '2' || pick.startsWith('2')) {
+        if (aForm !== null) { if (aForm >= 12) s += 8; else if (aForm >= 9) s += 4; else if (aForm <= 4) s -= 8; }
+      } else if (pick.includes('draw') || pick === 'x') {
+        // Draw favored when both teams are mid-form
+        if (hForm !== null && aForm !== null) {
+          const diff = Math.abs(hForm - aForm);
+          if (diff <= 2) s += 6; else if (diff >= 6) s -= 6;
+        }
+      }
+    } else if (mkt.includes('both teams') || mkt.includes('btts') || mkt.includes('gg')) {
+      // BTTS: both teams need to score — check attacking stats
+      if (pick.includes('yes') || pick.includes('gg')) {
+        if (enrich.homeGoalsFor >= 1.3 && enrich.awayGoalsFor >= 1.3) s += 8;
+        else if (enrich.homeGoalsFor >= 1.0 && enrich.awayGoalsFor >= 1.0) s += 4;
+        else if (enrich.homeGoalsFor < 0.8 || enrich.awayGoalsFor < 0.8) s -= 8;
+      } else { // BTTS No
+        if (enrich.homeGoalsFor < 0.8 || enrich.awayGoalsFor < 0.8) s += 6;
+        else if (enrich.homeGoalsFor >= 1.5 && enrich.awayGoalsFor >= 1.5) s -= 8;
+      }
+    } else if (mkt.includes('handicap')) {
+      // Handicap: league position gap matters
+      if (enrich.homeLeaguePos && enrich.awayLeaguePos) {
+        const posGap = enrich.awayLeaguePos - enrich.homeLeaguePos; // positive = home is higher ranked
+        if (pick.includes('home') || pick.includes('1')) {
+          if (posGap >= 8) s += 6; else if (posGap <= -8) s -= 6;
+        } else if (pick.includes('away') || pick.includes('2')) {
+          if (posGap <= -8) s += 6; else if (posGap >= 8) s -= 6;
+        }
+      }
+    }
+
+    // --- GOALS (Over/Under) ---
+    if (mkt.includes('over/under') || mkt.includes('total')) {
+      if (pick.includes('over 0.5') && expectedGoals >= 1.5) s += 6;
+      else if (pick.includes('over 0.5') && expectedGoals >= 1.0) s += 3;
+      if (pick.includes('over 1.5') && expectedGoals >= 2.0) s += 6;
+      else if (pick.includes('over 1.5') && expectedGoals >= 1.5) s += 3;
+      else if (pick.includes('over 1.5') && expectedGoals < 1.0) s -= 6;
+      if (pick.includes('over 2.5') && expectedGoals >= 2.8) s += 5;
+      else if (pick.includes('over 2.5') && expectedGoals < 1.5) s -= 10;
+      else if (pick.includes('over 2.5') && expectedGoals < 2.0) s -= 5;
+      if (pick.includes('under 2.5') && expectedGoals <= 1.8) s += 6;
+      else if (pick.includes('under 2.5') && expectedGoals >= 3.0) s -= 8;
+      if (pick.includes('under 3.5') && expectedGoals <= 2.5) s += 5;
+      else if (pick.includes('under 3.5') && expectedGoals >= 3.5) s -= 6;
+      if (pick.includes('under 4.5') && expectedGoals <= 3.5) s += 4;
+    }
+
+    // --- LEAGUE POSITION ---
+    if (enrich.homeLeaguePos && enrich.awayLeaguePos) {
+      const posGap = Math.abs(enrich.homeLeaguePos - enrich.awayLeaguePos);
+      // Big position gap = less volatile, favorites more likely to win
+      if (mkt === '1x2' || mkt === 'match winner' || mkt.includes('double chance')) {
+        if (posGap >= 10) s += 4; // clear favorite/underdog
+      }
+      // Close positions = unpredictable
+      if (posGap <= 2) s -= 2;
+    }
+
+    // --- PREDICTION CONFIDENCE (all markets) ---
     if (mkt.includes('double chance')) {
       const dcDir = getDCDirection(g.pick);
       let dcPct = 0;
@@ -2023,22 +2073,52 @@ function safetyScore(g) {
       else if (dcDir === 'away-draw') dcPct = awayConf + drawConf;
       else if (dcDir === 'home-away') dcPct = homeConf + awayConf;
       if (dcPct >= 75) s += 8; else if (dcPct >= 60) s += 4; else if (dcPct < 40) s -= 8;
-    }
-
-    // H2H
-    const totalH2H = enrich.h2hHomeWins + enrich.h2hAwayWins + enrich.h2hDraws;
-    if (totalH2H >= 3 && mkt.includes('double chance')) {
-      const dcDir = getDCDirection(g.pick);
-      const homeH2HPct = (enrich.h2hHomeWins + enrich.h2hDraws) / totalH2H;
-      const awayH2HPct = (enrich.h2hAwayWins + enrich.h2hDraws) / totalH2H;
-      if (dcDir === 'home-draw') {
-        if (homeH2HPct >= 0.7) s += 6; else if (homeH2HPct < 0.3) s -= 6;
-      } else if (dcDir === 'away-draw') {
-        if (awayH2HPct >= 0.7) s += 6; else if (awayH2HPct < 0.3) s -= 6;
+    } else if (mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2')) {
+      if (pick.includes('home') || pick === '1' || pick.startsWith('1')) {
+        if (homeConf >= 60) s += 8; else if (homeConf >= 45) s += 4; else if (homeConf < 25) s -= 8;
+      } else if (pick.includes('away') || pick === '2' || pick.startsWith('2')) {
+        if (awayConf >= 60) s += 8; else if (awayConf >= 45) s += 4; else if (awayConf < 25) s -= 8;
+      } else if (pick.includes('draw') || pick === 'x') {
+        if (drawConf >= 35) s += 6; else if (drawConf < 20) s -= 6;
       }
     }
 
-    // Both teams in bad form = volatile
+    // --- H2H (all markets) ---
+    if (totalH2H >= 3) {
+      const homeH2HPct = (enrich.h2hHomeWins + enrich.h2hDraws) / totalH2H;
+      const awayH2HPct = (enrich.h2hAwayWins + enrich.h2hDraws) / totalH2H;
+      if (mkt.includes('double chance')) {
+        const dcDir = getDCDirection(g.pick);
+        if (dcDir === 'home-draw') { if (homeH2HPct >= 0.7) s += 6; else if (homeH2HPct < 0.3) s -= 6; }
+        else if (dcDir === 'away-draw') { if (awayH2HPct >= 0.7) s += 6; else if (awayH2HPct < 0.3) s -= 6; }
+      } else if (mkt === '1x2' || mkt === 'match winner') {
+        if (pick.includes('home') || pick === '1' || pick.startsWith('1')) {
+          const winPct = enrich.h2hHomeWins / totalH2H;
+          if (winPct >= 0.6) s += 5; else if (winPct < 0.2) s -= 5;
+        } else if (pick.includes('away') || pick === '2' || pick.startsWith('2')) {
+          const winPct = enrich.h2hAwayWins / totalH2H;
+          if (winPct >= 0.6) s += 5; else if (winPct < 0.2) s -= 5;
+        }
+      }
+      // Over/Under H2H: if past meetings are high/low scoring
+      if (mkt.includes('over/under') || mkt.includes('total')) {
+        if (pick.includes('over') && expectedGoals >= 2.5 && enrich.goalsOver25Pct >= 60) s += 4;
+        if (pick.includes('under') && expectedGoals <= 2.0 && enrich.goalsUnder25Pct >= 60) s += 4;
+      }
+    }
+
+    // --- DEFENSIVE STATS (goalsconceding patterns) ---
+    if (mkt.includes('over/under') || mkt.includes('total') || mkt.includes('both teams') || mkt.includes('btts')) {
+      // Leaky defenses = more goals
+      const totalGA = enrich.homeGoalsAgainst + enrich.awayGoalsAgainst;
+      if (pick.includes('over') || pick.includes('yes') || pick.includes('gg')) {
+        if (totalGA >= 2.5) s += 4; // both teams concede a lot
+      } else {
+        if (totalGA <= 1.2) s += 4; // both teams defend well
+      }
+    }
+
+    // --- VOLATILITY: both teams in bad form ---
     if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) s -= 5;
   }
 
@@ -2124,12 +2204,18 @@ function estimateProb(g) {
     prob *= 0.99; // no timestamp — mild uncertainty
   }
 
-  // FIX 1+2+8: Enrichment with correct DC direction
+  // ENRICHMENT — ESPN + TheSportsDB stats adjustment
   const enrich = getEnrichment(g.eventId);
   if (enrich) {
     const hForm = formScore(enrich.homeForm);
     const aForm = formScore(enrich.awayForm);
+    const homeConf = enrich.homeWinPct || 0;
+    const drawConf = enrich.drawPct || 0;
+    const awayConf = enrich.awayWinPct || 0;
+    const expectedGoals = (enrich.homeGoalsFor + enrich.awayGoalsAgainst) / 2 + (enrich.awayGoalsFor + enrich.homeGoalsAgainst) / 2;
+    const totalH2H = enrich.h2hHomeWins + enrich.h2hAwayWins + enrich.h2hDraws;
 
+    // --- FORM ---
     if (mkt.includes('double chance')) {
       const dcDir = getDCDirection(g.pick);
       if (dcDir === 'home-draw') {
@@ -2137,20 +2223,87 @@ function estimateProb(g) {
       } else if (dcDir === 'away-draw') {
         if (aForm !== null) { if (aForm >= 12) prob = Math.min(0.98, prob * 1.04); else if (aForm <= 3) prob *= 0.92; }
       } else if (dcDir === 'home-away') {
-        // Both teams matter — check both, average the effect
         if (hForm !== null && aForm !== null) {
           const avgForm = (hForm + aForm) / 2;
           if (avgForm >= 12) prob = Math.min(0.98, prob * 1.03); else if (avgForm <= 3) prob *= 0.93;
         }
       }
+    } else if (mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2')) {
+      if (pick.includes('home') || pick === '1' || pick.startsWith('1')) {
+        if (hForm !== null) { if (hForm >= 12) prob = Math.min(0.98, prob * 1.05); else if (hForm >= 9) prob = Math.min(0.98, prob * 1.02); else if (hForm <= 3) prob *= 0.90; }
+      } else if (pick.includes('away') || pick === '2' || pick.startsWith('2')) {
+        if (aForm !== null) { if (aForm >= 12) prob = Math.min(0.98, prob * 1.05); else if (aForm >= 9) prob = Math.min(0.98, prob * 1.02); else if (aForm <= 3) prob *= 0.90; }
+      } else if (pick.includes('draw') || pick === 'x') {
+        if (hForm !== null && aForm !== null) {
+          const diff = Math.abs(hForm - aForm);
+          if (diff <= 2) prob = Math.min(0.98, prob * 1.03); else if (diff >= 6) prob *= 0.94;
+        }
+      }
+    } else if (mkt.includes('both teams') || mkt.includes('btts') || mkt.includes('gg')) {
+      if (pick.includes('yes') || pick.includes('gg')) {
+        if (enrich.homeGoalsFor >= 1.3 && enrich.awayGoalsFor >= 1.3) prob = Math.min(0.98, prob * 1.04);
+        else if (enrich.homeGoalsFor < 0.8 || enrich.awayGoalsFor < 0.8) prob *= 0.92;
+      } else {
+        if (enrich.homeGoalsFor < 0.8 || enrich.awayGoalsFor < 0.8) prob = Math.min(0.98, prob * 1.03);
+        else if (enrich.homeGoalsFor >= 1.5 && enrich.awayGoalsFor >= 1.5) prob *= 0.92;
+      }
     }
 
+    // --- GOALS (Over/Under) ---
     if (mkt.includes('over/under') || mkt.includes('total')) {
-      const avgGoals = (enrich.homeGoalsFor + enrich.awayGoalsFor) / 2;
-      if (pick.includes('over 0.5') && avgGoals >= 1.2) prob = Math.min(0.98, prob * 1.02);
-      if (pick.includes('over 2.5') && avgGoals < 1.2) prob *= 0.90;
+      if (pick.includes('over 0.5') && expectedGoals >= 1.5) prob = Math.min(0.98, prob * 1.03);
+      if (pick.includes('over 1.5') && expectedGoals >= 2.0) prob = Math.min(0.98, prob * 1.03);
+      else if (pick.includes('over 1.5') && expectedGoals < 1.0) prob *= 0.92;
+      if (pick.includes('over 2.5') && expectedGoals >= 2.8) prob = Math.min(0.98, prob * 1.03);
+      else if (pick.includes('over 2.5') && expectedGoals < 1.5) prob *= 0.88;
+      else if (pick.includes('over 2.5') && expectedGoals < 2.0) prob *= 0.94;
+      if (pick.includes('under 2.5') && expectedGoals <= 1.8) prob = Math.min(0.98, prob * 1.04);
+      else if (pick.includes('under 2.5') && expectedGoals >= 3.0) prob *= 0.90;
+      if (pick.includes('under 3.5') && expectedGoals <= 2.5) prob = Math.min(0.98, prob * 1.02);
+      // Defensive stats for goals markets
+      const totalGA = enrich.homeGoalsAgainst + enrich.awayGoalsAgainst;
+      if (pick.includes('over') && totalGA >= 2.5) prob = Math.min(0.98, prob * 1.02);
+      else if (pick.includes('under') && totalGA <= 1.2) prob = Math.min(0.98, prob * 1.02);
     }
 
+    // --- PREDICTION CONFIDENCE ---
+    if (mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2')) {
+      if (pick.includes('home') || pick === '1' || pick.startsWith('1')) {
+        if (homeConf >= 60) prob = Math.min(0.98, prob * 1.04); else if (homeConf < 25) prob *= 0.92;
+      } else if (pick.includes('away') || pick === '2' || pick.startsWith('2')) {
+        if (awayConf >= 60) prob = Math.min(0.98, prob * 1.04); else if (awayConf < 25) prob *= 0.92;
+      } else if (pick.includes('draw') || pick === 'x') {
+        if (drawConf >= 35) prob = Math.min(0.98, prob * 1.03); else if (drawConf < 20) prob *= 0.93;
+      }
+    }
+
+    // --- H2H ---
+    if (totalH2H >= 3) {
+      if (mkt === '1x2' || mkt === 'match winner') {
+        if (pick.includes('home') || pick === '1') {
+          const pct = enrich.h2hHomeWins / totalH2H;
+          if (pct >= 0.6) prob = Math.min(0.98, prob * 1.03); else if (pct < 0.2) prob *= 0.94;
+        } else if (pick.includes('away') || pick === '2') {
+          const pct = enrich.h2hAwayWins / totalH2H;
+          if (pct >= 0.6) prob = Math.min(0.98, prob * 1.03); else if (pct < 0.2) prob *= 0.94;
+        }
+      }
+      if ((mkt.includes('over/under') || mkt.includes('total')) && enrich.goalsOver25Pct) {
+        if (pick.includes('over') && enrich.goalsOver25Pct >= 65) prob = Math.min(0.98, prob * 1.02);
+        if (pick.includes('under') && enrich.goalsUnder25Pct >= 65) prob = Math.min(0.98, prob * 1.02);
+      }
+    }
+
+    // --- LEAGUE POSITION GAP ---
+    if (enrich.homeLeaguePos && enrich.awayLeaguePos) {
+      const posGap = Math.abs(enrich.homeLeaguePos - enrich.awayLeaguePos);
+      if (posGap >= 10 && (mkt === '1x2' || mkt.includes('double chance') || mkt.includes('handicap'))) {
+        // Clear mismatch — favorites are more reliable
+        prob = Math.min(0.98, prob * 1.02);
+      }
+    }
+
+    // --- VOLATILITY ---
     if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) prob *= 0.96;
   }
 
