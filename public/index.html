@@ -1151,6 +1151,7 @@ async function loadBookingCodes() {
     }
 
     for (const c of codes) {
+      currentCodeSource = c.source || '';
       recordConsensus(c.selections, c.code);
       addToGamePool(c.selections);
     }
@@ -1768,19 +1769,41 @@ function getCodeFamily(codeId) {
   return codeFamily.get(codeId) || codeId;
 }
 
+// Group sources into independent channels — mirrors of the same tipster count as 1
+const SOURCE_GROUPS = {
+  'sportybet': ['Sportybet Nigeria','Sportybet Ghana','Sportybet Kenya','Sportybet Tanzania','Sportybet Zambia'],
+  'betloy': ['Betloy (Sportybet Nigeria)','Betloy (Sportybet Ghana)','Betloy (Sportybet Kenya)','Betloy (Sportybet South Africa)'],
+  'convertbet': ['ConvertBetCodes (bet9ja)','ConvertBetCodes (betika)','ConvertBetCodes (all)','ConvertBetCodes (22bet)','ConvertBetCodes (betwinner)','ConvertBetCodes (melbet)','ConvertBetCodes (1xbet)','ConvertBetCodes (betway)','ConvertBetCodes (msport)','ConvertBetCodes (betpawa)','ConvertBetCodes (hollywoodbet)','ConvertBetCodes (merrybet)','ConvertBetCodes (linebet)','ConvertBetCodes (bangbet)','ConvertBetCodes (megapari)'],
+  'sportpremi': ['SportPremi'],
+  'discovered': ['Sportybet Network'],
+};
+function getSourceGroup(sourceName) {
+  for (const [group, members] of Object.entries(SOURCE_GROUPS)) {
+    if (members.some(m => sourceName === m)) return group;
+  }
+  return sourceName; // unique source
+}
+
+let currentCodeSource = '';
+
 function recordConsensus(selections, codeId) {
   if (!selections) return;
   totalCodesLoaded++;
   const familyId = getCodeFamily(codeId);
+  const sourceGroup = getSourceGroup(currentCodeSource);
   for (const s of selections) {
     if (!s.eventId) continue;
     const key = s.eventId+':'+(s.marketId||'')+':'+(s.outcomeId||'');
-    if (!consensusMap.has(key)) consensusMap.set(key, {count:0, sources:new Set(), families:new Set(), eventId:s.eventId});
+    if (!consensusMap.has(key)) consensusMap.set(key, {count:0, sources:new Set(), families:new Set(), sourceGroups:new Set(), eventId:s.eventId});
     const e = consensusMap.get(key);
-    // Only count as new consensus if from a DIFFERENT family (independent source)
+    // Only count if from a DIFFERENT family AND a DIFFERENT source group
     if (!e.families.has(familyId)) {
       e.families.add(familyId);
-      e.count++;
+      // Only increment count for independent source groups
+      if (!e.sourceGroups.has(sourceGroup)) {
+        e.sourceGroups.add(sourceGroup);
+        e.count++;
+      }
     }
     e.sources.add(codeId);
   }
@@ -1788,16 +1811,27 @@ function recordConsensus(selections, codeId) {
 
 function getConsensus(g) { return consensusMap.get(g.eventId+':'+(g.marketId||'')+':'+(g.outcomeId||''))?.count || 0; }
 
+// Gimmick/novelty markets that are unpredictable
+const GIMMICK_MARKETS = ['1 to 5 minute', '1 to 10 minute', '1 to 15 minute', '6 to 10 minute', '11 to 15 minute', 'correct score', 'exact goals', 'first goal', 'last goal', 'race to', 'minute of'];
+
+function isGimmickMarket(market) {
+  if (!market) return false;
+  const m = market.toLowerCase();
+  return GIMMICK_MARKETS.some(g => m.includes(g));
+}
+
 function addToGamePool(selections) {
   if (!selections) return;
   for (const s of selections) {
     if (!s.eventId || s.isWinning !== null) continue;
-    // FIX 3: Exclude ended, cancelled, AND live games
+    // Exclude ended, cancelled, AND live games
     const status = (s.matchStatus || '').toLowerCase();
     if (status === 'ended' || status === 'cancelled' || status === 'live' ||
         status === '1h' || status === '2h' || status === 'ht' ||
         status === 'in progress' || status === 'second half' || status === 'first half') continue;
     if (!s.odds || s.odds <= 1) continue;
+    // Filter gimmick markets
+    if (isGimmickMarket(s.market)) continue;
     const key = s.eventId+':'+s.marketId+':'+s.outcomeId;
     if (gamePool.some(g => g._key === key)) continue;
     let matchDate = s.matchDate || null;
@@ -2120,6 +2154,18 @@ function safetyScore(g) {
 
     // --- VOLATILITY: both teams in bad form ---
     if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) s -= 5;
+
+    // ENRICHMENT BONUS — stats-verified pick
+    s += 8;
+  } else {
+    // NO ENRICHMENT — unknown league or ESPN/TheSportsDB can't verify
+    // Penalize picks we can't validate with data
+    const league = normalizeLeague(g.league);
+    if (!league || (!TOP_LEAGUES.some(l => league.includes(l)) && !MID_LEAGUES.some(l => league.includes(l)))) {
+      s -= 12; // obscure league with no stats = risky
+    } else {
+      s -= 4; // known league but enrichment didn't load yet
+    }
   }
 
   return Math.max(0, Math.min(100, s));
@@ -2305,6 +2351,14 @@ function estimateProb(g) {
 
     // --- VOLATILITY ---
     if (hForm !== null && aForm !== null && hForm <= 4 && aForm <= 4) prob *= 0.96;
+  } else {
+    // No enrichment — reduce confidence for obscure/unverified leagues
+    const league = normalizeLeague(g.league);
+    if (!league || (!TOP_LEAGUES.some(l => league.includes(l)) && !MID_LEAGUES.some(l => league.includes(l)))) {
+      prob *= 0.90; // obscure league, no stats to verify
+    } else {
+      prob *= 0.97; // known league, enrichment just didn't load
+    }
   }
 
   return Math.max(0.01, Math.min(0.98, prob));
@@ -2400,6 +2454,7 @@ async function runDiscovery() {
     for (const c of discoveredCodes) {
       // Mark this code as belonging to its parent's family
       if (c._parentCode) codeFamily.set(c.code, c._parentCode);
+      currentCodeSource = c.source || 'Sportybet Network';
       recordConsensus(c.selections, c.code);
       addToGamePool(c.selections);
     }
@@ -2465,6 +2520,7 @@ async function runDiscoverySilent() {
     }));
     for (const c of discoveredCodes) {
       if (c._parentCode) codeFamily.set(c.code, c._parentCode);
+      currentCodeSource = c.source || 'Sportybet Network';
       recordConsensus(c.selections, c.code);
       addToGamePool(c.selections);
     }
