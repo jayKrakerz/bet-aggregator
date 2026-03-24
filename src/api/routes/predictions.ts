@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { getAllBookingCodes } from '../booking-codes-scraper.js';
 import { enrichMatches, hasFootballApi } from '../football-enrichment.js';
+import { fotmobEnrichMatches } from '../fotmob-enrichment.js';
 import { discoverCodes, getMutationStats } from '../code-mutator.js';
 
 // Strict alphanumeric pattern for booking codes
@@ -168,12 +169,9 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(502).send({ error: 'All Sportybet endpoints failed' });
   });
 
-  // GET /predictions/enrich — batch enrich matches with external data
+  // POST /predictions/enrich — batch enrich matches with external data
+  // Uses FotMob (no key needed) as primary, API-Football as fallback
   app.post('/enrich', async (request, reply) => {
-    if (!hasFootballApi()) {
-      return reply.status(200).send({ data: {}, available: false });
-    }
-
     const body = request.body as { matches?: Array<{ homeTeam: string; awayTeam: string; matchDate: string | null; eventId: string }> };
     if (!body?.matches || !Array.isArray(body.matches)) {
       return reply.status(400).send({ error: 'No matches provided' });
@@ -181,15 +179,24 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
 
     // Limit to 25 matches per request
     const matches = body.matches.slice(0, 25);
-    const enrichments = await enrichMatches(matches);
-
-    // Convert Map to plain object for JSON
     const data: Record<string, unknown> = {};
-    for (const [eventId, enrichment] of enrichments) {
+
+    // 1. Try FotMob first (no API key required)
+    const fotmobResults = await fotmobEnrichMatches(matches);
+    for (const [eventId, enrichment] of fotmobResults) {
       data[eventId] = enrichment;
     }
 
-    return { data, available: true, enriched: enrichments.size };
+    // 2. Fill gaps with API-Football if key is available
+    const missing = matches.filter(m => !data[m.eventId]);
+    if (missing.length > 0 && hasFootballApi()) {
+      const apiResults = await enrichMatches(missing);
+      for (const [eventId, enrichment] of apiResults) {
+        data[eventId] = enrichment;
+      }
+    }
+
+    return { data, available: true, enriched: Object.keys(data).length, source: fotmobResults.size > 0 ? 'fotmob' : 'api-football' };
   });
 
   // POST /predictions/discover — discover new codes by mutating known codes
