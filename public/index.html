@@ -2405,7 +2405,8 @@ function pickDiversifiedSets(targetOdds) {
   // Calculate efficiency after prob is set
   scored.forEach(g => { g._eff = pickEfficiency(g); });
 
-  const used = new Set();
+  const used = new Set();        // eventIds used across all strategies
+  const usedMatches = new Set();  // "homeTeam:awayTeam" used across all strategies
   const allSets = [];
   const C = getConstraints(targetOdds);
 
@@ -2464,11 +2465,17 @@ function pickDiversifiedSets(targetOdds) {
 
     const picked = []; const usedSet = new Set(); let totalOdds = 1;
     const leagueCount = {};
-    const usedMatchKeys = new Set(); // FIX 2: dedup by exact match (eventId), not team name
+
+    function isUsed(g) {
+      if (usedSet.has(g.eventId) || used.has(g.eventId)) return true;
+      const mk = (g.homeTeam||'').toLowerCase() + ':' + (g.awayTeam||'').toLowerCase();
+      if (usedMatches.has(mk)) return true;
+      return false;
+    }
 
     for (const g of eligible) {
       if (totalOdds >= targetOdds || picked.length >= C.maxLegs) break;
-      if (usedSet.has(g.eventId) || used.has(g.eventId)) continue;
+      if (isUsed(g)) continue;
       const lk = getLeagueKey(g);
       if ((leagueCount[lk] || 0) >= C.maxPerLeague) continue;
 
@@ -2481,7 +2488,7 @@ function pickDiversifiedSets(targetOdds) {
     // FIX 1: If we UNDERSHOT the target, try adding more picks from remaining pool
     if (totalOdds < targetOdds * 0.9 && picked.length < C.maxLegs) {
       // Try adding picks we skipped (different sort — highest odds first to close the gap fast)
-      const remaining = eligible.filter(g => !usedSet.has(g.eventId) && !used.has(g.eventId));
+      const remaining = eligible.filter(g => !isUsed(g));
       remaining.sort((a, b) => b.odds - a.odds);
       for (const g of remaining) {
         if (totalOdds >= targetOdds || picked.length >= C.maxLegs) break;
@@ -2512,10 +2519,12 @@ function pickDiversifiedSets(targetOdds) {
       }
     }
 
-    // FIX 2: Only dedup by eventId across strategies, NOT by team name
+    // Dedup across strategies by eventId AND match (homeTeam:awayTeam)
     if (picked.length) {
       for (const g of picked) {
         used.add(g.eventId);
+        const mk = (g.homeTeam||'').toLowerCase() + ':' + (g.awayTeam||'').toLowerCase();
+        usedMatches.add(mk);
       }
     }
     return picked;
