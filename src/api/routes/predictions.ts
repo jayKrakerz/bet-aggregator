@@ -3,6 +3,7 @@ import { getAllBookingCodes } from '../booking-codes-scraper.js';
 import { enrichMatches, hasFootballApi } from '../football-enrichment.js';
 import { fotmobEnrichMatches } from '../fotmob-enrichment.js';
 import { discoverCodes, getMutationStats } from '../code-mutator.js';
+import { batchPinnacleOdds } from '../pinnacle-odds.js';
 
 // Strict alphanumeric pattern for booking codes
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
@@ -197,6 +198,24 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return { data, available: true, enriched: Object.keys(data).length, source: fotmobResults.size > 0 ? 'fotmob' : 'api-football' };
+  });
+
+  // POST /predictions/pinnacle — batch Pinnacle sharp odds for value detection
+  app.post('/pinnacle', async (request, reply) => {
+    const body = request.body as { matches?: Array<{ homeTeam: string; awayTeam: string; league: string; eventId: string }> };
+    if (!body?.matches || !Array.isArray(body.matches)) {
+      return reply.status(400).send({ error: 'No matches provided' });
+    }
+
+    const matches = body.matches.slice(0, 25);
+    const odds = await batchPinnacleOdds(matches);
+
+    const data: Record<string, unknown> = {};
+    for (const [eventId, pinnOdds] of odds) {
+      data[eventId] = pinnOdds;
+    }
+
+    return { data, matched: odds.size };
   });
 
   // POST /predictions/discover — discover new codes by mutating known codes

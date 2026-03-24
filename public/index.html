@@ -1162,8 +1162,9 @@ async function loadBookingCodes() {
     renderFilteredCodes();
     showToast(codes.length + ' codes loaded', 'success');
 
-    // Auto-fetch enrichment in background so stats are ready for code generation
+    // Auto-fetch enrichment + Pinnacle odds in background
     fetchEnrichment();
+    fetchPinnacleOdds();
   } catch {
     grid.innerHTML = '<div class="empty">Unable to load codes. Check your connection.<div class="empty-action"><button class="btn btn-ghost" onclick="document.getElementById(\'refresh-btn\').click()">Retry</button></div></div>';
     startRefreshCountdown();
@@ -2158,7 +2159,17 @@ function safetyScore(g) {
 
     // ENRICHMENT BONUS — stats-verified pick
     s += 8;
-  } else {
+  }
+
+  // PINNACLE VALUE — sharp odds comparison
+  const edge = pinnacleEdge(g);
+  if (edge > 0.10) s += 15;       // 10%+ edge = strong value
+  else if (edge > 0.05) s += 8;   // 5-10% edge = decent value
+  else if (edge > 0.02) s += 3;   // 2-5% edge = slight value
+  else if (edge < -0.05) s -= 10; // Sportybet underpriced vs Pinnacle = avoid
+  else if (edge < -0.02) s -= 4;
+
+  if (!enrich) {
     // NO ENRICHMENT — unknown league or ESPN/TheSportsDB can't verify
     // Penalize picks we can't validate with data
     const league = normalizeLeague(g.league);
@@ -2361,6 +2372,13 @@ function estimateProb(g) {
       prob *= 0.97; // known league, enrichment just didn't load
     }
   }
+
+  // Pinnacle sharp odds adjustment
+  const edge = pinnacleEdge(g);
+  if (edge > 0.10) prob = Math.min(0.98, prob * 1.06);     // strong value = boost confidence
+  else if (edge > 0.05) prob = Math.min(0.98, prob * 1.03);
+  else if (edge < -0.05) prob *= 0.92;                      // overpriced on Pinnacle = reduce
+  else if (edge < -0.02) prob *= 0.97;
 
   return Math.max(0.01, Math.min(0.98, prob));
 }
@@ -2951,6 +2969,90 @@ function getEnrichment(eventId) {
   return enrichmentData[eventId] || null;
 }
 
+// ===== PINNACLE SHARP ODDS =====
+let pinnacleData = {};  // eventId -> { moneyline, totals, spreads }
+let pinnacleFetched = false;
+
+async function fetchPinnacleOdds() {
+  if (pinnacleFetched || !gamePool.length) return;
+  pinnacleFetched = true;
+
+  // Send top 25 candidates for Pinnacle price comparison
+  const top = [...gamePool]
+    .sort((a, b) => safetyScore(b) - safetyScore(a))
+    .slice(0, 25)
+    .map(g => ({ homeTeam: g.homeTeam, awayTeam: g.awayTeam, league: g.league || '', eventId: g.eventId }));
+
+  try {
+    const res = await fetch('/predictions/pinnacle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matches: top }),
+    });
+    const json = await res.json();
+    if (json.data) {
+      pinnacleData = json.data;
+      // Re-sort pool with Pinnacle value signal
+      gamePool.sort((a, b) => safetyScore(b) - safetyScore(a));
+    }
+  } catch {}
+}
+
+function getPinnacle(eventId) {
+  return pinnacleData[eventId] || null;
+}
+
+/**
+ * Calculate value edge: how much Sportybet odds exceed Pinnacle implied probability.
+ * Returns a number: positive = value (Sportybet overpriced), negative = bad (Sportybet underpriced).
+ * e.g., +0.10 means 10% edge (Sportybet pays more than the true probability suggests).
+ */
+function pinnacleEdge(g) {
+  const pinn = getPinnacle(g.eventId);
+  if (!pinn) return 0;
+
+  const mkt = (g.market || '').toLowerCase();
+  const pick = (g.pick || '').toLowerCase();
+  const sportyOdds = g.odds || 1;
+  let pinnOdds = 0;
+
+  if (pinn.moneyline && (mkt === '1x2' || mkt === 'match winner' || mkt.includes('1x2'))) {
+    if (pick.includes('home') || pick === '1' || pick.startsWith('1')) pinnOdds = pinn.moneyline.home;
+    else if (pick.includes('away') || pick === '2' || pick.startsWith('2')) pinnOdds = pinn.moneyline.away;
+    else if (pick.includes('draw') || pick === 'x') pinnOdds = pinn.moneyline.draw;
+  }
+
+  if (pinn.moneyline && mkt.includes('double chance')) {
+    // Approximate DC odds from moneyline: DC(1X) ≈ 1 / (1/home + 1/draw)
+    const ml = pinn.moneyline;
+    if (pick.includes('home') && pick.includes('draw') || pick.includes('1x') || pick.includes('x1')) {
+      pinnOdds = 1 / (1/ml.home + 1/ml.draw);
+    } else if (pick.includes('away') && pick.includes('draw') || pick.includes('x2') || pick.includes('2x')) {
+      pinnOdds = 1 / (1/ml.away + 1/ml.draw);
+    } else if (pick.includes('home') && pick.includes('away') || pick.includes('12')) {
+      pinnOdds = 1 / (1/ml.home + 1/ml.away);
+    }
+  }
+
+  if (pinn.totals && (mkt.includes('over/under') || mkt.includes('total'))) {
+    // Find matching total line
+    const line = parseFloat((pick.match(/[\d.]+/) || ['2.5'])[0]);
+    const total = pinn.totals.find(t => Math.abs(t.line - line) < 0.1) || pinn.totals[0];
+    if (total) {
+      if (pick.includes('over')) pinnOdds = total.over;
+      else if (pick.includes('under')) pinnOdds = total.under;
+    }
+  }
+
+  if (!pinnOdds || pinnOdds <= 1) return 0;
+
+  // Edge = (sportybet implied prob) vs (pinnacle implied prob)
+  // If Sportybet odds are HIGHER than Pinnacle = value (they're paying more than sharp market says)
+  const sportyImplied = 1 / sportyOdds;
+  const pinnImplied = 1 / pinnOdds;
+  return pinnImplied - sportyImplied; // positive = value edge
+}
+
 /**
  * Calculate a form score from a form string like "WWDLW".
  * Returns a number: higher = better form.
@@ -2975,7 +3077,7 @@ async function generateSafeCode(targetOdds, btn) {
     await runDiscoverySilent();
   }
   // Fetch enrichment + news data
-  await Promise.all([fetchEnrichment(), fetchTeamNews()]);
+  await Promise.all([fetchEnrichment(), fetchTeamNews(), fetchPinnacleOdds()]);
 
   const poolBefore = gamePool.length;
   const sets = pickDiversifiedSets(targetOdds);
@@ -3048,6 +3150,10 @@ async function generateSafeCode(targetOdds, btn) {
         const hn = getNewsFlag(g.homeTeam);
         const an = getNewsFlag(g.awayTeam);
         if (hn || an) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">Verified</span>`);
+        // Pinnacle value badge
+        const pedge = pinnacleEdge(g);
+        if (pedge > 0.05) tags.push(`<span class="reason-badge" style="color:var(--green);background:var(--green-soft)">${I.zap(8,'var(--green)')} +${Math.round(pedge*100)}% value</span>`);
+        else if (pedge < -0.05) tags.push(`<span class="reason-badge" style="color:var(--red);background:var(--red-soft)">-${Math.round(Math.abs(pedge)*100)}% edge</span>`);
         const mt = fmtMatchTime(g);
         return `<div style="display:flex;align-items:center;gap:4px;padding:3px 0;flex-wrap:wrap"><span style="font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(g.pick)} <span style="color:var(--amber);font-weight:700">@${g.odds}</span></span>${tags.join('')}${mt ? '<span style="font-size:9px;color:var(--text-3)">'+esc(mt)+'</span>' : ''}</div>`;
       }).join('');
