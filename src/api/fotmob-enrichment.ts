@@ -392,6 +392,56 @@ async function getH2H(homeTeam: string, awayTeam: string): Promise<H2HResult> {
   return result;
 }
 
+// ===== ESPN INJURIES (from team news + roster) =====
+
+interface InjuryInfo {
+  home: Array<{ name: string; position: string; status: string }>;
+  away: Array<{ name: string; position: string; status: string }>;
+  severity: 'none' | 'low' | 'medium' | 'high';
+}
+
+const injuryCache = new Map<string, { data: InjuryInfo; ts: number }>();
+
+async function fetchInjuries(league: string, homeTeamId: string, awayTeamId: string): Promise<InjuryInfo> {
+  const key = `${league}:${homeTeamId}:${awayTeamId}`;
+  const cached = injuryCache.get(key);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+
+  const result: InjuryInfo = { home: [], away: [], severity: 'none' };
+
+  // Fetch team news for both teams — injury reports appear here
+  const [homeNews, awayNews] = await Promise.all([
+    fetchJSON<{ articles?: Array<{ headline: string; description?: string }> }>(
+      `${ESPN_BASE}/site/v2/sports/soccer/${league}/teams/${homeTeamId}/news`,
+    ),
+    fetchJSON<{ articles?: Array<{ headline: string; description?: string }> }>(
+      `${ESPN_BASE}/site/v2/sports/soccer/${league}/teams/${awayTeamId}/news`,
+    ),
+  ]);
+
+  // Parse injury keywords from headlines
+  const injuryKeywords = /injur|ruled out|miss|sidelined|suspend|banned|absent|doubt|hamstring|knee|ankle|muscle|broken|fracture|torn|acl|mcl/i;
+
+  for (const article of homeNews?.articles || []) {
+    if (injuryKeywords.test(article.headline)) {
+      result.home.push({ name: article.headline, position: '', status: 'out' });
+    }
+  }
+  for (const article of awayNews?.articles || []) {
+    if (injuryKeywords.test(article.headline)) {
+      result.away.push({ name: article.headline, position: '', status: 'out' });
+    }
+  }
+
+  const totalAlerts = result.home.length + result.away.length;
+  if (totalAlerts >= 4) result.severity = 'high';
+  else if (totalAlerts >= 2) result.severity = 'medium';
+  else if (totalAlerts >= 1) result.severity = 'low';
+
+  injuryCache.set(key, { data: result, ts: Date.now() });
+  return result;
+}
+
 // ===== MAIN ENRICHMENT =====
 
 export async function fotmobEnrichMatch(
@@ -414,12 +464,13 @@ export async function fotmobEnrichMatch(
 
   // 2. Fetch standings, schedules, H2H in parallel
   const tsdbLeagueId = TSDB_LEAGUES[league];
-  const [standings, homeSchedule, awaySchedule, h2h, tsdbStandings] = await Promise.all([
+  const [standings, homeSchedule, awaySchedule, h2h, tsdbStandings, injuries] = await Promise.all([
     getESPNStandings(league),
     getTeamSchedule(league, homeComp.team.id),
     getTeamSchedule(league, awayComp.team.id),
     getH2H(homeTeam, awayTeam),
     tsdbLeagueId ? getTSDBStandings(tsdbLeagueId) : Promise.resolve([]),
+    fetchInjuries(league, homeComp.team.id, awayComp.team.id),
   ]);
 
   // 3. Get form — prefer TheSportsDB (has ready form strings), fallback to ESPN schedule
@@ -481,6 +532,11 @@ export async function fotmobEnrichMatch(
     h2hAwayWins: h2h.awayWins,
     h2hDraws: h2h.draws,
   };
+
+  // Add injury data if available
+  if (injuries && injuries.severity !== 'none') {
+    enrichment.injuries = injuries;
+  }
 
   enrichCache.set(cacheKey, { data: enrichment, ts: Date.now() });
   return enrichment;

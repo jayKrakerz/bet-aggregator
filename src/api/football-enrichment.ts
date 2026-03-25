@@ -35,6 +35,12 @@ export interface MatchEnrichment {
   h2hHomeWins: number;
   h2hAwayWins: number;
   h2hDraws: number;
+  // Lineup/injury info (from ESPN rosters)
+  injuries?: {
+    home: Array<{ name: string; position: string; status: string }>;
+    away: Array<{ name: string; position: string; status: string }>;
+    severity: 'none' | 'low' | 'medium' | 'high';
+  };
 }
 
 interface FixtureMatch {
