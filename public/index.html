@@ -459,6 +459,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <button class="chip" data-page="generate">Generate</button>
       <button class="chip" data-page="tools">Tools</button>
       <button class="chip" data-page="history">History</button>
+      <button class="chip" data-page="vfl">VFL</button>
     </div>
     <div class="hdr-status" id="health">
       <div class="hdr-dot"></div>
@@ -873,6 +874,71 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
     <div id="br-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px"></div>
   </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: VFL ANALYZER ===== -->
+<div class="page" id="page-vfl">
+  <h2 style="font-size:18px;font-weight:700;margin-bottom:14px">VFL Analyzer</h2>
+  <!-- League selector -->
+  <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+    <input id="vfl-league" class="input" style="flex:1;letter-spacing:normal;text-transform:none;font-size:14px;padding:8px 12px" placeholder="League ID (e.g. season-1)" value="">
+    <button class="btn btn-blue btn-sm" onclick="vflLoad()">Load</button>
+  </div>
+
+  <!-- VFL Sub-tabs -->
+  <div class="filter-bar" id="vfl-tabs" style="margin-bottom:14px">
+    <button class="chip active" data-vt="input">Input</button>
+    <button class="chip" data-vt="table">Table</button>
+    <button class="chip" data-vt="analysis">Analysis</button>
+    <button class="chip" data-vt="picks">Picks</button>
+  </div>
+
+  <!-- SUB: Input Results -->
+  <div id="vfl-input">
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+      <label style="font-size:13px;color:var(--muted)">Week:</label>
+      <input id="vfl-week" type="number" class="input" style="width:60px;padding:8px;letter-spacing:normal" min="1" max="38" value="1">
+    </div>
+    <div id="vfl-match-rows" style="display:flex;flex-direction:column;gap:6px"></div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-green" onclick="vflSubmitResults()" style="flex:1">Save Week Results</button>
+      <button class="btn btn-ghost btn-sm" onclick="vflAddRow()">+ Row</button>
+    </div>
+    <div id="vfl-input-status" style="margin-top:8px;font-size:12px"></div>
+  </div>
+
+  <!-- SUB: League Table -->
+  <div id="vfl-table" style="display:none">
+    <div id="vfl-disc-badge" style="margin-bottom:10px"></div>
+    <div id="vfl-league-table" style="overflow-x:auto"></div>
+  </div>
+
+  <!-- SUB: Analysis -->
+  <div id="vfl-analysis" style="display:none">
+    <div id="vfl-alerts" style="margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div id="vfl-predators" class="card" style="padding:10px"></div>
+      <div id="vfl-activators" class="card" style="padding:10px"></div>
+    </div>
+    <h3 style="font-size:14px;margin-bottom:8px;color:var(--muted)">Team Form (Major Teams)</h3>
+    <div id="vfl-team-cards" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+    <h3 style="font-size:14px;margin:14px 0 8px;color:var(--muted)">Top Scorers vs Top Conceders</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div id="vfl-scorers" class="card" style="padding:10px"></div>
+      <div id="vfl-conceders" class="card" style="padding:10px"></div>
+    </div>
+  </div>
+
+  <!-- SUB: Picks -->
+  <div id="vfl-picks" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+      <label style="font-size:13px;color:var(--muted)">Predict week:</label>
+      <input id="vfl-pick-week" type="number" class="input" style="width:60px;padding:8px;letter-spacing:normal" min="1" max="38" value="6">
+      <button class="btn btn-blue btn-sm" onclick="vflGetPicks()">Get Picks</button>
+    </div>
+    <div id="vfl-pick-results"></div>
+  </div>
 </div>
 
 <!-- ===== PAGE: HISTORY ===== -->
@@ -909,6 +975,10 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   <button class="nav-btn" data-page="history">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
     History
+  </button>
+  <button class="nav-btn" data-page="vfl">
+    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>
+    VFL
   </button>
 </nav>
 
@@ -3808,6 +3878,211 @@ document.getElementById('refresh-btn').onclick = async () => {
   btn.classList.remove('spinning');
   btn.disabled = false;
 };
+
+// ===== VFL ANALYZER =====
+const VFL_TEAMS = ['MNC','LIV','ARS','CHE','MNU','TOT','EVE','LEI','SOU','WHU','CRY','WOL','BRI','BUR','LEE','WBA','ASV','NWC','SHU','FUL'];
+const VFL_NAMES = {MNC:'Man City',LIV:'Liverpool',MNU:'Man United',CHE:'Chelsea',ARS:'Arsenal',TOT:'Tottenham',EVE:'Everton',LEI:'Leicester',SOU:'Southampton',WHU:'West Ham',CRY:'Crystal Palace',WOL:'Wolverhampton',BRI:'Brighton',BUR:'Burnley',LEE:'Leeds',WBA:'West Brom',ASV:'Aston Villa',NWC:'Newcastle',SHU:'Sheffield Utd',FUL:'Fulham'};
+
+// VFL sub-tab switching
+const vflSubs = ['vfl-input','vfl-table','vfl-analysis','vfl-picks'];
+document.querySelectorAll('#vfl-tabs .chip').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#vfl-tabs .chip').forEach(c => c.classList.remove('active'));
+  b.classList.add('active');
+  const target = 'vfl-' + b.dataset.vt;
+  vflSubs.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === target ? 'block' : 'none';
+  });
+});
+
+function vflLeague() { return document.getElementById('vfl-league').value.trim() || 'season-1'; }
+
+function vflMatchRowHtml(idx) {
+  const opts = VFL_TEAMS.map(t => `<option value="${t}">${t}</option>`).join('');
+  return `<div class="vfl-row" style="display:flex;gap:4px;align-items:center;font-size:13px">
+    <select class="input vfl-home" style="flex:1;padding:6px">${opts}</select>
+    <input type="number" class="input vfl-hs" style="width:36px;text-align:center;padding:6px" min="0" max="9" value="0">
+    <span style="color:var(--muted)">-</span>
+    <input type="number" class="input vfl-as" style="width:36px;text-align:center;padding:6px" min="0" max="9" value="0">
+    <select class="input vfl-away" style="flex:1;padding:6px">${opts}</select>
+    <button class="btn btn-ghost" style="padding:2px 6px;font-size:11px" onclick="this.closest('.vfl-row').remove()">x</button>
+  </div>`;
+}
+
+function vflAddRow() {
+  const c = document.getElementById('vfl-match-rows');
+  c.insertAdjacentHTML('beforeend', vflMatchRowHtml(c.children.length));
+}
+
+function vflInitRows() {
+  const c = document.getElementById('vfl-match-rows');
+  c.innerHTML = '';
+  for (let i = 0; i < 10; i++) c.insertAdjacentHTML('beforeend', vflMatchRowHtml(i));
+}
+vflInitRows();
+
+async function vflSubmitResults() {
+  const league = vflLeague();
+  const week = parseInt(document.getElementById('vfl-week').value, 10);
+  const rows = document.querySelectorAll('#vfl-match-rows .vfl-row');
+  const matches = [];
+  for (const r of rows) {
+    matches.push({
+      home: r.querySelector('.vfl-home').value,
+      away: r.querySelector('.vfl-away').value,
+      homeScore: parseInt(r.querySelector('.vfl-hs').value, 10) || 0,
+      awayScore: parseInt(r.querySelector('.vfl-as').value, 10) || 0,
+    });
+  }
+  const st = document.getElementById('vfl-input-status');
+  try {
+    const res = await fetch('/vfl/results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ league, week, matches }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      st.innerHTML = `<span style="color:var(--green)">Week ${week} saved (${data.matchCount} matches)</span>`;
+      document.getElementById('vfl-week').value = week + 1;
+    } else {
+      st.innerHTML = `<span style="color:var(--red)">${data.error || 'Error'}: ${(data.details||[]).map(d=>d.message).join(', ')}</span>`;
+    }
+  } catch (e) { st.innerHTML = `<span style="color:var(--red)">Network error</span>`; }
+}
+
+async function vflLoad() {
+  const league = vflLeague();
+  await Promise.all([vflLoadTable(league), vflLoadAnalysis(league)]);
+}
+
+async function vflLoadTable(league) {
+  try {
+    const res = await fetch(`/vfl/analysis?league=${encodeURIComponent(league)}`);
+    const data = await res.json();
+    const { table, disc } = data;
+
+    // Disc badge
+    const discColors = { CORD: 'var(--green)', MULTI_CORD: 'var(--amber)', BANK: 'var(--red)', UNKNOWN: 'var(--muted)' };
+    document.getElementById('vfl-disc-badge').innerHTML = `<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:rgba(255,255,255,0.05);font-size:12px">
+      <span style="width:8px;height:8px;border-radius:50%;background:${discColors[disc.type]||'var(--muted)'}"></span>
+      RNG ${disc.type.replace('_','-')} (${disc.confidence}% confidence)
+    </div>`;
+
+    // Table
+    if (!table.length) { document.getElementById('vfl-league-table').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center">No data. Enter results first.</div>'; return; }
+    let html = `<table style="width:100%;font-size:12px;border-collapse:collapse">
+      <tr style="color:var(--muted);text-align:left"><th style="padding:4px">#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th><th>Form</th></tr>`;
+    for (const t of table) {
+      const formDots = t.form.map(f => f === 'W' ? '<span style="color:var(--green)">W</span>' : f === 'L' ? '<span style="color:var(--red)">L</span>' : '<span style="color:var(--amber)">D</span>').join(' ');
+      const rowBg = t.position <= 4 ? 'rgba(34,197,94,0.06)' : t.position >= 18 ? 'rgba(239,68,68,0.06)' : 'transparent';
+      html += `<tr style="background:${rowBg};border-bottom:1px solid rgba(255,255,255,0.05)">
+        <td style="padding:4px;font-weight:600">${t.position}</td><td style="font-weight:600">${t.team}</td>
+        <td>${t.played}</td><td>${t.won}</td><td>${t.drawn}</td><td>${t.lost}</td>
+        <td>${t.goalsScored}</td><td>${t.goalsConceded}</td><td>${t.goalDifference}</td>
+        <td style="font-weight:700;color:var(--blue)">${t.points}</td><td>${formDots}</td></tr>`;
+    }
+    html += '</table>';
+    document.getElementById('vfl-league-table').innerHTML = html;
+  } catch (e) { document.getElementById('vfl-league-table').innerHTML = '<div style="color:var(--red);font-size:13px">Failed to load</div>'; }
+}
+
+async function vflLoadAnalysis(league) {
+  try {
+    const res = await fetch(`/vfl/analysis?league=${encodeURIComponent(league)}`);
+    const data = await res.json();
+
+    // Alerts
+    const alertsHtml = data.alerts.length ? data.alerts.map(a => `<div class="card" style="padding:8px;margin-bottom:6px;border-left:3px solid ${a.type==='LONG_UNDER_EXIT'?'var(--green)':'var(--amber)'}">
+      <div style="font-size:12px;font-weight:600">${a.team} - ${a.type.replace(/_/g,' ')}</div>
+      <div style="font-size:11px;color:var(--muted)">${a.message}</div>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">No alerts</div>';
+    document.getElementById('vfl-alerts').innerHTML = '<h3 style="font-size:14px;margin-bottom:8px;color:var(--muted)">Alerts</h3>' + alertsHtml;
+
+    // Predators & Activators
+    document.getElementById('vfl-predators').innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:4px">Predators (UNDER)</div>` +
+      (data.predators.length ? data.predators.map(t => `<span style="font-size:11px;background:rgba(239,68,68,0.1);padding:2px 6px;border-radius:4px;margin:2px">${t}</span>`).join(' ') : '<span style="font-size:11px;color:var(--muted)">None detected</span>');
+    document.getElementById('vfl-activators').innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px">Activators (OVER)</div>` +
+      (data.activators.length ? data.activators.map(t => `<span style="font-size:11px;background:rgba(34,197,94,0.1);padding:2px 6px;border-radius:4px;margin:2px">${t}</span>`).join(' ') : '<span style="font-size:11px;color:var(--muted)">None detected</span>');
+
+    // Team form cards (major teams)
+    const majorTeams = data.table.filter(t => ['MNC','LIV','ARS','EVE'].includes(t.team));
+    document.getElementById('vfl-team-cards').innerHTML = majorTeams.map(t => {
+      const formDots = t.form.map(f => `<span style="display:inline-block;width:16px;height:16px;border-radius:50%;text-align:center;line-height:16px;font-size:10px;font-weight:700;background:${f==='W'?'var(--green)':f==='L'?'var(--red)':'var(--amber)'};color:#000">${f}</span>`).join(' ');
+      const scores = t.scoringForm.map(s => `<span style="font-size:10px;color:${s.isOver?'var(--green)':'var(--muted)'}">${s.scored}-${s.conceded}</span>`).join(' ');
+      return `<div class="card" style="padding:10px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-weight:700">${t.team}</span>
+          <span style="font-size:11px;color:var(--muted)">#${t.position} | ${t.points}pts</span>
+        </div>
+        <div style="margin-bottom:4px">${formDots}</div>
+        <div style="margin-bottom:4px">${scores}</div>
+        <div style="font-size:10px;display:flex;gap:6px;flex-wrap:wrap">
+          ${t.overStreak>0?`<span style="background:rgba(34,197,94,0.15);padding:1px 5px;border-radius:3px">OVER x${t.overStreak}</span>`:''}
+          ${t.underStreak>0?`<span style="background:rgba(239,68,68,0.15);padding:1px 5px;border-radius:3px">UNDER x${t.underStreak}</span>`:''}
+          ${t.ggStreak>0?`<span style="background:rgba(251,191,36,0.15);padding:1px 5px;border-radius:3px">GG x${t.ggStreak}</span>`:''}
+          <span style="color:var(--muted)">O:${(t.overRate*100).toFixed(0)}%</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Top scorers & conceders
+    document.getElementById('vfl-scorers').innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px">JARGUA (Top Scorers)</div>` +
+      data.topScorers.map(t => `<div style="font-size:11px;display:flex;justify-content:space-between"><span>${t.team}</span><span style="color:var(--green)">${t.goals} GF</span></div>`).join('');
+    document.getElementById('vfl-conceders').innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:4px">PREY (Top Conceders)</div>` +
+      data.topConceders.map(t => `<div style="font-size:11px;display:flex;justify-content:space-between"><span>${t.team}</span><span style="color:var(--red)">${t.conceded} GA</span></div>`).join('');
+  } catch (e) { console.error('VFL analysis error:', e); }
+}
+
+async function vflGetPicks() {
+  const league = vflLeague();
+  const week = parseInt(document.getElementById('vfl-pick-week').value, 10);
+  const el = document.getElementById('vfl-pick-results');
+  try {
+    const res = await fetch(`/vfl/picks?league=${encodeURIComponent(league)}&week=${week}`);
+    const data = await res.json();
+
+    if (data.skipWeek) {
+      el.innerHTML = `<div class="card" style="padding:16px;text-align:center;border:1px solid var(--red)">
+        <div style="font-size:16px;font-weight:700;color:var(--red);margin-bottom:6px">RNG BANK DETECTED</div>
+        <div style="font-size:13px;color:var(--muted)">Skip this league entirely. Logout and try another season.</div>
+      </div>`;
+      return;
+    }
+
+    if (!data.picks.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center">No picks available. Need more data or fixtures for week ' + week + '.</div>';
+      return;
+    }
+
+    const confColors = { HIGH: 'var(--green)', MEDIUM: 'var(--amber)', LOW: 'var(--muted)' };
+    const sugColors = { TRIO: 'var(--green)', OVER_2_5: 'var(--blue)', STRAIGHT_WIN: 'var(--amber)', SKIP: 'var(--red)' };
+
+    let html = '';
+
+    // Pro analysis
+    if (data.proAnalysis) {
+      html += `<div class="card" style="padding:10px;margin-bottom:10px;border-left:3px solid var(--blue)">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">Expert Analysis</div>
+        <div style="font-size:11px">JARGUA: ${data.proAnalysis.jargua.map(j=>`${j.team} (${j.goals}G)`).join(', ')} | PREY: ${data.proAnalysis.prey.map(p=>`${p.team} (${p.conceded}GA)`).join(', ')}</div>
+      </div>`;
+    }
+
+    html += data.picks.map(p => {
+      const sugKey = p.suggestion.replace('.', '_');
+      return `<div class="card" style="padding:12px;margin-bottom:8px;border-left:3px solid ${confColors[p.confidence]||'var(--muted)'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-weight:700;font-size:14px">${p.team} vs ${p.opponent}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;background:${sugKey==='SKIP'?'rgba(239,68,68,0.15)':'rgba(34,197,94,0.15)'};color:${sugKey==='SKIP'?'var(--red)':'var(--green)'}">${p.suggestion.replace('_',' ')}</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${p.isHome?'Home':'Away'} | Criteria: ${p.criteriaPass}/5 | Confidence: ${p.confidence}</div>
+        <div style="font-size:11px">${p.reasons.map(r => r.startsWith('WARNING') ? `<div style="color:var(--red)">${r}</div>` : `<div style="color:var(--muted)">${r}</div>`).join('')}</div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = html;
+  } catch (e) { el.innerHTML = '<div style="color:var(--red);font-size:13px">Failed to load picks</div>'; }
+}
 
 // ===== INIT =====
 (async () => {

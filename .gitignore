@@ -6,3 +6,4 @@ snapshots/
 *.log
 .DS_Store
 .vercel
+data/
