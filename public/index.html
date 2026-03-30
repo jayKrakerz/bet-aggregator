@@ -127,6 +127,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .chip{padding:7px 16px;font-size:13px;font-weight:600;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--text-2);cursor:pointer;font-family:inherit;transition:all .2s var(--ease-out);white-space:nowrap;touch-action:manipulation}
 .chip:hover{background:rgba(255,255,255,0.08);color:var(--text);border-color:rgba(255,255,255,0.2)}
 .chip.active{background:#fff;color:#131620;border-color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(255,255,255,0.1)}
+#market-filter-chips .chip.active{background:rgba(239,68,68,0.15);color:var(--red);border-color:rgba(239,68,68,0.3);text-decoration:line-through;opacity:0.7;font-weight:600;box-shadow:none}
 
 /* ===== GENERATE PILLS ===== */
 .gen-pills{display:flex;gap:8px;flex-wrap:wrap}
@@ -657,14 +658,16 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       </div>
 
       <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:11px;color:var(--text-3);font-weight:600">Market:</span>
+        <span style="font-size:11px;color:var(--text-3);font-weight:600">Exclude:</span>
         <span id="market-filter-chips" style="display:inline-flex;gap:3px;flex-wrap:wrap">
-          <button class="chip active" data-mf="" style="padding:4px 10px;font-size:11px">All</button>
           <button class="chip" data-mf="over/under" style="padding:4px 10px;font-size:11px">O/U</button>
           <button class="chip" data-mf="gg" style="padding:4px 10px;font-size:11px">GG</button>
           <button class="chip" data-mf="1x2" style="padding:4px 10px;font-size:11px">1X2</button>
           <button class="chip" data-mf="double chance" style="padding:4px 10px;font-size:11px">DC</button>
           <button class="chip" data-mf="handicap" style="padding:4px 10px;font-size:11px">HC</button>
+          <button class="chip" data-mf="halftime" style="padding:4px 10px;font-size:11px">HT</button>
+          <button class="chip" data-mf="correct score" style="padding:4px 10px;font-size:11px">CS</button>
+          <button class="chip" data-mf="draw no bet" style="padding:4px 10px;font-size:11px">DNB</button>
         </span>
       </div>
     </div>
@@ -2547,11 +2550,20 @@ function pickEfficiency(g) {
 }
 
 // ===== GENERATE CODES =====
-let selectedMarketFilter = '';
+const excludedMarkets = new Set();
 let selectedDaysRange = 0;
 document.getElementById('days-range-select').addEventListener('change', e => { selectedDaysRange = parseInt(e.target.value)||0; });
 document.querySelectorAll('#market-filter-chips .chip').forEach(b => {
-  b.onclick = () => { document.querySelectorAll('#market-filter-chips .chip').forEach(x=>x.classList.remove('active')); b.classList.add('active'); selectedMarketFilter = b.dataset.mf; };
+  b.onclick = () => {
+    const mf = b.dataset.mf;
+    if (excludedMarkets.has(mf)) {
+      excludedMarkets.delete(mf);
+      b.classList.remove('active');
+    } else {
+      excludedMarkets.add(mf);
+      b.classList.add('active');
+    }
+  };
 });
 
 // Source tabs (Scraped / Discovered)
@@ -2727,15 +2739,19 @@ function getEligibleGames(targetOdds) {
   const dates = new Set();
   for (let d=0;d<maxDays;d++) { const dt = new Date(today); dt.setDate(dt.getDate()+d); dates.add(dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')); }
   let pool = gamePool.filter(g => !g.matchDate || dates.has(g.matchDate));
-  if (selectedMarketFilter) {
-    const mf = selectedMarketFilter.toLowerCase();
+  if (excludedMarkets.size > 0) {
     pool = pool.filter(g => {
       const m = (g.market||'').toLowerCase();
-      if (mf==='gg') return m.includes('both teams')||m.includes('btts')||m.includes('gg');
-      if (mf==='over/under') return m.includes('over/under')||m.includes('total');
-      if (mf==='1x2') return m==='1x2'||m.includes('1x2')||m==='match winner';
-      if (mf==='double chance') return m.includes('double chance');
-      if (mf==='handicap') return m.includes('handicap');
+      for (const mf of excludedMarkets) {
+        if (mf==='gg' && (m.includes('both teams')||m.includes('btts')||m.includes('gg'))) return false;
+        if (mf==='over/under' && (m.includes('over/under')||m.includes('total')||m.includes('over ')||m.includes('under '))) return false;
+        if (mf==='1x2' && (m==='1x2'||m.includes('1x2')||m==='match winner')) return false;
+        if (mf==='double chance' && m.includes('double chance')) return false;
+        if (mf==='handicap' && m.includes('handicap')) return false;
+        if (mf==='halftime' && (m.includes('1st half')||m.includes('halftime')||m.includes('half time')||m.includes('ht '))) return false;
+        if (mf==='correct score' && (m.includes('correct score')||m.includes('exact score'))) return false;
+        if (mf==='draw no bet' && m.includes('draw no bet')) return false;
+      }
       return true;
     });
   }

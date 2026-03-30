@@ -667,26 +667,55 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
     }
   }
 
-  // Only keep valid codes
-  const result = raw.filter(c => c.isValid);
-
-  // Sort: codes with pending selections first (playable), then by odds
-  result.sort((a, b) => {
-    // Codes with pending games first (still playable)
-    if (a.pendingCount > 0 && b.pendingCount === 0) return -1;
-    if (a.pendingCount === 0 && b.pendingCount > 0) return 1;
-    // Then by total odds (lower = safer)
-    return (a.totalOdds || 999) - (b.totalOdds || 999);
+  // Quality filtering
+  const MAX_SELECTIONS = 20;    // 20+ legs = near-certain loss
+  const MAX_TOTAL_ODDS = 500;   // astronomical accumulators rarely hit
+  const result = raw.filter(c => {
+    if (!c.isValid) return false;
+    // Drop dead codes (any leg already lost)
+    if (c.lostCount > 0) return false;
+    // Drop codes with no pending games (fully settled, nothing to play)
+    if (c.pendingCount === 0) return false;
+    // Drop mega-accumulators
+    if (c.events && c.events > MAX_SELECTIONS) return false;
+    // Drop astronomical odds
+    if (c.totalOdds && c.totalOdds > MAX_TOTAL_ODDS) return false;
+    return true;
   });
+
+  // Score each code for ranking (higher = better)
+  function qualityScore(c: BookingCode): number {
+    let score = 0;
+    const total = (c.wonCount || 0) + (c.lostCount || 0) + (c.pendingCount || 0);
+
+    // Win progress: codes with some legs already won are proven
+    if (total > 0) score += (c.wonCount / total) * 30;
+
+    // Fewer selections = higher probability of hitting
+    if (c.events) score += Math.max(0, 20 - c.events);
+
+    // Sweet-spot odds: 2-50 range is realistic
+    if (c.totalOdds) {
+      if (c.totalOdds >= 2 && c.totalOdds <= 50) score += 15;
+      else if (c.totalOdds <= 100) score += 8;
+    }
+
+    // Pending ratio: more pending games = more upside
+    if (total > 0) score += (c.pendingCount / total) * 10;
+
+    return score;
+  }
+
+  result.sort((a, b) => qualityScore(b) - qualityScore(a));
 
   codesCache = result;
   codesCacheTime = Date.now();
   logger.info({
-    scraped: raw.length + (raw.length - result.length),
+    scraped: raw.length,
     valid: result.length,
-    invalid: raw.length - result.length,
+    filtered: raw.filter(c => c.isValid).length - result.length,
     withPending: result.filter(c => c.pendingCount > 0).length,
-  }, 'Booking codes validated');
+  }, 'Booking codes validated and filtered');
 
   return result;
 }
