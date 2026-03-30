@@ -102,43 +102,32 @@ async function scrapeSportPremi(): Promise<BookingCode[]> {
     const $ = cheerio.load(html);
 
     const codes: BookingCode[] = [];
+    const seen = new Set<string>();
 
-    // SportPremi uses a WordPress table plugin (wptb)
-    // Each row has cells containing: events, code, odds in separate div containers
-    $('tr.wptb-row, table tr').each((_, row) => {
-      const cells = $(row).find('td');
-      if (cells.length < 2) return;
+    // SportPremi uses WP Table Builder plugin (wptb).
+    // Structure: tr.wptb-row > td(0) has 3 stacked .wptb-text-container divs:
+    //   1st (12px) = events count ("21events")
+    //   2nd (16px) = booking code ("SWFLU4")
+    //   3rd (14px) = bookmaker label ("Sportybet")
+    // td(1) has odds ("46.94 Odds")
+    $('tr.wptb-row').each((_, row) => {
+      const firstCell = $(row).find('td').first();
+      const textContainers = firstCell.find('.wptb-text-container');
+      if (textContainers.length < 2) return;
 
-      // Collect all text from all cells
-      const cellTexts: string[] = [];
-      cells.each((_, cell) => {
-        $(cell).find('p, div, span').each((_, el) => {
-          const t = $(el).text().trim();
-          if (t) cellTexts.push(t);
-        });
-      });
+      // Code is in the 2nd text container (largest font)
+      const codeText = $(textContainers[1]).text().replace(/[\u200B-\u200D\uFEFF\s]/g, '').toUpperCase();
+      if (!codeText || !isValidCode(codeText) || seen.has(codeText)) return;
+      seen.add(codeText);
 
-      const rowText = cellTexts.join(' ');
-
-      // Find booking code
-      let code: string | null = null;
-      for (const t of cellTexts) {
-        const m = t.match(/^([A-Z0-9]{6})$/);
-        if (m && isValidCode(m[1]!)) { code = m[1]!; break; }
-      }
-      if (!code) {
-        const m = rowText.match(/\b([A-Z0-9]{6})\b/);
-        if (m && isValidCode(m[1]!)) code = m[1]!;
-      }
-      if (!code || codes.some(c => c.code === code)) return;
-
-      // Extract events count (e.g. "22events" or "47events")
-      const eventsMatch = rowText.match(/(\d{1,3})\s*events?/i);
-      // Extract odds (e.g. "83.51")
-      const oddsMatch = rowText.match(/([\d,]+\.\d{2})/);
+      // Events from 1st container, odds from 2nd cell
+      const eventsText = $(textContainers[0]).text().trim();
+      const eventsMatch = eventsText.match(/(\d{1,3})\s*events?/i);
+      const oddsCell = $(row).find('td').eq(1);
+      const oddsMatch = oddsCell.text().match(/([\d,]+\.\d{2})/);
 
       codes.push({
-        code,
+        code: codeText,
         source: 'SportPremi',
         sourceUrl: 'https://sportpremi.com/bet-codes/sportybet/',
         events: eventsMatch ? parseInt(eventsMatch[1]!) : null,
@@ -152,14 +141,14 @@ async function scrapeSportPremi(): Promise<BookingCode[]> {
       });
     });
 
-    // Fallback: scan all <p> tags for codes if table parsing found nothing
+    // Fallback: scan all <p> tags for codes if structured parsing found nothing
     if (codes.length === 0) {
       $('p').each((_, el) => {
-        const text = $(el).text().trim();
-        const match = text.match(/^([A-Z0-9]{6})$/);
-        if (match && isValidCode(match[1]!)) {
+        const raw = $(el).text().replace(/[\u200B-\u200D\uFEFF\s]/g, '').toUpperCase();
+        if (raw.length === 6 && isValidCode(raw) && !seen.has(raw)) {
+          seen.add(raw);
           codes.push({
-            code: match[1]!,
+            code: raw,
             source: 'SportPremi',
             sourceUrl: 'https://sportpremi.com/bet-codes/sportybet/',
             events: null, totalOdds: null, market: null,
@@ -182,11 +171,18 @@ async function scrapeSportPremi(): Promise<BookingCode[]> {
 /** Scrape paqbet.com */
 async function scrapePaqBet(): Promise<BookingCode[]> {
   try {
-    const res = await fetch('https://paqbet.com/pg/bet-codes', {
-      headers: HEADERS,
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return [];
+    // PaqBet is slow — use longer timeout with one retry
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await fetch('https://paqbet.com/pg/bet-codes', {
+          headers: HEADERS,
+          signal: AbortSignal.timeout(15000),
+        });
+        if (res.ok) break;
+      } catch { /* retry */ }
+    }
+    if (!res?.ok) return [];
     const html = await res.text();
     const $ = cheerio.load(html);
 
@@ -425,10 +421,10 @@ type CodeHubEntry = {
   }>;
 };
 
-/** Fetch codes from a single Sportybet country hub */
-async function fetchCountryCodeHub(country: { code: string; name: string }): Promise<BookingCode[]> {
+/** Fetch codes from a single Sportybet country hub endpoint */
+async function fetchCodeHubEndpoint(url: string, country: { code: string; name: string }): Promise<BookingCode[]> {
   try {
-    const res = await fetch(`https://www.sportybet.com/api/${country.code}/orders/bookingCode/recommendedCode`, {
+    const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       signal: AbortSignal.timeout(10000),
     });
@@ -470,11 +466,15 @@ async function fetchCountryCodeHub(country: { code: string; name: string }): Pro
   }
 }
 
-/** Scrape Sportybet Code Hub — all countries in parallel (100 codes total) */
+/** Scrape Sportybet Code Hub — all countries x 2 endpoints in parallel */
 async function scrapeSportyBetCodeHub(): Promise<BookingCode[]> {
-  const results = await Promise.allSettled(
-    SPORTYBET_COUNTRIES.map(c => fetchCountryCodeHub(c)),
-  );
+  // Call both the default endpoint and football-filtered endpoint per country
+  // They return overlapping but different sets of codes
+  const requests = SPORTYBET_COUNTRIES.flatMap(c => [
+    fetchCodeHubEndpoint(`https://www.sportybet.com/api/${c.code}/orders/bookingCode/recommendedCode`, c),
+    fetchCodeHubEndpoint(`https://www.sportybet.com/api/${c.code}/orders/bookingCode/recommendedCode?sportId=sr%3Asport%3A1`, c),
+  ]);
+  const results = await Promise.allSettled(requests);
 
   const allCodes: BookingCode[] = [];
   const seen = new Set<string>();
