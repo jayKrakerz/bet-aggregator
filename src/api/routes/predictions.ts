@@ -4,14 +4,9 @@ import { enrichMatches, hasFootballApi } from '../football-enrichment.js';
 import { fotmobEnrichMatches } from '../fotmob-enrichment.js';
 import { discoverCodes, getMutationStats } from '../code-mutator.js';
 import { batchPinnacleOdds } from '../pinnacle-odds.js';
-import { scrapeVirtuals } from '../virtual-scraper.js';
-import {
-  scrapeResults as scrapeVirtualResults,
-  getAllStats as getVirtualStats,
-  predictMatch as predictVirtualMatch,
-  getResultsCount as getVirtualResultsCount,
-  getRecentResults as getVirtualRecentResults,
-} from '../virtual-results.js';
+// Virtual imports are lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
+const virtualScraper = () => import('../virtual-scraper.js');
+const virtualResults = () => import('../virtual-results.js');
 
 // Strict alphanumeric pattern for booking codes
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
@@ -266,6 +261,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   // GET /predictions/virtuals — scrape virtual football from Golden Race
   app.get('/virtuals', async (_request, reply) => {
     try {
+      const { scrapeVirtuals } = await virtualScraper();
       const leagues = await scrapeVirtuals();
       void reply.header('Cache-Control', 'public, max-age=90');
       return {
@@ -281,8 +277,9 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   // GET /predictions/virtual-stats — team stats from collected virtual results
   app.get('/virtual-stats', async (request) => {
     const { country } = request.query as { country?: string };
-    const stats = getVirtualStats();
-    const resultsCount = getVirtualResultsCount();
+    const { getAllStats, getResultsCount } = await virtualResults();
+    const stats = getAllStats();
+    const resultsCount = getResultsCount();
     if (country) {
       return { data: stats[country] || [], resultsCount, country };
     }
@@ -294,12 +291,13 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     const { matches } = request.query as { matches?: string };
     if (!matches) return reply.status(400).send({ error: 'Provide matches as JSON array' });
     try {
+      const { predictMatch, getResultsCount } = await virtualResults();
       const parsed = JSON.parse(matches) as Array<{ home: string; away: string; country: string }>;
       const predictions = parsed
         .slice(0, 50)
-        .map((m) => predictVirtualMatch(m.home, m.away, m.country))
+        .map((m) => predictMatch(m.home, m.away, m.country))
         .filter(Boolean);
-      return { data: predictions, resultsCount: getVirtualResultsCount() };
+      return { data: predictions, resultsCount: getResultsCount() };
     } catch {
       return reply.status(400).send({ error: 'Invalid matches format' });
     }
@@ -308,15 +306,17 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   // GET /predictions/virtual-results — recent results
   app.get('/virtual-results', async (request) => {
     const { country, limit } = request.query as { country?: string; limit?: string };
-    const results = getVirtualRecentResults(country, parseInt(limit || '50', 10));
-    return { data: results, total: getVirtualResultsCount() };
+    const { getRecentResults, getResultsCount } = await virtualResults();
+    const results = getRecentResults(country, parseInt(limit || '50', 10));
+    return { data: results, total: getResultsCount() };
   });
 
   // POST /predictions/virtual-collect — trigger a results collection
   app.post('/virtual-collect', async (_request, reply) => {
     try {
-      const results = await scrapeVirtualResults();
-      return { collected: results.length, total: getVirtualResultsCount() };
+      const { scrapeResults } = await virtualResults();
+      const results = await scrapeResults();
+      return { collected: results.length, total: (await virtualResults()).getResultsCount() };
     } catch {
       return reply.status(502).send({ error: 'Failed to collect virtual results' });
     }
