@@ -787,6 +787,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
           <button class="chip" data-mf="halftime" style="padding:4px 10px;font-size:11px">HT</button>
           <button class="chip" data-mf="correct score" style="padding:4px 10px;font-size:11px">CS</button>
           <button class="chip" data-mf="draw no bet" style="padding:4px 10px;font-size:11px">DNB</button>
+          <button class="chip" data-mf="corner" style="padding:4px 10px;font-size:11px">Corners</button>
         </span>
       </div>
     </div>
@@ -2941,6 +2942,7 @@ function getEligibleGames(targetOdds) {
         if (mf==='halftime' && (m.includes('1st half')||m.includes('halftime')||m.includes('half time')||m.includes('ht '))) return false;
         if (mf==='correct score' && (m.includes('correct score')||m.includes('exact score'))) return false;
         if (mf==='draw no bet' && m.includes('draw no bet')) return false;
+        if (mf==='corner' && m.includes('corner')) return false;
       }
       return true;
     });
