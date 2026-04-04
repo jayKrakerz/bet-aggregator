@@ -4,6 +4,14 @@ import { enrichMatches, hasFootballApi } from '../football-enrichment.js';
 import { fotmobEnrichMatches } from '../fotmob-enrichment.js';
 import { discoverCodes, getMutationStats } from '../code-mutator.js';
 import { batchPinnacleOdds } from '../pinnacle-odds.js';
+import { scrapeVirtuals } from '../virtual-scraper.js';
+import {
+  scrapeResults as scrapeVirtualResults,
+  getAllStats as getVirtualStats,
+  predictMatch as predictVirtualMatch,
+  getResultsCount as getVirtualResultsCount,
+  getRecentResults as getVirtualRecentResults,
+} from '../virtual-results.js';
 
 // Strict alphanumeric pattern for booking codes
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
@@ -216,6 +224,102 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return { data, matched: odds.size };
+  });
+
+  // GET /predictions/games — fetch pre-match football events with odds from Sportybet
+  app.get('/games', async (request, reply) => {
+    const query = request.query as { sportId?: string; timeline?: string; pageSize?: string; pageNum?: string };
+    const sportId = query.sportId || 'sr:sport:1'; // football
+    if (!BETRADAR_ID.test(sportId)) {
+      return reply.status(400).send({ error: 'Invalid sportId' });
+    }
+    const isLive = query.timeline === 'live';
+    const pageSize = Math.min(Math.max(parseInt(query.pageSize || '50', 10) || 50, 1), 100);
+    const pageNum = Math.max(parseInt(query.pageNum || '1', 10) || 1, 1);
+    // marketId: 1=1X2, 18=Over/Under, 29=GG/NG (Both Teams to Score)
+    const marketId = '1,18,29';
+    const ts = Date.now();
+
+    const countries = ['ng', 'gh', 'ke', 'tz', 'zm'];
+    const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    for (const cc of countries) {
+      try {
+        const endpoint = isLive ? 'pcLiveEvents' : 'pcUpcomingEvents';
+        const url = `https://www.sportybet.com/api/${cc}/factsCenter/${endpoint}?_t=${ts}&sportId=${encodeURIComponent(sportId)}&marketId=${encodeURIComponent(marketId)}&pageSize=${pageSize}&pageNum=${pageNum}`;
+        const res = await fetch(url, {
+          headers: { 'User-Agent': ua },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) continue;
+        const data = await res.json() as { bizCode?: number; data?: unknown };
+        if (data.bizCode === 10000 && data.data) {
+          void reply.header('Cache-Control', 'public, max-age=120');
+          return { data: data.data, country: cc, timeline: isLive ? 'live' : 'prematch' };
+        }
+      } catch {
+        // try next country
+      }
+    }
+    return reply.status(502).send({ error: 'All Sportybet endpoints failed' });
+  });
+
+  // GET /predictions/virtuals — scrape virtual football from Golden Race
+  app.get('/virtuals', async (_request, reply) => {
+    try {
+      const leagues = await scrapeVirtuals();
+      void reply.header('Cache-Control', 'public, max-age=90');
+      return {
+        data: leagues,
+        count: leagues.length,
+        matches: leagues.reduce((s, l) => s + l.matches.length, 0),
+      };
+    } catch {
+      return reply.status(502).send({ error: 'Failed to scrape virtual games' });
+    }
+  });
+
+  // GET /predictions/virtual-stats — team stats from collected virtual results
+  app.get('/virtual-stats', async (request) => {
+    const { country } = request.query as { country?: string };
+    const stats = getVirtualStats();
+    const resultsCount = getVirtualResultsCount();
+    if (country) {
+      return { data: stats[country] || [], resultsCount, country };
+    }
+    return { data: stats, resultsCount };
+  });
+
+  // GET /predictions/virtual-predict — predict upcoming virtual matches
+  app.get('/virtual-predict', async (request, reply) => {
+    const { matches } = request.query as { matches?: string };
+    if (!matches) return reply.status(400).send({ error: 'Provide matches as JSON array' });
+    try {
+      const parsed = JSON.parse(matches) as Array<{ home: string; away: string; country: string }>;
+      const predictions = parsed
+        .slice(0, 50)
+        .map((m) => predictVirtualMatch(m.home, m.away, m.country))
+        .filter(Boolean);
+      return { data: predictions, resultsCount: getVirtualResultsCount() };
+    } catch {
+      return reply.status(400).send({ error: 'Invalid matches format' });
+    }
+  });
+
+  // GET /predictions/virtual-results — recent results
+  app.get('/virtual-results', async (request) => {
+    const { country, limit } = request.query as { country?: string; limit?: string };
+    const results = getVirtualRecentResults(country, parseInt(limit || '50', 10));
+    return { data: results, total: getVirtualResultsCount() };
+  });
+
+  // POST /predictions/virtual-collect — trigger a results collection
+  app.post('/virtual-collect', async (_request, reply) => {
+    try {
+      const results = await scrapeVirtualResults();
+      return { collected: results.length, total: getVirtualResultsCount() };
+    } catch {
+      return reply.status(502).send({ error: 'Failed to collect virtual results' });
+    }
   });
 
   // POST /predictions/discover — discover new codes by mutating known codes

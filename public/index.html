@@ -178,6 +178,96 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .sel-row:hover{background:rgba(255,255,255,0.03)}
 .sel-row[data-sel]{cursor:pointer}
 
+/* ===== GAMES PAGE ===== */
+.games-hero{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
+.games-hero-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 10px;text-align:center}
+.games-hero-num{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-0.5px;line-height:1.2}
+.games-hero-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-3);margin-top:4px}
+.games-controls{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.games-search{flex:1;min-width:140px;max-width:280px;padding:9px 14px 9px 36px;font-size:13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);color:var(--text);font-family:inherit;transition:border-color .2s,box-shadow .2s;outline:none}
+.games-search:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(78,148,255,0.12)}
+.games-search-wrap{position:relative;flex:1;min-width:140px;max-width:280px}
+.games-search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none}
+.games-timeline{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);overflow:hidden;flex-shrink:0}
+.games-timeline button{padding:8px 18px;font-size:12px;font-weight:700;border:none;background:transparent;color:var(--text-3);cursor:pointer;font-family:inherit;transition:all .2s;position:relative;letter-spacing:.3px}
+.games-timeline button.active{background:var(--blue);color:#fff}
+.games-timeline button.live-btn.active{background:var(--green);color:#fff}
+.league-section{margin-bottom:6px;border-radius:var(--r-sm);overflow:hidden;border:1px solid var(--border);background:var(--surface)}
+.league-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;user-select:none;background:linear-gradient(135deg,rgba(255,255,255,0.02),transparent);transition:background .2s}
+.league-hdr:hover{background:rgba(255,255,255,0.03)}
+.league-hdr .flag{font-size:18px;flex-shrink:0}
+.league-hdr .name{font-size:13px;font-weight:700;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.league-hdr .count{font-size:11px;font-weight:600;color:var(--text-3);background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:10px}
+.league-hdr .chevron{color:var(--text-3);transition:transform .25s var(--ease-out);flex-shrink:0}
+.league-section.collapsed .chevron{transform:rotate(-90deg)}
+.league-section.collapsed .league-body{display:none}
+.league-body{border-top:1px solid var(--border)}
+/* Column headers for odds */
+.odds-header{display:flex;align-items:center;padding:6px 16px;gap:0;background:rgba(0,0,0,0.15);border-bottom:1px solid rgba(255,255,255,0.03)}
+.odds-header-spacer{flex:1;min-width:0}
+.odds-header-group{display:flex;gap:2px;align-items:center}
+.odds-header-label{width:48px;text-align:center;font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px}
+.odds-header-sep{width:1px;height:16px;background:var(--border);margin:0 4px;flex-shrink:0}
+/* Game rows */
+.gm{display:flex;align-items:center;padding:10px 16px;gap:0;border-bottom:1px solid rgba(255,255,255,0.03);transition:background .15s}
+.gm:last-child{border-bottom:none}
+.gm:hover{background:rgba(255,255,255,0.02)}
+.gm-info{flex:1;min-width:0;display:flex;align-items:center;gap:12px}
+.gm-time-col{width:44px;flex-shrink:0;text-align:center}
+.gm-time-h{font-size:12px;font-weight:700;color:var(--text);line-height:1.2}
+.gm-time-d{font-size:9px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px;margin-top:1px}
+.gm-live-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:.5px}
+.gm-live-badge::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:livePulse 1.5s ease-in-out infinite}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+.gm-teams{flex:1;min-width:0}
+.gm-team{font-size:13px;font-weight:600;color:var(--text);line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-score{width:28px;text-align:center;flex-shrink:0}
+.gm-score-val{font-size:14px;font-weight:800;color:var(--green);line-height:1.6}
+.gm-odds{display:flex;gap:2px;align-items:center;flex-shrink:0}
+.gm-odds-sep{width:1px;height:28px;background:var(--border);margin:0 4px;flex-shrink:0}
+.ob{width:48px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.03);color:var(--text);font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s var(--ease-out);touch-action:manipulation;font-variant-numeric:tabular-nums}
+.ob:hover{border-color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.07);transform:translateY(-1px)}
+.ob:active{transform:scale(.95)}
+.ob.sel{background:rgba(78,148,255,0.15);border-color:var(--blue);color:var(--blue);box-shadow:0 0 12px rgba(78,148,255,0.12)}
+.ob.fav{color:var(--green)}
+.ob.sel.fav{color:var(--blue)}
+.ob.locked{opacity:.35;pointer-events:none}
+.gm-more{display:flex;justify-content:center;padding:0 16px 8px}
+.gm-more-btn{font-size:11px;font-weight:600;color:var(--text-3);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 12px;border-radius:4px;transition:all .15s}
+.gm-more-btn:hover{color:var(--text-2);background:rgba(255,255,255,0.04)}
+/* Expanded markets */
+.gm-expand{display:none;padding:0 16px 12px;border-top:1px solid var(--border);background:rgba(0,0,0,0.08)}
+.gm-expand.open{display:block}
+.gm-expand-mkt{padding:8px 0}
+.gm-expand-mkt:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.03)}
+.gm-expand-title{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.gm-expand-odds{display:flex;gap:4px;flex-wrap:wrap}
+.gm-expand-odds .ob{width:auto;min-width:52px;padding:0 10px;height:32px;gap:4px}
+.gm-expand-odds .ob .ob-lbl{font-size:10px;color:var(--text-3);font-weight:500}
+.gm-expand-odds .ob.sel .ob-lbl{color:var(--blue)}
+/* Betslip floating bar */
+.slip-float{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 12px);left:50%;transform:translateX(-50%);z-index:90;width:calc(100% - 24px);max-width:540px;background:rgba(30,34,49,0.96);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border:1px solid rgba(78,148,255,0.25);border-radius:var(--r);padding:14px 18px;box-shadow:0 8px 40px rgba(0,0,0,0.4),0 0 0 1px rgba(78,148,255,0.08);display:none;animation:slideUp .3s var(--ease-out-expo)}
+@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.slip-float.show{display:block}
+.slip-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.slip-picks{font-size:16px;font-weight:800;color:var(--blue)}
+.slip-odds-val{font-size:14px;font-weight:700;color:var(--amber);margin-left:auto}
+.slip-details{display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto;margin-bottom:12px;scrollbar-width:thin}
+.slip-detail{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-2);padding:4px 0}
+.slip-detail-match{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slip-detail-pick{font-weight:700;color:var(--text);flex-shrink:0}
+.slip-detail-odds{color:var(--amber);font-weight:700;flex-shrink:0;min-width:36px;text-align:right}
+.slip-detail-rm{width:18px;height:18px;border-radius:50%;border:none;background:rgba(240,96,96,0.12);color:var(--red);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s}
+.slip-detail-rm:hover{background:rgba(240,96,96,0.25)}
+.slip-actions{display:flex;gap:8px}
+.slip-actions .btn{flex:1}
+/* Load more */
+.games-load-more{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;margin:8px 0 16px;border:1px dashed var(--border);border-radius:var(--r-xs);cursor:pointer;color:var(--text-2);font-size:13px;font-weight:600;background:none;width:100%;font-family:inherit;transition:all .2s}
+.games-load-more:hover{border-color:var(--blue);color:var(--blue);background:rgba(78,148,255,0.04)}
+/* Generated code result */
+.slip-result{margin-bottom:14px;border-radius:var(--r-sm);border:1px solid rgba(52,212,114,0.25);background:linear-gradient(135deg,rgba(52,212,114,0.04),transparent);padding:16px 18px;animation:fadeUp .3s ease-out}
+.slip-result .code-val{font-size:22px}
+
 /* ===== GEN LOADING ===== */
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -415,6 +505,21 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   .onboard-steps{flex-direction:column;gap:8px}
   .onboard-step{min-width:auto}
 
+  /* Games page */
+  .games-hero{grid-template-columns:repeat(4,1fr);gap:6px}
+  .games-hero-num{font-size:18px}
+  .games-hero-label{font-size:8px}
+  .games-hero-stat{padding:10px 6px}
+  .ob{width:42px;height:32px;font-size:11px}
+  .odds-header-label{width:42px;font-size:8px}
+  .gm{padding:8px 12px}
+  .gm-team{font-size:12px}
+  .league-hdr{padding:10px 12px}
+  .slip-float{width:calc(100% - 16px);padding:12px 14px}
+  .gm-time-col{width:38px}
+  .gm-time-h{font-size:11px}
+  .gm-odds-sep{margin:0 2px;height:24px}
+
   /* Drawer */
   .drawer-body{padding:14px 16px calc(24px + env(safe-area-inset-bottom,0px))}
 }
@@ -442,6 +547,19 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   .gen-code-val{font-size:16px;letter-spacing:1px}
   .sel-col-time{display:none !important}
   .sel-col-score{display:none !important}
+  .games-hero{grid-template-columns:repeat(4,1fr);gap:4px}
+  .games-hero-num{font-size:16px}
+  .games-hero-stat{padding:8px 4px}
+  .ob{width:38px;height:30px;font-size:10px;border-radius:4px}
+  .odds-header-label{width:38px;font-size:7px}
+  .gm{padding:6px 10px}
+  .gm-team{font-size:11px}
+  .gm-time-col{width:34px}
+  .gm-time-h{font-size:10px}
+  .gm-time-d{font-size:8px}
+  .gm-odds-sep{display:none}
+  .league-hdr{padding:8px 10px}
+  .league-hdr .name{font-size:12px}
 }
 </style>
 </head>
@@ -460,6 +578,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <button class="chip" data-page="generate">Generate</button>
       <button class="chip" data-page="tools">Tools</button>
       <button class="chip" data-page="history">History</button>
+      <button class="chip" data-page="games">Games</button>
       <button class="chip" data-page="vfl">VFL</button>
     </div>
     <div class="hdr-status" id="health">
@@ -881,6 +1000,69 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 </div>
 
 <!-- ===== PAGE: VFL ANALYZER ===== -->
+<!-- ===== PAGE: GAMES ===== -->
+<div class="page" id="page-games">
+  <!-- Hero stats -->
+  <div class="games-hero" id="games-hero">
+    <div class="games-hero-stat">
+      <div class="games-hero-num" id="gh-matches" style="color:var(--blue)">--</div>
+      <div class="games-hero-label">Matches</div>
+    </div>
+    <div class="games-hero-stat">
+      <div class="games-hero-num" id="gh-leagues" style="color:var(--green)">--</div>
+      <div class="games-hero-label">Leagues</div>
+    </div>
+    <div class="games-hero-stat">
+      <div class="games-hero-num" id="gh-today" style="color:var(--amber)">--</div>
+      <div class="games-hero-label">Today</div>
+    </div>
+    <div class="games-hero-stat">
+      <div class="games-hero-num" id="gh-picks" style="color:var(--purple)">0</div>
+      <div class="games-hero-label">Picks</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="games-controls">
+    <div class="games-timeline" id="games-timeline-tabs">
+      <button class="active" data-gt="prematch">Pre-match</button>
+      <button data-gt="live" class="live-btn">Live</button>
+      <button data-gt="virtual" style="border-left:1px solid var(--border)">Virtuals</button>
+    </div>
+    <div class="games-search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="games-search" class="games-search" placeholder="Search team or league...">
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="gamesTimeline==='virtual'?loadVirtuals():loadGames()" style="flex-shrink:0;gap:4px;display:inline-flex;align-items:center">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      Refresh
+    </button>
+  </div>
+
+  <div id="games-slip-result"></div>
+
+  <!-- Games list -->
+  <div id="games-list">
+    <div class="empty">Loading games...</div>
+  </div>
+
+  <!-- Virtual games list -->
+  <div id="virtuals-list" style="display:none"></div>
+
+  <!-- Floating betslip -->
+  <div class="slip-float" id="games-slip-bar">
+    <div class="slip-top">
+      <span class="slip-picks" id="games-slip-count">0 picks</span>
+      <span class="slip-odds-val" id="games-slip-odds">0.00</span>
+    </div>
+    <div class="slip-details" id="games-slip-details"></div>
+    <div class="slip-actions">
+      <button class="btn btn-ghost btn-sm" onclick="clearGamesSlip()">Clear All</button>
+      <button class="btn btn-green btn-sm" onclick="createGamesCode()" style="font-weight:800">Get Booking Code</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-vfl">
   <h2 style="font-size:18px;font-weight:700;margin-bottom:14px">VFL Analyzer</h2>
   <!-- League selector -->
@@ -978,6 +1160,10 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   <button class="nav-btn" data-page="history">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
     History
+  </button>
+  <button class="nav-btn" data-page="games">
+    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg></span>
+    Games
   </button>
   <button class="nav-btn" data-page="vfl">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>
@@ -1093,6 +1279,10 @@ function switchPage(name) {
   });
 
   if (name === 'codes' && !codesLoaded) loadBookingCodes();
+  if (name === 'games') {
+    if (gamesTimeline === 'virtual') { if (!virtualsLoaded) loadVirtuals(); }
+    else if (!gamesLoaded) loadGames();
+  }
   if (name === 'history') { renderHistory(); refreshHistoryStatuses(); }
 
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -1904,7 +2094,7 @@ function recordConsensus(selections, codeId) {
 function getConsensus(g) { return consensusMap.get(g.eventId+':'+(g.marketId||'')+':'+(g.outcomeId||''))?.count || 0; }
 
 // Gimmick/novelty markets that are unpredictable
-const GIMMICK_MARKETS = ['1 to 5 minute', '1 to 10 minute', '1 to 15 minute', '6 to 10 minute', '11 to 15 minute', 'correct score', 'exact goals', 'first goal', 'last goal', 'race to', 'minute of'];
+const GIMMICK_MARKETS = ['1 to 5 minute', '1 to 10 minute', '1 to 15 minute', '6 to 10 minute', '11 to 15 minute', 'correct score', 'exact goals', 'first goal', 'last goal', 'race to', 'minute of', 'corner'];
 
 function isGimmickMarket(market) {
   if (!market) return false;
@@ -4098,6 +4288,771 @@ async function vflGetPicks() {
 
     el.innerHTML = html;
   } catch (e) { el.innerHTML = '<div style="color:var(--red);font-size:13px">Failed to load picks</div>'; }
+}
+
+// ===== GAMES PAGE =====
+let gamesTimeline = 'prematch';
+let gamesData = [];
+let gamesTotalNum = 0;
+let gamesPageNum = 1;
+const GAMES_PAGE_SIZE = 50;
+const gamesSlip = new Map();
+let gamesLoaded = false;
+const collapsedLeagues = new Set();
+
+document.querySelectorAll('#games-timeline-tabs button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('#games-timeline-tabs button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    gamesTimeline = b.dataset.gt;
+    const isVirtual = gamesTimeline === 'virtual';
+    document.getElementById('games-list').style.display = isVirtual ? 'none' : '';
+    document.getElementById('virtuals-list').style.display = isVirtual ? '' : 'none';
+    document.getElementById('games-slip-bar').classList.toggle('show', false);
+    if (isVirtual) {
+      if (!virtualsLoaded) loadVirtuals();
+      else renderVirtuals();
+    } else {
+      gamesLoaded = false;
+      loadGames();
+    }
+  };
+});
+
+async function loadGames(append) {
+  const listEl = document.getElementById('games-list');
+  if (!append) {
+    gamesPageNum = 1;
+    gamesData = [];
+    listEl.innerHTML = '<div class="empty"><div class="spinner" style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 10px"></div>Loading games...</div>';
+  }
+  try {
+    const res = await fetch(`/predictions/games?timeline=${gamesTimeline}&pageSize=${GAMES_PAGE_SIZE}&pageNum=${gamesPageNum}`);
+    if (!res.ok) throw new Error('API error');
+    const json = await res.json();
+    const newGames = parseGamesResponse(json.data);
+    gamesTotalNum = json.data?.totalNum || 0;
+    gamesData = append ? gamesData.concat(newGames) : newGames;
+    gamesLoaded = true;
+    renderGames();
+  } catch (e) {
+    console.error('Load games error:', e);
+    if (!append) listEl.innerHTML = '<div class="empty" style="color:var(--red)">Failed to load games. Tap Refresh to retry.</div>';
+  }
+}
+
+function parseGamesResponse(data) {
+  const games = [];
+  if (!data) return games;
+  const tournaments = data.tournaments || data;
+  if (!Array.isArray(tournaments)) return games;
+  for (const t of tournaments) {
+    const events = t.events || [];
+    for (const e of events) {
+      const cat = e.sport?.category;
+      const league = cat ? `${cat.name} - ${cat.tournament?.name || t.name || ''}` : (t.name || 'Unknown League');
+      const category = cat?.name || '';
+      const markets = [];
+      if (e.markets && Array.isArray(e.markets)) {
+        for (const m of e.markets) {
+          const outcomes = [];
+          if (m.outcomes && Array.isArray(m.outcomes)) {
+            for (const o of m.outcomes) {
+              if (!o.isActive) continue;
+              outcomes.push({ id: o.id || '', desc: o.desc || '', odds: parseFloat(o.odds) || 0 });
+            }
+          }
+          markets.push({ id: m.id || '', desc: m.desc || m.name || '', specifier: m.specifier || '', outcomes });
+        }
+      }
+      games.push({
+        eventId: e.eventId || '', sportId: e.sport?.id || 'sr:sport:1',
+        homeTeam: e.homeTeamName || '', awayTeam: e.awayTeamName || '',
+        league, category,
+        kickoff: e.estimateStartTime || 0,
+        matchStatus: e.matchStatus || '', score: e.setScore || '',
+        totalMarkets: e.totalMarketSize || 0, markets,
+      });
+    }
+  }
+  return games;
+}
+
+function formatKickoff(ts) {
+  if (!ts) return { time: '--:--', date: '' };
+  const d = new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts);
+  const now = new Date();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const isToday = d.toDateString() === now.toDateString();
+  const tom = new Date(now); tom.setDate(tom.getDate() + 1);
+  const isTomorrow = d.toDateString() === tom.toDateString();
+  let date = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  if (isToday) date = 'Today';
+  else if (isTomorrow) date = 'Tmrw';
+  return { time, date };
+}
+
+function updateGamesHero() {
+  const now = new Date();
+  const todayStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const leagues = new Set(gamesData.map(g => g.league));
+  const todayCount = gamesData.filter(g => {
+    if (!g.kickoff) return true;
+    const d = new Date(g.kickoff);
+    return d.toDateString() === now.toDateString();
+  }).length;
+  document.getElementById('gh-matches').textContent = gamesTotalNum || gamesData.length;
+  document.getElementById('gh-leagues').textContent = leagues.size;
+  document.getElementById('gh-today').textContent = todayCount;
+  document.getElementById('gh-picks').textContent = gamesSlip.size;
+}
+
+function renderGames() {
+  const listEl = document.getElementById('games-list');
+  const search = (document.getElementById('games-search').value || '').toLowerCase().trim();
+
+  let filtered = gamesData;
+  if (search) {
+    filtered = gamesData.filter(g =>
+      g.homeTeam.toLowerCase().includes(search) ||
+      g.awayTeam.toLowerCase().includes(search) ||
+      g.league.toLowerCase().includes(search)
+    );
+  }
+
+  updateGamesHero();
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="empty">No games found</div>';
+    return;
+  }
+
+  // Group by league
+  const groups = new Map();
+  for (const g of filtered) {
+    if (!groups.has(g.league)) groups.set(g.league, []);
+    groups.get(g.league).push(g);
+  }
+
+  let html = '';
+  for (const [league, events] of groups) {
+    const collapsed = collapsedLeagues.has(league);
+    const flag = getCountryFlag(league);
+
+    html += `<div class="league-section${collapsed ? ' collapsed' : ''}">`;
+    html += `<div class="league-hdr" onclick="toggleLeague(this)">`;
+    html += `<span class="flag">${flag}</span>`;
+    html += `<span class="name">${esc(league)}</span>`;
+    html += `<span class="count">${events.length}</span>`;
+    html += `<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+    html += `</div>`;
+    html += `<div class="league-body">`;
+
+    // Column headers
+    html += `<div class="odds-header">`;
+    html += `<div class="odds-header-spacer"></div>`;
+    html += `<div class="odds-header-group"><span class="odds-header-label">1</span><span class="odds-header-label">X</span><span class="odds-header-label">2</span></div>`;
+    html += `<div class="odds-header-sep"></div>`;
+    html += `<div class="odds-header-group"><span class="odds-header-label">OV</span><span class="odds-header-label">UN</span></div>`;
+    html += `<div class="odds-header-sep"></div>`;
+    html += `<div class="odds-header-group"><span class="odds-header-label">GG</span><span class="odds-header-label">NG</span></div>`;
+    html += `</div>`;
+
+    for (const g of events) {
+      const isLive = gamesTimeline === 'live' || ['live','1h','2h','ht','in progress','first half','second half'].includes((g.matchStatus||'').toLowerCase());
+      const ko = formatKickoff(g.kickoff);
+      const mainMkts = getMainMarkets(g.markets);
+      const m1x2 = mainMkts.find(m => (m.desc||'').toLowerCase().includes('1x2') || (m.desc||'').toLowerCase().includes('match winner'));
+      const mOU = mainMkts.find(m => (m.desc||'').toLowerCase().includes('over/under') || (m.desc||'').toLowerCase().includes('total'));
+      const mGG = mainMkts.find(m => { const d = (m.desc||'').toLowerCase(); return d.includes('both teams') || d.includes('btts') || d.includes('gg/ng') || d === 'gg'; });
+
+      html += `<div class="gm" data-eid="${esc(g.eventId)}">`;
+
+      // Time column
+      html += `<div class="gm-info">`;
+      html += `<div class="gm-time-col">`;
+      if (isLive) {
+        html += `<div class="gm-live-badge">LIVE</div>`;
+      } else {
+        html += `<div class="gm-time-h">${ko.time}</div>`;
+        html += `<div class="gm-time-d">${ko.date}</div>`;
+      }
+      html += `</div>`;
+
+      // Teams
+      html += `<div class="gm-teams">`;
+      html += `<div class="gm-team">${esc(g.homeTeam)}</div>`;
+      html += `<div class="gm-team">${esc(g.awayTeam)}</div>`;
+      html += `</div>`;
+
+      // Live score
+      if (isLive && g.score) {
+        const scores = g.score.split(':');
+        html += `<div class="gm-score">`;
+        html += `<div class="gm-score-val">${scores[0] || '0'}</div>`;
+        html += `<div class="gm-score-val">${scores[1] || '0'}</div>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+
+      // Odds grid
+      html += `<div class="gm-odds">`;
+
+      // 1X2
+      html += renderOddsGroup(g, m1x2, ['Home', 'Draw', 'Away'], ['1', 'X', '2']);
+      html += `<div class="gm-odds-sep"></div>`;
+      // O/U
+      html += renderOddsGroup(g, mOU, ['Over', 'Under'], ['Over', 'Under']);
+      html += `<div class="gm-odds-sep"></div>`;
+      // GG/NG
+      html += renderOddsGroup(g, mGG, ['Yes', 'No'], ['GG', 'NG']);
+
+      html += `</div>`;
+      html += `</div>`;
+
+      // Extra markets expand
+      const extraMarkets = g.markets.filter(m => !mainMkts.includes(m) && m.outcomes.length > 0);
+      if (extraMarkets.length > 0) {
+        html += `<div class="gm-more"><button class="gm-more-btn" onclick="toggleExtraMarkets(this,'${esc(g.eventId)}')">+${g.totalMarkets > 3 ? g.totalMarkets - 3 : extraMarkets.length} markets</button></div>`;
+        html += `<div class="gm-expand" id="extra-${esc(g.eventId)}">`;
+        for (const m of extraMarkets) {
+          html += `<div class="gm-expand-mkt">`;
+          html += `<div class="gm-expand-title">${esc(m.desc)}${m.specifier ? ' (' + esc(m.specifier) + ')' : ''}</div>`;
+          html += `<div class="gm-expand-odds">`;
+          for (const o of m.outcomes) {
+            if (!o.odds || o.odds <= 1) continue;
+            const key = `${g.eventId}:${m.id}:${o.id}`;
+            const sel = gamesSlip.has(key);
+            html += `<button class="ob${sel ? ' sel' : ''}" data-key="${esc(key)}" data-eid="${esc(g.eventId)}" data-mid="${esc(m.id)}" data-oid="${esc(o.id)}" data-spec="${esc(m.specifier)}" data-sid="${esc(g.sportId)}" data-odds="${o.odds}" data-label="${esc(g.homeTeam)} vs ${esc(g.awayTeam)}: ${esc(m.desc)} - ${esc(o.desc)}" onclick="toggleGamePick(this)"><span class="ob-lbl">${esc(o.desc)}</span> ${o.odds.toFixed(2)}</button>`;
+          }
+          html += `</div></div>`;
+        }
+        html += `</div>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+
+  // Load more
+  if (gamesData.length < gamesTotalNum) {
+    html += `<button class="games-load-more" onclick="gamesPageNum++;loadGames(true)">`;
+    html += `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>`;
+    html += `Load More &mdash; ${gamesData.length} of ${gamesTotalNum.toLocaleString()}`;
+    html += `</button>`;
+  } else if (gamesData.length > 0) {
+    html += `<div style="text-align:center;padding:12px;font-size:11px;color:var(--text-3)">${gamesData.length} games loaded</div>`;
+  }
+
+  listEl.innerHTML = html;
+}
+
+function renderOddsGroup(game, market, descOrder, labels) {
+  let html = '<div class="odds-header-group">';
+  if (!market || !market.outcomes.length) {
+    for (let i = 0; i < descOrder.length; i++) {
+      html += `<button class="ob locked">-</button>`;
+    }
+    return html + '</div>';
+  }
+
+  // Find lowest odds (favorite)
+  const lowestOdds = Math.min(...market.outcomes.filter(o => o.odds > 1).map(o => o.odds));
+
+  for (let i = 0; i < descOrder.length; i++) {
+    const target = descOrder[i].toLowerCase();
+    const o = market.outcomes.find(x => x.desc.toLowerCase().includes(target)) || market.outcomes[i];
+    if (!o || !o.odds || o.odds <= 1) {
+      html += `<button class="ob locked">-</button>`;
+      continue;
+    }
+    const key = `${game.eventId}:${market.id}:${o.id}`;
+    const sel = gamesSlip.has(key);
+    const isFav = o.odds === lowestOdds && o.odds < 2.5;
+    html += `<button class="ob${sel ? ' sel' : ''}${isFav ? ' fav' : ''}" data-key="${esc(key)}" data-eid="${esc(game.eventId)}" data-mid="${esc(market.id)}" data-oid="${esc(o.id)}" data-spec="${esc(market.specifier)}" data-sid="${esc(game.sportId)}" data-odds="${o.odds}" data-label="${esc(game.homeTeam)} vs ${esc(game.awayTeam)}: ${esc(market.desc)} - ${esc(o.desc)}" onclick="toggleGamePick(this)">${o.odds.toFixed(2)}</button>`;
+  }
+  return html + '</div>';
+}
+
+function getMainMarkets(markets) {
+  const main = [];
+  const find = (keywords) => markets.find(m => {
+    const d = (m.desc||'').toLowerCase();
+    return keywords.some(k => d.includes(k)) && m.outcomes.length >= 2;
+  });
+  const m1x2 = find(['1x2', 'match winner']);
+  const mOU = markets.find(m => {
+    const d = (m.desc||'').toLowerCase();
+    return (d.includes('over/under') || d.includes('total')) && (m.specifier||'').includes('2.5') && m.outcomes.length >= 2;
+  }) || find(['over/under', 'total']);
+  const mGG = find(['both teams', 'btts', 'gg/ng', 'gg']);
+  if (m1x2) main.push(m1x2);
+  if (mOU) main.push(mOU);
+  if (mGG) main.push(mGG);
+  return main;
+}
+
+function getCountryFlag(league) {
+  const l = league.toLowerCase();
+  if (l.includes('england') || l.includes('premier league') || l.includes('epl')) return '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}';
+  if (l.includes('spain') || l.includes('la liga')) return '\u{1F1EA}\u{1F1F8}';
+  if (l.includes('germany') || l.includes('bundesliga')) return '\u{1F1E9}\u{1F1EA}';
+  if (l.includes('italy') || l.includes('serie a')) return '\u{1F1EE}\u{1F1F9}';
+  if (l.includes('france') || l.includes('ligue')) return '\u{1F1EB}\u{1F1F7}';
+  if (l.includes('nigeria')) return '\u{1F1F3}\u{1F1EC}';
+  if (l.includes('ghana')) return '\u{1F1EC}\u{1F1ED}';
+  if (l.includes('kenya')) return '\u{1F1F0}\u{1F1EA}';
+  if (l.includes('brazil')) return '\u{1F1E7}\u{1F1F7}';
+  if (l.includes('usa') || l.includes('mls') || l.includes('united states')) return '\u{1F1FA}\u{1F1F8}';
+  if (l.includes('japan') || l.includes('j-league') || l.includes('j league')) return '\u{1F1EF}\u{1F1F5}';
+  if (l.includes('south korea') || l.includes('k-league') || l.includes('korea republic')) return '\u{1F1F0}\u{1F1F7}';
+  if (l.includes('portugal')) return '\u{1F1F5}\u{1F1F9}';
+  if (l.includes('netherlands') || l.includes('holland') || l.includes('eredivisie')) return '\u{1F1F3}\u{1F1F1}';
+  if (l.includes('turkey')) return '\u{1F1F9}\u{1F1F7}';
+  if (l.includes('mexico')) return '\u{1F1F2}\u{1F1FD}';
+  if (l.includes('argentina')) return '\u{1F1E6}\u{1F1F7}';
+  if (l.includes('south africa')) return '\u{1F1FF}\u{1F1E6}';
+  if (l.includes('australia')) return '\u{1F1E6}\u{1F1FA}';
+  if (l.includes('scotland')) return '\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}';
+  if (l.includes('international')) return '\u{1F30D}';
+  if (l.includes('uefa') || l.includes('champions') || l.includes('europa')) return '\u{1F3C6}';
+  if (l.includes('africa')) return '\u{1F30D}';
+  return '\u26BD';
+}
+
+function toggleLeague(hdr) {
+  const section = hdr.closest('.league-section');
+  const league = hdr.querySelector('.name').textContent;
+  section.classList.toggle('collapsed');
+  if (section.classList.contains('collapsed')) collapsedLeagues.add(league);
+  else collapsedLeagues.delete(league);
+}
+
+function toggleExtraMarkets(btn, eventId) {
+  const el = document.getElementById('extra-' + eventId);
+  if (!el) return;
+  const isOpen = el.classList.toggle('open');
+  btn.textContent = isOpen ? 'Hide markets' : btn.dataset.origText || btn.textContent;
+  if (!btn.dataset.origText) btn.dataset.origText = btn.textContent;
+}
+
+function toggleGamePick(btn) {
+  const key = btn.dataset.key;
+  if (gamesSlip.has(key)) {
+    gamesSlip.delete(key);
+    btn.classList.remove('sel');
+  } else {
+    // Only one pick per event
+    const eid = btn.dataset.eid;
+    for (const [k] of gamesSlip) {
+      if (k.startsWith(eid + ':')) {
+        gamesSlip.delete(k);
+        document.querySelectorAll(`.ob[data-key="${k}"]`).forEach(b => b.classList.remove('sel'));
+      }
+    }
+    gamesSlip.set(key, {
+      eventId: btn.dataset.eid,
+      marketId: btn.dataset.mid,
+      outcomeId: btn.dataset.oid,
+      specifier: btn.dataset.spec,
+      sportId: btn.dataset.sid,
+      odds: parseFloat(btn.dataset.odds),
+      label: btn.dataset.label,
+    });
+    btn.classList.add('sel');
+  }
+  updateGamesSlipBar();
+}
+
+function updateGamesSlipBar() {
+  const bar = document.getElementById('games-slip-bar');
+  const count = gamesSlip.size;
+  document.getElementById('gh-picks').textContent = count;
+  if (count === 0) {
+    bar.classList.remove('show');
+    return;
+  }
+  bar.classList.add('show');
+  let totalOdds = 1;
+  for (const v of gamesSlip.values()) totalOdds *= v.odds;
+  document.getElementById('games-slip-count').textContent = count + ' Pick' + (count > 1 ? 's' : '');
+  document.getElementById('games-slip-odds').textContent = totalOdds.toFixed(2);
+
+  // Render slip details
+  let dHtml = '';
+  for (const [k, v] of gamesSlip) {
+    const parts = v.label.split(': ');
+    const match = parts[0] || '';
+    const pick = parts.slice(1).join(': ') || '';
+    dHtml += `<div class="slip-detail">`;
+    dHtml += `<span class="slip-detail-match">${esc(match)}</span>`;
+    dHtml += `<span class="slip-detail-pick">${esc(pick)}</span>`;
+    dHtml += `<span class="slip-detail-odds">${v.odds.toFixed(2)}</span>`;
+    dHtml += `<button class="slip-detail-rm" onclick="removeSlipPick('${esc(k)}')">&times;</button>`;
+    dHtml += `</div>`;
+  }
+  document.getElementById('games-slip-details').innerHTML = dHtml;
+}
+
+function removeSlipPick(key) {
+  gamesSlip.delete(key);
+  document.querySelectorAll(`.ob[data-key="${key}"]`).forEach(b => b.classList.remove('sel'));
+  updateGamesSlipBar();
+}
+
+function clearGamesSlip() {
+  gamesSlip.clear();
+  document.querySelectorAll('.ob.sel').forEach(b => b.classList.remove('sel'));
+  updateGamesSlipBar();
+  document.getElementById('games-slip-result').innerHTML = '';
+}
+
+async function createGamesCode() {
+  if (!gamesSlip.size) return;
+  const resultEl = document.getElementById('games-slip-result');
+  resultEl.innerHTML = '<div class="slip-result" style="text-align:center"><div class="spinner" style="width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 8px"></div>Creating booking code...</div>';
+
+  const selections = [...gamesSlip.values()].map(v => ({
+    eventId: v.eventId, marketId: v.marketId,
+    outcomeId: v.outcomeId, specifier: v.specifier, sportId: v.sportId,
+  }));
+
+  try {
+    const res = await fetch('/predictions/create-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections }),
+    });
+    const data = await res.json();
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      let totalOdds = 1;
+      for (const v of gamesSlip.values()) totalOdds *= v.odds;
+      resultEl.innerHTML = `<div class="slip-result">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+          <span class="code-val">${esc(code)}</span>
+          <button onclick="navigator.clipboard.writeText('${esc(code)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',1500)})" class="code-copy" style="padding:6px 16px">Copy Code</button>
+        </div>
+        <div style="font-size:13px;color:var(--text-2);display:flex;gap:12px">
+          <span>${gamesSlip.size} picks</span>
+          <span style="color:var(--amber);font-weight:700">Odds: ${totalOdds.toFixed(2)}</span>
+        </div>
+      </div>`;
+      const hist = JSON.parse(localStorage.getItem('ja_history') || '[]');
+      hist.unshift({ code, odds: totalOdds.toFixed(2), picks: gamesSlip.size, source: 'Games Page', date: new Date().toISOString(), status: 'pending' });
+      localStorage.setItem('ja_history', JSON.stringify(hist.slice(0, 200)));
+    } else {
+      resultEl.innerHTML = `<div class="slip-result" style="border-color:rgba(240,96,96,0.25);color:var(--red)">Failed to create code: ${esc(data.message || 'Unknown error')}</div>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="slip-result" style="border-color:rgba(240,96,96,0.25);color:var(--red)">Network error — try again</div>`;
+  }
+}
+
+document.getElementById('games-search').addEventListener('input', () => {
+  if (gamesTimeline === 'virtual') { if (virtualsData.length) renderVirtuals(); }
+  else if (gamesLoaded) renderGames();
+});
+
+// ===== VIRTUAL GAMES =====
+let virtualsData = [];
+let virtualPredictions = {};
+let virtualsLoaded = false;
+let virtualResultsCount = 0;
+
+async function loadVirtuals() {
+  const listEl = document.getElementById('virtuals-list');
+  listEl.innerHTML = '<div class="empty"><div class="spinner" style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 10px"></div>Loading virtual games...<div style="font-size:11px;color:var(--text-3);margin-top:6px">First load may take ~15s (launching browser)</div></div>';
+  try {
+    const res = await fetch('/predictions/virtuals');
+    if (!res.ok) throw new Error('API error');
+    const json = await res.json();
+    virtualsData = json.data || [];
+    virtualsLoaded = true;
+    renderVirtuals();
+    // Fetch predictions in background
+    fetchVirtualPredictions();
+  } catch (e) {
+    console.error('Load virtuals error:', e);
+    listEl.innerHTML = '<div class="empty" style="color:var(--red)">Failed to load virtual games. Tap Refresh to retry.</div>';
+  }
+}
+
+async function fetchVirtualPredictions() {
+  // Build list of all matches for prediction
+  const matches = [];
+  for (const l of virtualsData) {
+    for (const m of l.matches) {
+      matches.push({ home: m.home, away: m.away, country: l.country });
+    }
+  }
+  if (!matches.length) return;
+  try {
+    const res = await fetch('/predictions/virtual-predict?matches=' + encodeURIComponent(JSON.stringify(matches)));
+    if (!res.ok) return;
+    const json = await res.json();
+    virtualResultsCount = json.resultsCount || 0;
+    virtualPredictions = {};
+    for (const p of (json.data || [])) {
+      virtualPredictions[p.home + ':' + p.away + ':' + p.country] = p;
+    }
+    // Generate auto-pick
+    generateVirtualPick();
+    // Re-render with predictions
+    renderVirtuals();
+  } catch (e) {
+    console.error('Virtual predictions error:', e);
+  }
+}
+
+let virtualAutoPick = null; // { picks: [...], totalOdds, timestamp }
+
+function generateVirtualPick() {
+  if (virtualResultsCount < 20) { virtualAutoPick = null; return; }
+
+  // Gather all predictions with their odds from virtualsData
+  const candidates = [];
+  for (const l of virtualsData) {
+    for (const m of l.matches) {
+      const pred = virtualPredictions[m.home + ':' + m.away + ':' + l.country];
+      if (!pred || pred.confidence < 40) continue;
+      const odds = pred.predictedOutcome === '1' ? parseFloat(m.homeOdds)
+                 : pred.predictedOutcome === '2' ? parseFloat(m.awayOdds)
+                 : parseFloat(m.drawOdds);
+      if (!odds || odds <= 1) continue;
+      candidates.push({
+        home: m.home, away: m.away, country: l.country,
+        league: l.title, timer: l.timer,
+        outcome: pred.predictedOutcome,
+        pick: pred.predictedOutcome === '1' ? m.home
+            : pred.predictedOutcome === '2' ? m.away
+            : 'Draw',
+        odds,
+        confidence: pred.confidence,
+        homeWinProb: pred.homeWinProb,
+        drawProb: pred.drawProb,
+        awayWinProb: pred.awayWinProb,
+      });
+    }
+  }
+
+  if (!candidates.length) { virtualAutoPick = null; return; }
+
+  // Sort by confidence (highest first)
+  candidates.sort((a, b) => b.confidence - a.confidence);
+
+  // Greedy pick: accumulate picks until total odds reach ~2.00
+  const targetOdds = 2.0;
+  const picks = [];
+  let totalOdds = 1;
+  const usedCountries = new Set();
+
+  for (const c of candidates) {
+    if (totalOdds >= targetOdds) break;
+    // Spread across leagues — max 1 per league per pick
+    if (usedCountries.has(c.country)) continue;
+    picks.push(c);
+    totalOdds *= c.odds;
+    usedCountries.add(c.country);
+  }
+
+  // If we didn't reach target, try adding from same leagues
+  if (totalOdds < 1.5 && picks.length < 3) {
+    for (const c of candidates) {
+      if (totalOdds >= targetOdds) break;
+      if (picks.some(p => p.home === c.home && p.away === c.away)) continue;
+      picks.push(c);
+      totalOdds *= c.odds;
+    }
+  }
+
+  if (!picks.length) { virtualAutoPick = null; return; }
+
+  virtualAutoPick = {
+    picks,
+    totalOdds: Math.round(totalOdds * 100) / 100,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+function predColor(conf) {
+  if (conf >= 55) return 'var(--green)';
+  if (conf >= 45) return 'var(--amber)';
+  return 'var(--text-3)';
+}
+
+function formDots(form) {
+  if (!form) return '';
+  return form.split('').map(c => {
+    if (c === 'W') return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin:0 1px"></span>';
+    if (c === 'L') return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin:0 1px"></span>';
+    return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-3);margin:0 1px"></span>';
+  }).join('');
+}
+
+function renderVirtuals() {
+  const listEl = document.getElementById('virtuals-list');
+  const search = (document.getElementById('games-search').value || '').toLowerCase().trim();
+
+  let filtered = virtualsData;
+  if (search) {
+    filtered = virtualsData.filter(l =>
+      l.title.toLowerCase().includes(search) ||
+      l.country.toLowerCase().includes(search) ||
+      l.matches.some(m => m.home.toLowerCase().includes(search) || m.away.toLowerCase().includes(search))
+    );
+  }
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="empty">No virtual games found</div>';
+    return;
+  }
+
+  // Update hero stats for virtuals
+  const totalMatches = filtered.reduce((s, l) => s + l.matches.length, 0);
+  document.getElementById('gh-matches').textContent = totalMatches;
+  document.getElementById('gh-leagues').textContent = filtered.length;
+  document.getElementById('gh-today').textContent = virtualResultsCount > 0 ? virtualResultsCount : '--';
+  // Repurpose "Today" label for virtuals
+  const todayLabel = document.querySelector('#games-hero .games-hero-stat:nth-child(3) .games-hero-label');
+  if (todayLabel) todayLabel.textContent = gamesTimeline === 'virtual' ? 'Results' : 'Today';
+
+  let html = '';
+
+  // Auto-pick card
+  if (virtualAutoPick && virtualAutoPick.picks.length > 0) {
+    const ap = virtualAutoPick;
+    html += '<div style="background:linear-gradient(135deg,rgba(78,148,255,0.08),rgba(176,124,255,0.08));border:1px solid rgba(78,148,255,0.2);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:12px">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+    html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>';
+    html += '<span style="font-size:14px;font-weight:800;color:var(--text)">AI Pick</span>';
+    html += '<span style="font-size:20px;font-weight:900;color:var(--amber);margin-left:auto">' + ap.totalOdds.toFixed(2) + '</span>';
+    html += '<span style="font-size:10px;color:var(--text-3);font-weight:600">ODDS</span>';
+    html += '</div>';
+    for (const p of ap.picks) {
+      const confCol = predColor(p.confidence);
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,0.04);font-size:12px">';
+      html += '<span style="color:var(--text-3);min-width:50px;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.country) + '</span>';
+      html += '<span style="font-weight:700;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.home) + ' vs ' + esc(p.away) + '</span>';
+      html += '<span style="font-weight:800;color:' + confCol + ';min-width:40px;text-align:center">' + esc(p.pick) + '</span>';
+      html += '<span style="font-weight:700;color:var(--amber);min-width:36px;text-align:right">@' + p.odds.toFixed(2) + '</span>';
+      html += '<span style="font-size:10px;color:var(--text-3);min-width:28px;text-align:right">' + p.confidence + '%</span>';
+      html += '</div>';
+    }
+    html += '<div style="margin-top:8px;font-size:10px;color:var(--text-3);display:flex;align-items:center;gap:6px">';
+    html += '<span>Generated at ' + ap.timestamp + '</span>';
+    html += '<span style="margin-left:auto">' + virtualResultsCount + ' results analyzed</span>';
+    html += '</div>';
+    html += '</div>';
+  }
+
+  // Data collection status
+  if (virtualResultsCount > 0 && !virtualAutoPick) {
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;margin-bottom:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);font-size:12px">';
+    html += '<div style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:livePulse 1.5s ease-in-out infinite;flex-shrink:0"></div>';
+    html += '<span style="color:var(--text-2)">Collecting data: <b style="color:var(--text)">' + virtualResultsCount + '</b> results stored</span>';
+    html += '<span style="margin-left:auto;color:var(--text-3)">Predictions ' + (virtualResultsCount >= 30 ? 'active' : 'need ~30+ results') + '</span>';
+    html += '</div>';
+  }
+
+  for (const league of filtered) {
+    const flag = getCountryFlag(league.country);
+    const collapsed = collapsedLeagues.has(league.title);
+
+    html += '<div class="league-section' + (collapsed ? ' collapsed' : '') + '">';
+    html += '<div class="league-hdr" onclick="toggleLeague(this)">';
+    html += '<span class="flag">' + flag + '</span>';
+    html += '<span class="name">' + esc(league.title) + '</span>';
+    if (league.timer) {
+      html += '<span style="font-size:11px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + esc(league.timer) + '</span>';
+    }
+    html += '<span class="count">' + league.matches.length + '</span>';
+    html += '<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+    html += '</div>';
+    html += '<div class="league-body">';
+
+    // Column headers
+    html += '<div class="odds-header">';
+    html += '<div class="odds-header-spacer"></div>';
+    html += '<div class="odds-header-group"><span class="odds-header-label">1</span><span class="odds-header-label">X</span><span class="odds-header-label">2</span></div>';
+    if (virtualResultsCount >= 30) {
+      html += '<div class="odds-header-sep"></div>';
+      html += '<div class="odds-header-group"><span class="odds-header-label" style="width:60px">Pred</span></div>';
+    }
+    html += '</div>';
+
+    for (const m of league.matches) {
+      const pred = virtualPredictions[m.home + ':' + m.away + ':' + league.country];
+
+      html += '<div class="gm" style="flex-wrap:wrap">';
+      html += '<div class="gm-info">';
+      html += '<div class="gm-time-col"><div style="font-size:11px;font-weight:700;color:var(--purple)">' + esc(m.num) + '</div></div>';
+      html += '<div class="gm-teams">';
+      html += '<div class="gm-team">' + esc(m.home) + '</div>';
+      html += '<div class="gm-team">' + esc(m.away) + '</div>';
+      html += '</div></div>';
+
+      // Odds
+      const odds = [
+        { label: '1', val: m.homeOdds },
+        { label: 'X', val: m.drawOdds },
+        { label: '2', val: m.awayOdds },
+      ];
+      const lowestOdds = Math.min(...odds.map(o => parseFloat(o.val) || 99));
+
+      html += '<div class="gm-odds"><div class="odds-header-group">';
+      for (const o of odds) {
+        const oval = parseFloat(o.val) || 0;
+        const isFav = oval === lowestOdds && oval < 2.5;
+        html += '<button class="ob' + (isFav ? ' fav' : '') + '" style="pointer-events:none">' + (oval > 0 ? oval.toFixed(2) : '-') + '</button>';
+      }
+      html += '</div>';
+
+      // Prediction badge
+      if (pred) {
+        const outcomeLabel = pred.predictedOutcome === '1' ? m.home : pred.predictedOutcome === '2' ? m.away : 'Draw';
+        const color = predColor(pred.confidence);
+        html += '<div class="gm-odds-sep"></div>';
+        html += '<div style="min-width:60px;text-align:center">';
+        html += '<div style="font-size:11px;font-weight:800;color:' + color + '">' + esc(outcomeLabel) + '</div>';
+        html += '<div style="font-size:9px;color:var(--text-3)">' + pred.confidence + '%</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+
+      // Expandable prediction details
+      if (pred) {
+        html += '<div style="width:100%;padding:4px 16px 6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:10px;color:var(--text-3)">';
+        html += '<span>H:' + Math.round(pred.homeWinProb*100) + '%</span>';
+        html += '<span>D:' + Math.round(pred.drawProb*100) + '%</span>';
+        html += '<span>A:' + Math.round(pred.awayWinProb*100) + '%</span>';
+        html += '<span style="color:var(--text-2)">O2.5:' + Math.round(pred.overProb*100) + '%</span>';
+        html += '<span style="color:var(--text-2)">GG:' + Math.round(pred.ggProb*100) + '%</span>';
+        if (pred.h2h.played > 0) {
+          html += '<span>H2H:' + pred.h2h.homeWins + 'W/' + pred.h2h.draws + 'D/' + pred.h2h.awayWins + 'L</span>';
+        }
+        html += '<span style="margin-left:auto">' + formDots(pred.homeForm) + '</span>';
+        html += '<span>vs</span>';
+        html += '<span>' + formDots(pred.awayForm) + '</span>';
+        html += '</div>';
+      }
+
+      html += '</div>';
+    }
+
+    html += '</div></div>';
+  }
+
+  // Footer
+  html += '<div style="text-align:center;padding:12px;font-size:11px;color:var(--text-3)">';
+  html += 'Virtual rounds every ~3 min. Tap Refresh for latest. ';
+  if (virtualResultsCount > 0) {
+    html += 'Data: ' + virtualResultsCount + ' results collected.';
+  } else {
+    html += 'Collecting data in background — predictions improve over time.';
+  }
+  html += '</div>';
+
+  listEl.innerHTML = html;
 }
 
 // ===== INIT =====
