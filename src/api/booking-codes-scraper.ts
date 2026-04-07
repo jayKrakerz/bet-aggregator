@@ -53,7 +53,10 @@ export interface BookingCode {
   pendingCount: number;
 }
 
-// Cache
+// Cache — in-memory + disk for instant cold start
+import fs from 'node:fs';
+import path from 'node:path';
+const DISK_CACHE_PATH = path.join(process.cwd(), 'data', 'codes-cache.json');
 let codesCache: BookingCode[] | null = null;
 let codesCacheTime = 0;
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
@@ -641,11 +644,53 @@ async function validateCode(code: string): Promise<{
  * Validates each code against Sportybet API.
  * Deduplicates by code string, keeps the entry with most data.
  */
+/** Load disk cache for instant cold start */
+function loadDiskCache(): BookingCode[] | null {
+  try {
+    if (fs.existsSync(DISK_CACHE_PATH)) {
+      const raw = JSON.parse(fs.readFileSync(DISK_CACHE_PATH, 'utf-8')) as { data: BookingCode[]; time: number };
+      // Accept disk cache up to 2 hours old
+      if (Date.now() - raw.time < 2 * 60 * 60 * 1000) {
+        logger.info({ count: raw.data.length, age: Math.round((Date.now() - raw.time) / 60000) + 'min' }, 'Loaded codes from disk cache');
+        return raw.data;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function saveDiskCache(codes: BookingCode[]) {
+  try {
+    const dir = path.dirname(DISK_CACHE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DISK_CACHE_PATH, JSON.stringify({ data: codes, time: Date.now() }));
+  } catch { /* ignore */ }
+}
+
+let refreshing = false;
+
 export async function getAllBookingCodes(): Promise<BookingCode[]> {
   if (codesCache && Date.now() - codesCacheTime < CACHE_TTL) {
     return codesCache;
   }
 
+  // Instant cold start: serve disk cache while refreshing in background
+  if (!codesCache && !refreshing) {
+    const disk = loadDiskCache();
+    if (disk) {
+      codesCache = disk;
+      codesCacheTime = Date.now() - CACHE_TTL + 60000; // expires in 1 min to trigger refresh
+      // Refresh in background
+      refreshing = true;
+      refreshCodes().then(() => { refreshing = false; }).catch(() => { refreshing = false; });
+      return disk;
+    }
+  }
+
+  return refreshCodes();
+}
+
+async function refreshCodes(): Promise<BookingCode[]> {
   const [sportPremi, paqBet, convertBet, social, codeHub, betloy, twitter, telegram, meta, headless] = await Promise.allSettled([
     scrapeSportPremi(),
     scrapePaqBet(),
@@ -749,6 +794,7 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
 
   codesCache = result;
   codesCacheTime = Date.now();
+  saveDiskCache(result);
   logger.info({
     scraped: raw.length,
     valid: result.length,

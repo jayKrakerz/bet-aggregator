@@ -100,6 +100,19 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .card-title{font-size:15px;font-weight:700;flex:1}
 .card-hint{font-size:13px;color:var(--text-2);margin-top:8px;line-height:1.5}
 
+/* ===== TODAY PAGE ===== */
+.pick-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:12px;margin-bottom:6px;cursor:pointer;transition:all .2s var(--ease-out);-webkit-tap-highlight-color:transparent;user-select:none;position:relative}
+.pick-card:active{transform:scale(0.98);background:var(--surface-2)}
+.pick-card.selected{border-color:var(--green);background:rgba(52,212,114,0.06);box-shadow:0 0 0 1px var(--green),0 2px 12px rgba(52,212,114,0.1)}
+.pick-card.selected::before{content:'';position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;background-image:url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:10px}
+.section-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text-3);margin-bottom:10px}
+.conf-meter{height:4px;border-radius:2px;background:var(--bg);overflow:hidden;margin-top:8px}
+.conf-meter-fill{height:100%;border-radius:2px;transition:width .6s var(--ease-out-expo)}
+
+/* Press feedback for all interactive */
+.btn:active,.chip:active{transform:scale(0.96)}
+.card:active{transform:scale(0.99)}
+
 /* ===== TOOL GRID ===== */
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
 
@@ -638,7 +651,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 
   <!-- Top Picks -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <h2 style="font-size:15px;font-weight:800">Top Picks</h2>
+    <div class="section-title">Top Picks</div>
     <span id="today-picks-count" style="font-size:11px;color:var(--text-3)"></span>
   </div>
   <div id="today-picks-bar" style="display:none;position:sticky;top:var(--header-h);z-index:50;background:rgba(19,22,32,0.95);backdrop-filter:blur(12px);padding:10px 14px;margin:0 -20px 12px;border-bottom:1px solid var(--border);align-items:center;gap:8px">
@@ -659,7 +672,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 
   <!-- Ready Codes -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 10px">
-    <h2 style="font-size:15px;font-weight:800">Ready Codes</h2>
+    <div class="section-title">Ready Codes</div>
     <button class="btn btn-ghost btn-sm" onclick="switchPage('codes')" style="font-size:11px">See all &rarr;</button>
   </div>
   <div id="today-ready-codes">
@@ -5784,7 +5797,7 @@ function renderTopPicks() {
     if (picks.length >= 10) break;
   }
 
-  // Render hero card with #1 pick
+  // Render hero card with #1 pick + confidence meter
   if (picks.length > 0) {
     const best = picks[0];
     const bProb = Math.round(best._prob * 100);
@@ -5792,17 +5805,19 @@ function renderTopPicks() {
     const bKickoff = best.estimateStartTime ? new Date(best.estimateStartTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
     const bLeague = normalizeLeague ? normalizeLeague(best.league) || best.league : best.league;
     const heroCard = document.getElementById('today-hero-card');
+    const meterCol = bProb >= 80 ? 'var(--green)' : bProb >= 65 ? 'var(--blue)' : 'var(--amber)';
     heroCard.style.borderColor = bProb >= 75 ? 'rgba(52,212,114,0.3)' : 'rgba(78,148,255,0.2)';
     heroContent.innerHTML = `
-      <div style="font-size:18px;font-weight:900;margin-bottom:2px">${best.homeTeam} vs ${best.awayTeam}</div>
+      <div style="font-size:20px;font-weight:900;margin-bottom:2px;line-height:1.2">${best.homeTeam} vs ${best.awayTeam}</div>
       <div style="font-size:12px;color:var(--text-2);margin-bottom:10px">${bLeague}${bKickoff?' &middot; '+bKickoff:''}</div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span style="font-size:13px;font-weight:800;padding:4px 12px;border-radius:6px;background:var(--surface);color:var(--text)">${best.market} &mdash; ${best.pick}</span>
-        <span style="font-size:16px;font-weight:900;color:var(--amber)">@${best.odds}</span>
+        <span style="font-size:18px;font-weight:900;color:var(--amber)">@${best.odds}</span>
       </div>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${bProb>=75?'var(--green-soft)':'var(--blue-soft)'};color:${bProb>=75?'var(--green)':'var(--blue)'}">${bProb}% win</span>
-        ${bCon >= 2 ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--amber-soft);color:var(--amber)">${bCon}x tipsters agree</span>` : ''}
+      <div class="conf-meter" style="margin-top:10px"><div class="conf-meter-fill" style="width:${bProb}%;background:${meterCol}"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px">
+        <span style="font-size:11px;font-weight:700;color:${meterCol}">${bProb}% confidence</span>
+        ${bCon >= 2 ? `<span style="font-size:11px;font-weight:700;color:var(--amber)">${bCon}x tipsters agree</span>` : ''}
       </div>`;
   }
 
@@ -5813,53 +5828,78 @@ function renderTopPicks() {
     return;
   }
 
-  list.innerHTML = picks.map((g, i) => {
-    const prob = Math.round(g._prob * 100);
-    const con = g._consensus;
-    const probCol = prob >= 80 ? 'var(--green)' : prob >= 65 ? 'var(--blue)' : 'var(--amber)';
-    const kickoff = g.estimateStartTime ? new Date(g.estimateStartTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
-    const league = normalizeLeague ? normalizeLeague(g.league) || g.league : g.league;
-
-    // Confidence-based left border
-    const borderCol = prob >= 80 ? 'var(--green)' : prob >= 65 ? 'var(--blue)' : 'var(--amber)';
-
-    return `<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${borderCol};border-radius:var(--r-xs);padding:12px;margin-bottom:6px;transition:border-color .2s">
-      <div style="display:flex;align-items:center;gap:10px">
-        <input type="checkbox" class="today-pick-check" data-idx="${i}" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.homeTeam} vs ${g.awayTeam}</div>
-          <div style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${league}${kickoff?' &middot; '+kickoff:''}</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:16px;font-weight:900;color:var(--amber)">@${g.odds}</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:4px;margin-top:6px;margin-left:28px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--bg);color:var(--text)">${g.market} &mdash; ${g.pick}</span>
-        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${prob>=75?'var(--green-soft)':'var(--blue-soft)'};color:${probCol}">${prob}%</span>
-        ${con >= 2 ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--amber-soft);color:var(--amber)">${con}x</span>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-
+  const INITIAL_SHOW = 5;
   window._todayPicks = picks;
-  list.querySelectorAll('.today-pick-check').forEach(cb => {
-    cb.onchange = updateTodayPicksBar;
-  });
+  window._todaySelected = new Set();
+
+  function renderPickCards(showAll) {
+    const visible = showAll ? picks : picks.slice(0, INITIAL_SHOW);
+    let html = visible.map((g, i) => {
+      const prob = Math.round(g._prob * 100);
+      const con = g._consensus;
+      const probCol = prob >= 80 ? 'var(--green)' : prob >= 65 ? 'var(--blue)' : 'var(--amber)';
+      const kickoff = g.estimateStartTime ? new Date(g.estimateStartTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+      const league = normalizeLeague ? normalizeLeague(g.league) || g.league : g.league;
+      const borderCol = prob >= 80 ? 'var(--green)' : prob >= 65 ? 'var(--blue)' : 'var(--amber)';
+      const sel = window._todaySelected.has(i) ? ' selected' : '';
+
+      return `<div class="pick-card${sel}" data-pick-idx="${i}" style="border-left:3px solid ${borderCol}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.homeTeam} vs ${g.awayTeam}</div>
+            <div style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${league}${kickoff?' &middot; '+kickoff:''}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:16px;font-weight:900;color:var(--amber)">@${g.odds}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--bg);color:var(--text)">${g.market} &mdash; ${g.pick}</span>
+          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${prob>=75?'var(--green-soft)':'var(--blue-soft)'};color:${probCol}">${prob}%</span>
+          ${con >= 2 ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--amber-soft);color:var(--amber)">${con}x</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    if (!showAll && picks.length > INITIAL_SHOW) {
+      html += `<button class="btn btn-ghost" id="today-show-more" style="width:100%;margin-top:4px;padding:10px;font-size:13px">Show ${picks.length - INITIAL_SHOW} more picks</button>`;
+    }
+    list.innerHTML = html;
+
+    // Tap-to-select
+    list.querySelectorAll('.pick-card').forEach(card => {
+      card.onclick = () => {
+        const idx = parseInt(card.dataset.pickIdx);
+        if (window._todaySelected.has(idx)) {
+          window._todaySelected.delete(idx);
+          card.classList.remove('selected');
+        } else {
+          window._todaySelected.add(idx);
+          card.classList.add('selected');
+        }
+        updateTodayPicksBar();
+      };
+    });
+
+    const moreBtn = document.getElementById('today-show-more');
+    if (moreBtn) moreBtn.onclick = () => renderPickCards(true);
+  }
+
+  renderPickCards(false);
 }
 
 function updateTodayPicksBar() {
-  const checks = document.querySelectorAll('.today-pick-check:checked');
+  const sel = window._todaySelected || new Set();
   const bar = document.getElementById('today-picks-bar');
   const countEl = document.getElementById('today-picks-selected');
   const oddsEl = document.getElementById('today-picks-odds');
 
-  if (checks.length > 0) {
+  if (sel.size > 0) {
     bar.style.display = 'flex';
-    countEl.textContent = checks.length + ' selected';
+    countEl.textContent = sel.size + ' selected';
     let totalOdds = 1;
-    checks.forEach(cb => {
-      const g = window._todayPicks[parseInt(cb.dataset.idx)];
+    sel.forEach(idx => {
+      const g = window._todayPicks[idx];
       if (g) totalOdds *= g.odds;
     });
     oddsEl.textContent = 'Total: @' + totalOdds.toFixed(2);
@@ -5869,20 +5909,21 @@ function updateTodayPicksBar() {
 }
 
 document.getElementById('today-picks-clear').onclick = () => {
-  document.querySelectorAll('.today-pick-check').forEach(cb => cb.checked = false);
+  window._todaySelected = new Set();
+  document.querySelectorAll('.pick-card').forEach(c => c.classList.remove('selected'));
   updateTodayPicksBar();
 };
 
 document.getElementById('today-picks-gen').onclick = async () => {
-  const checks = document.querySelectorAll('.today-pick-check:checked');
-  if (!checks.length) return;
+  const sel = window._todaySelected || new Set();
+  if (!sel.size) return;
   const btn = document.getElementById('today-picks-gen');
   const resultsDiv = document.getElementById('today-gen-result');
   btnLoad(btn);
 
   const picked = [];
-  checks.forEach(cb => {
-    const g = window._todayPicks[parseInt(cb.dataset.idx)];
+  sel.forEach(idx => {
+    const g = window._todayPicks[idx];
     if (g) picked.push(g);
   });
 
