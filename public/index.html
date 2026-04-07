@@ -2370,6 +2370,8 @@ function addToGamePool(selections) {
   if (!selections) return;
   for (const s of selections) {
     if (!s.eventId || s.isWinning !== null) continue;
+    // Skip selections with missing data
+    if (!s.homeTeam || !s.awayTeam || !s.market || !s.pick) continue;
     // Exclude ended, cancelled, AND live games
     const status = (s.matchStatus || '').toLowerCase();
     if (status === 'ended' || status === 'cancelled' || status === 'live' ||
@@ -3918,14 +3920,25 @@ document.getElementById('safe-2odds').onclick = async () => {
         return b._safety - a._safety;
       });
 
-    // Pick top 2, ensuring different matches
+    // Pick 2-3 safest games that reach >= 2.0 odds
+    // Fewer legs = higher win probability (each extra leg multiplies risk)
+    const MIN_TOTAL_ODDS = 2.0;
+    const MAX_LEGS = 3;
     const picked = [];
     const usedEvents = new Set();
-    for (const g of candidates) {
+    let totalOdds = 1;
+
+    // Skip ultra-low odds (<1.20) — they add legs without reaching the target
+    const viable = candidates.filter(g => g.odds >= 1.20);
+    const pool = viable.length >= 2 ? viable : candidates;
+
+    for (const g of pool) {
       if (usedEvents.has(g.eventId)) continue;
       picked.push(g);
       usedEvents.add(g.eventId);
-      if (picked.length >= 2) break;
+      totalOdds *= g.odds;
+      if (totalOdds >= MIN_TOTAL_ODDS) break;
+      if (picked.length >= MAX_LEGS) break;
     }
 
     if (picked.length < 2) {
@@ -5782,7 +5795,7 @@ function renderTopPicks() {
       _safety: safetyScore(g),
       _consensus: getConsensus(g),
     }))
-    .filter(g => g._prob > 0.5 && g._safety > 30)
+    .filter(g => g._prob > 0.5 && g._safety > 30 && g.homeTeam && g.awayTeam)
     .sort((a, b) => {
       const conDiff = b._consensus - a._consensus;
       if (Math.abs(conDiff) >= 2) return conDiff;
@@ -6001,33 +6014,70 @@ function renderReadyCodes() {
 }
 
 // Wire Today page buttons to existing handlers
+// Today page Safe 2-Odds — runs logic directly, not via delegation
 document.getElementById('today-safe-2odds').onclick = async () => {
   const btn = document.getElementById('today-safe-2odds');
   const resultsDiv = document.getElementById('today-gen-result');
-  // Reuse the safe-2odds logic
-  document.getElementById('safe-2odds').click();
-  // Copy result from generated-code-result to today-gen-result
-  setTimeout(() => {
-    const src = document.getElementById('generated-code-result');
-    if (src && src.innerHTML) {
-      resultsDiv.style.display = 'block';
-      resultsDiv.innerHTML = src.innerHTML;
+  btnLoad(btn);
+  resultsDiv.style.display = 'block';
+  resultsDiv.innerHTML = '<div style="padding:12px;text-align:center;font-size:13px;color:var(--text-2)"><div class="spinner" style="margin:0 auto 6px;width:20px;height:20px"></div>Finding safest picks...</div>';
+
+  try {
+    if (!discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) await runDiscoverySilent();
+    await Promise.all([fetchEnrichment(), fetchPinnacleOdds()]);
+
+    const now = Date.now();
+    const candidates = gamePool
+      .filter(g => g.estimateStartTime && g.estimateStartTime > now + 20*60000 && g.homeTeam && g.awayTeam)
+      .map(g => ({ ...g, _prob: estimateProb(g), _safety: safetyScore(g), _consensus: getConsensus(g) }))
+      .filter(g => g._prob >= 0.70 && g._safety >= 50)
+      .sort((a, b) => (b._prob - a._prob) || (b._consensus - a._consensus) || (b._safety - a._safety));
+
+    const picked = [];
+    const usedEvents = new Set();
+    let totalOdds = 1;
+    for (const g of candidates) {
+      if (usedEvents.has(g.eventId)) continue;
+      picked.push(g);
+      usedEvents.add(g.eventId);
+      totalOdds *= g.odds;
+      if (totalOdds >= 2.0 && picked.length >= 2) break;
     }
-  }, 500);
+
+    if (picked.length < 2) {
+      resultsDiv.innerHTML = '<div style="padding:12px;color:var(--amber);font-size:13px">Not enough high-confidence picks right now.</div>';
+      btnDone(btn); return;
+    }
+
+    const sels = picked.map(g => ({eventId:g.eventId, marketId:g.marketId, outcomeId:g.outcomeId, specifier:g.specifier||'', sportId:g.sportId}));
+    const res = await fetch('/predictions/create-code', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({selections:sels}) });
+    const data = await res.json();
+
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      resultsDiv.innerHTML = `<div style="border:2px solid rgba(52,212,114,0.3);border-radius:var(--r);padding:14px;background:var(--green-soft)">
+        <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase">Safe 2-Odds Code</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+          <div style="font-size:24px;font-weight:900;letter-spacing:2px;flex:1">${code}</div>
+          <div style="font-size:15px;font-weight:800;color:var(--amber)">@${totalOdds.toFixed(2)}</div>
+          <button onclick="navigator.clipboard.writeText('${code}');showToast('Copied!','success')" class="btn btn-green btn-sm">Copy</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:6px">${picked.length} picks &middot; ${picked.map(g=>g.homeTeam+' vs '+g.awayTeam).join(' &middot; ')}</div>
+      </div>`;
+      showToast('Code: ' + code, 'success');
+    } else {
+      resultsDiv.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Failed to create code.</div>';
+    }
+  } catch (e) {
+    resultsDiv.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Error: '+e.message+'</div>';
+  } finally {
+    btnDone(btn);
+  }
 };
 
+// Today page Generate x5 — runs logic directly
 document.getElementById('today-quick-gen').onclick = () => {
-  const resultsDiv = document.getElementById('today-gen-result');
-  document.getElementById('quick-gen').click();
-  const checkResult = setInterval(() => {
-    const src = document.getElementById('auto-gen-results');
-    if (src && src.innerHTML && src.innerHTML.length > 50) {
-      resultsDiv.style.display = 'block';
-      resultsDiv.innerHTML = src.innerHTML;
-      clearInterval(checkResult);
-    }
-  }, 1000);
-  setTimeout(() => clearInterval(checkResult), 30000);
+  generateSafeCode(5, document.getElementById('today-quick-gen'));
 };
 
 // ===== INIT =====
