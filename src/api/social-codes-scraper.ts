@@ -44,6 +44,8 @@ const CBC_PLATFORMS = [
   'bet9ja', '1xbet', 'betway', 'msport', 'betpawa',
   'betwinner', '22bet', 'melbet', 'megapari', 'linebet',
   'bangbet', 'betika', 'hollywoodbet', 'merrybet',
+  'betking', 'nairabet', 'betland', 'paripesa', 'helabet',
+  'betlion', 'odibets', 'premierbet', 'surebet247', 'frapapa',
 ];
 
 async function scrapeConvertBetCodesExtra(): Promise<BookingCode[]> {
@@ -163,18 +165,175 @@ async function scrapeConvertBetCodesAll(): Promise<BookingCode[]> {
 }
 
 // =========================================================================
+// SURECODES24 — table with booking-code-badge spans and alt="SportyBet"
+// =========================================================================
+
+async function scrapeSureCodes24(): Promise<BookingCode[]> {
+  try {
+    const res = await fetch('https://surecodes24.com/', {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    const codes: BookingCode[] = [];
+
+    $('tr').each((_, row) => {
+      const el = $(row);
+      // Only rows with SportyBet image
+      if (!el.find('img[alt*="SportyBet" i]').length) return;
+
+      const badge = el.find('.booking-code-badge').first().text().trim().toUpperCase();
+      if (!badge || !isValidCode(badge)) return;
+      if (codes.some(c => c.code === badge)) return;
+
+      // Extract odds
+      const rowText = el.text();
+      const oddsMatch = rowText.match(/Odds:\s*([\d,.]+)/i);
+      const dateMatch = rowText.match(/((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*\d{4})/i);
+
+      codes.push(makeCode(
+        badge,
+        'SureCodes24',
+        'https://surecodes24.com/',
+        dateMatch ? dateMatch[0] : null,
+      ));
+      if (oddsMatch) {
+        codes[codes.length - 1]!.totalOdds = parseFloat(oddsMatch[1]!.replace(/,/g, ''));
+      }
+    });
+
+    return codes;
+  } catch {
+    return [];
+  }
+}
+
+// =========================================================================
+// BANKEROFTHEDAY — codes in <strong> tags on sportybet booking code page
+// =========================================================================
+
+async function scrapeBankerOfTheDay(): Promise<BookingCode[]> {
+  try {
+    const res = await fetch('https://bankeroftheday.com/sportybet-booking-code-today', {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return [];
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    const codes: BookingCode[] = [];
+    const seen = new Set<string>();
+
+    // Codes appear in <strong> tags within the article body
+    $('article strong, .entry-content strong, .post-content strong, p strong').each((_, el) => {
+      const text = $(el).text().trim().toUpperCase();
+      if (text.length === 6 && isValidCode(text) && !seen.has(text)) {
+        seen.add(text);
+
+        // Get surrounding context for odds
+        const parent = $(el).parent();
+        const parentText = parent.text();
+        const oddsMatch = parentText.match(/([\d,.]+)\s*odds/i);
+
+        codes.push(makeCode(
+          text,
+          'BankerOfTheDay',
+          'https://bankeroftheday.com/sportybet-booking-code-today',
+          null,
+        ));
+        if (oddsMatch) {
+          codes[codes.length - 1]!.totalOdds = parseFloat(oddsMatch[1]!.replace(/,/g, ''));
+        }
+      }
+    });
+
+    // Fallback: scan all paragraphs for 6-char codes
+    if (codes.length === 0) {
+      $('article p, .entry-content p').each((_, el) => {
+        const text = $(el).text();
+        const matches = text.toUpperCase().match(/\b[A-Z0-9]{6}\b/g) || [];
+        for (const m of matches) {
+          if (isValidCode(m) && !seen.has(m)) {
+            seen.add(m);
+            codes.push(makeCode(m, 'BankerOfTheDay', 'https://bankeroftheday.com/sportybet-booking-code-today', null));
+          }
+        }
+      });
+    }
+
+    return codes;
+  } catch {
+    return [];
+  }
+}
+
+// =========================================================================
+// ACCURATEPREDICT — converted codes page with sportybet entries
+// =========================================================================
+
+async function scrapeAccuratePredict(): Promise<BookingCode[]> {
+  try {
+    const res = await fetch('https://accuratepredict.com/convert-bet-codes', {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    const codes: BookingCode[] = [];
+    const seen = new Set<string>();
+
+    // Look for sections/cards mentioning sportybet with codes
+    $('h4, h3, .card-title, .code-card, tr, li').each((_, el) => {
+      const text = $(el).text();
+      if (!/sportybet/i.test(text)) return;
+
+      const matches = text.toUpperCase().match(/\b[A-Z0-9]{6}\b/g) || [];
+      for (const m of matches) {
+        if (!isValidCode(m) || seen.has(m)) continue;
+        seen.add(m);
+
+        const oddsMatch = text.match(/@?\s*([\d,.]+)\s*odds/i);
+        const eventsMatch = text.match(/(\d{1,3})\s*events?/i);
+        const agoMatch = text.match(/(\d+\s*(?:hour|minute|min|hr|day)s?\s*ago)/i);
+
+        const c = makeCode(m, 'AccuratePredict', 'https://accuratepredict.com/convert-bet-codes', agoMatch ? agoMatch[0] : null);
+        if (oddsMatch) c.totalOdds = parseFloat(oddsMatch[1]!.replace(/,/g, ''));
+        if (eventsMatch) c.events = parseInt(eventsMatch[1]!);
+        codes.push(c);
+      }
+    });
+
+    return codes;
+  } catch {
+    return [];
+  }
+}
+
+// =========================================================================
 // MAIN ENTRY
 // =========================================================================
 
 export async function scrapeSocialMediaCodes(): Promise<BookingCode[]> {
-  const [cbcExtra, cbcAll] = await Promise.allSettled([
+  const [cbcExtra, cbcAll, sureCodes, banker, accurate] = await Promise.allSettled([
     scrapeConvertBetCodesExtra(),
     scrapeConvertBetCodesAll(),
+    scrapeSureCodes24(),
+    scrapeBankerOfTheDay(),
+    scrapeAccuratePredict(),
   ]);
 
   const all: BookingCode[] = [];
   if (cbcExtra.status === 'fulfilled') all.push(...cbcExtra.value);
   if (cbcAll.status === 'fulfilled') all.push(...cbcAll.value);
+  if (sureCodes.status === 'fulfilled') all.push(...sureCodes.value);
+  if (banker.status === 'fulfilled') all.push(...banker.value);
+  if (accurate.status === 'fulfilled') all.push(...accurate.value);
 
   // Deduplicate
   const byCode = new Map<string, BookingCode>();
@@ -187,6 +346,9 @@ export async function scrapeSocialMediaCodes(): Promise<BookingCode[]> {
     total: result.length,
     cbcExtra: cbcExtra.status === 'fulfilled' ? cbcExtra.value.length : 0,
     cbcAll: cbcAll.status === 'fulfilled' ? cbcAll.value.length : 0,
+    sureCodes: sureCodes.status === 'fulfilled' ? sureCodes.value.length : 0,
+    banker: banker.status === 'fulfilled' ? banker.value.length : 0,
+    accurate: accurate.status === 'fulfilled' ? accurate.value.length : 0,
   }, 'Extra codes scraped');
 
   return result;

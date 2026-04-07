@@ -128,6 +128,7 @@ body{min-height:100dvh;overflow-x:hidden;padding-bottom:calc(var(--nav-h) + env(
 .chip:hover{background:rgba(255,255,255,0.08);color:var(--text);border-color:rgba(255,255,255,0.2)}
 .chip.active{background:#fff;color:#131620;border-color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(255,255,255,0.1)}
 #market-filter-chips .chip.active{background:rgba(239,68,68,0.15);color:var(--red);border-color:rgba(239,68,68,0.3);text-decoration:line-through;opacity:0.7;font-weight:600;box-shadow:none}
+#market-include-chips .chip.active{background:var(--green-soft);color:var(--green);border-color:rgba(52,212,114,0.3);font-weight:700;box-shadow:none}
 
 /* ===== GENERATE PILLS ===== */
 .gen-pills{display:flex;gap:8px;flex-wrap:wrap}
@@ -580,6 +581,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <button class="chip" data-page="history">History</button>
       <button class="chip" data-page="games">Games</button>
       <button class="chip" data-page="vfl">VFL</button>
+      <button class="chip" data-page="arb">Arb</button>
     </div>
     <div class="hdr-status" id="health">
       <div class="hdr-dot"></div>
@@ -629,11 +631,17 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
-  <!-- Quick generate button -->
-  <button class="btn btn-blue" id="quick-gen" style="width:100%;margin-bottom:20px;padding:16px;font-size:16px;border-radius:var(--r-sm)">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-    Generate x5 Code
-  </button>
+  <!-- Quick generate buttons -->
+  <div style="display:flex;gap:8px;margin-bottom:20px">
+    <button class="btn btn-green" id="safe-2odds" style="flex:1;padding:16px;font-size:15px;border-radius:var(--r-sm)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Safe 2-Odds
+    </button>
+    <button class="btn btn-blue" id="quick-gen" style="flex:1;padding:16px;font-size:15px;border-radius:var(--r-sm)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Generate x5
+    </button>
+  </div>
 
   <!-- Search -->
   <div class="search-bar">
@@ -651,6 +659,9 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <button class="chip" data-sf="lost" style="padding:5px 12px;font-size:12px">Lost</button>
     </div>
     <div style="flex:1"></div>
+    <select id="codes-source" class="input-sm" style="width:auto;min-width:100px;padding:8px 10px;font-size:13px;min-height:auto">
+      <option value="all">Source: All</option>
+    </select>
     <select id="codes-sort" class="input-sm" style="width:auto;min-width:110px;padding:8px 10px;font-size:13px;min-height:auto">
       <option value="default">Sort: Default</option>
       <option value="odds-asc">Odds: Low-High</option>
@@ -788,6 +799,23 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
           <button class="chip" data-mf="correct score" style="padding:4px 10px;font-size:11px">CS</button>
           <button class="chip" data-mf="draw no bet" style="padding:4px 10px;font-size:11px">DNB</button>
           <button class="chip" data-mf="corner" style="padding:4px 10px;font-size:11px">Corners</button>
+        </span>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:6px">
+        <span style="font-size:11px;color:var(--green);font-weight:600">Include only:</span>
+        <span id="market-include-chips" style="display:inline-flex;gap:3px;flex-wrap:wrap">
+          <button class="chip" data-mi="1x2" style="padding:4px 10px;font-size:11px">1X2</button>
+          <button class="chip" data-mi="over/under" style="padding:4px 10px;font-size:11px">O/U</button>
+          <button class="chip" data-mi="gg" style="padding:4px 10px;font-size:11px">BTS</button>
+          <button class="chip" data-mi="double chance" style="padding:4px 10px;font-size:11px">DC</button>
+          <button class="chip" data-mi="1-5min" style="padding:4px 10px;font-size:11px">1-5 min</button>
+          <button class="chip" data-mi="1-10min" style="padding:4px 10px;font-size:11px">1-10 min</button>
+          <button class="chip" data-mi="1-15min" style="padding:4px 10px;font-size:11px">1-15 min</button>
+          <button class="chip" data-mi="corner" style="padding:4px 10px;font-size:11px">Corners</button>
+          <button class="chip" data-mi="handicap" style="padding:4px 10px;font-size:11px">HC</button>
+          <button class="chip" data-mi="halftime" style="padding:4px 10px;font-size:11px">HT</button>
+          <button class="chip" data-mi="correct score" style="padding:4px 10px;font-size:11px">CS</button>
+          <button class="chip" data-mi="team ou" style="padding:4px 10px;font-size:11px">Team O/U</button>
         </span>
       </div>
     </div>
@@ -1074,14 +1102,30 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 
   <!-- VFL Sub-tabs -->
   <div class="filter-bar" id="vfl-tabs" style="margin-bottom:14px">
-    <button class="chip active" data-vt="input">Input</button>
+    <button class="chip active" data-vt="schedule">Schedule</button>
+    <button class="chip" data-vt="input">Input</button>
     <button class="chip" data-vt="table">Table</button>
     <button class="chip" data-vt="analysis">Analysis</button>
     <button class="chip" data-vt="picks">Picks</button>
   </div>
 
+  <!-- SUB: Live Schedule (scraped from Golden Race) -->
+  <div id="vfl-schedule">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button class="btn btn-green" id="vfl-schedule-btn" style="flex:1">Scan Upcoming Matches</button>
+    </div>
+    <div id="vfl-schedule-stats" style="display:none;margin-bottom:14px"></div>
+    <div id="vfl-schedule-filters" style="display:none;margin-bottom:12px"></div>
+    <div id="vfl-schedule-list">
+      <div class="empty" style="padding:20px;font-size:13px">
+        Tap <b>Scan</b> to scrape upcoming scheduled virtual football from Sportybet.<br>
+        <span style="color:var(--text-3);font-size:12px">Gets all 6 leagues with predictions based on ${'>'}2000 historical results.</span>
+      </div>
+    </div>
+  </div>
+
   <!-- SUB: Input Results -->
-  <div id="vfl-input">
+  <div id="vfl-input" style="display:none">
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
       <label style="font-size:13px;color:var(--muted)">Week:</label>
       <input id="vfl-week" type="number" class="input" style="width:60px;padding:8px;letter-spacing:normal" min="1" max="38" value="1">
@@ -1142,6 +1186,38 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   </div>
 </div>
 
+<!-- ===== PAGE: ARBITRAGE ===== -->
+<div class="page" id="page-arb">
+
+  <div class="hero" id="arb-hero">
+    <div class="hero-stat"><div class="hero-num" id="arb-count" style="color:var(--green)">-</div><div class="hero-label">Arbs</div></div>
+    <div class="hero-stat"><div class="hero-num" id="arb-value-count" style="color:var(--amber)">-</div><div class="hero-label">Value Bets</div></div>
+    <div class="hero-stat"><div class="hero-num" id="arb-matched" style="color:var(--blue)">-</div><div class="hero-label">Matched</div></div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <button class="btn btn-green" id="arb-scan-btn" style="flex:1">Scan for Arbitrage</button>
+  </div>
+
+  <!-- Arbs section -->
+  <div id="arb-list">
+    <div class="empty" style="padding:24px;font-size:13px">
+      Tap <b>Scan</b> to compare Sportybet odds against Pinnacle (the sharpest bookmaker).<br>
+      <span style="color:var(--text-3);font-size:12px;line-height:1.6">
+        <b style="color:var(--green)">Arbs</b> = guaranteed profit by betting both sides across bookmakers.<br>
+        <b style="color:var(--amber)">Value Bets</b> = Sportybet paying more than the true probability suggests. Profitable long-term.
+      </span>
+    </div>
+  </div>
+
+  <!-- Value bets section -->
+  <div style="margin-top:20px">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px" id="arb-value-title" style="display:none">Value Bets</div>
+    <div id="arb-value-list"></div>
+  </div>
+
+</div>
+
 </main>
 
 <!-- BOTTOM NAV -->
@@ -1165,6 +1241,10 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   <button class="nav-btn" data-page="games">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg></span>
     Games
+  </button>
+  <button class="nav-btn" data-page="arb">
+    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg></span>
+    Arb
   </button>
   <button class="nav-btn" data-page="vfl">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>
@@ -1285,6 +1365,7 @@ function switchPage(name) {
     else if (!gamesLoaded) loadGames();
   }
   if (name === 'history') { renderHistory(); refreshHistoryStatuses(); }
+  if (name === 'arb' && !arbLoaded) loadArbitrage();
 
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
@@ -1423,6 +1504,24 @@ async function loadBookingCodes() {
     const conPicks = gamePool.filter(g => getConsensus(g) >= 2).length;
     document.getElementById('stat-consensus').textContent = conPicks;
 
+    // Populate source dropdown
+    const sourceSet = new Set(codes.map(c => c.source || 'Unknown'));
+    const sourceSelect = document.getElementById('codes-source');
+    sourceSelect.innerHTML = '<option value="all">Source: All</option>';
+    // Group sources: Twitter first, then others
+    const sources = [...sourceSet].sort((a, b) => {
+      const aT = a.toLowerCase().includes('twitter') ? 0 : 1;
+      const bT = b.toLowerCase().includes('twitter') ? 0 : 1;
+      return aT - bT || a.localeCompare(b);
+    });
+    for (const s of sources) {
+      const count = codes.filter(c => c.source === s).length;
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s + ' (' + count + ')';
+      sourceSelect.appendChild(opt);
+    }
+
     renderFilteredCodes();
     showToast(codes.length + ' codes loaded', 'success');
 
@@ -1440,8 +1539,10 @@ function getFilteredCodes() {
   const search = (document.getElementById('codes-search').value || '').toLowerCase().trim();
   const status = document.querySelector('#status-chips .chip.active')?.dataset.sf || 'all';
   const sort = document.getElementById('codes-sort').value;
+  const source = document.getElementById('codes-source').value;
 
   let filtered = allBookingCodes.filter(c => {
+    if (source !== 'all' && c.source !== source) return false;
     if (status !== 'all') {
       if (status === 'pending' && c.pendingCount <= 0) return false;
       if (status === 'won' && !(c.wonCount > 0 && c.lostCount === 0 && c.pendingCount === 0)) return false;
@@ -1509,12 +1610,15 @@ function renderFilteredCodes() {
   });
   const sort = document.getElementById('codes-sort');
   if (sort) sort.onchange = renderFilteredCodes;
+  const sourceFilter = document.getElementById('codes-source');
+  if (sourceFilter) sourceFilter.onchange = renderFilteredCodes;
   const clear = document.getElementById('filter-clear');
   if (clear) clear.onclick = () => {
     if (s) s.value = '';
     document.querySelectorAll('#status-chips .chip').forEach(x => x.classList.remove('active'));
     document.querySelector('#status-chips .chip[data-sf="all"]')?.classList.add('active');
     if (sort) sort.value = 'default';
+    if (sourceFilter) sourceFilter.value = 'all';
     renderFilteredCodes();
   };
 })();
@@ -2052,11 +2156,11 @@ function getCodeFamily(codeId) {
 }
 
 // Group sources into independent channels — mirrors of the same tipster count as 1
+// IMPORTANT: Code Hub codes are from DIFFERENT users (independent tipsters).
+// Only group converter sites (same code converted to different bookies = same tipster).
 const SOURCE_GROUPS = {
-  'sportybet': ['Sportybet Nigeria','Sportybet Ghana','Sportybet Kenya','Sportybet Tanzania','Sportybet Zambia'],
+  'convertbet': ['ConvertBetCodes (bet9ja)','ConvertBetCodes (betika)','ConvertBetCodes (all)','ConvertBetCodes (22bet)','ConvertBetCodes (betwinner)','ConvertBetCodes (melbet)','ConvertBetCodes (1xbet)','ConvertBetCodes (betway)','ConvertBetCodes (msport)','ConvertBetCodes (betpawa)','ConvertBetCodes (hollywoodbet)','ConvertBetCodes (merrybet)','ConvertBetCodes (linebet)','ConvertBetCodes (bangbet)','ConvertBetCodes (megapari)','ConvertBetCodes (betking)','ConvertBetCodes (nairabet)','ConvertBetCodes (betland)','ConvertBetCodes (paripesa)','ConvertBetCodes (helabet)','ConvertBetCodes (betlion)','ConvertBetCodes (odibets)','ConvertBetCodes (premierbet)','ConvertBetCodes (surebet247)','ConvertBetCodes (frapapa)'],
   'betloy': ['Betloy (Sportybet Nigeria)','Betloy (Sportybet Ghana)','Betloy (Sportybet Kenya)','Betloy (Sportybet South Africa)'],
-  'convertbet': ['ConvertBetCodes (bet9ja)','ConvertBetCodes (betika)','ConvertBetCodes (all)','ConvertBetCodes (22bet)','ConvertBetCodes (betwinner)','ConvertBetCodes (melbet)','ConvertBetCodes (1xbet)','ConvertBetCodes (betway)','ConvertBetCodes (msport)','ConvertBetCodes (betpawa)','ConvertBetCodes (hollywoodbet)','ConvertBetCodes (merrybet)','ConvertBetCodes (linebet)','ConvertBetCodes (bangbet)','ConvertBetCodes (megapari)'],
-  'sportpremi': ['SportPremi'],
   'discovered': ['Sportybet Network'],
   'stats-engine': ['Stats Engine'],
 };
@@ -2064,7 +2168,7 @@ function getSourceGroup(sourceName) {
   for (const [group, members] of Object.entries(SOURCE_GROUPS)) {
     if (members.some(m => sourceName === m)) return group;
   }
-  return sourceName; // unique source
+  return sourceName; // unique source — each Code Hub code, tipster site, Twitter/Telegram is independent
 }
 
 let currentCodeSource = '';
@@ -2073,18 +2177,20 @@ function recordConsensus(selections, codeId) {
   if (!selections) return;
   totalCodesLoaded++;
   const familyId = getCodeFamily(codeId);
+  // For Code Hub + Betloy: use CODE as the source key (each code = different user)
+  // For converters: use source group (same code converted = same tipster)
   const sourceGroup = getSourceGroup(currentCodeSource);
+  const sourceKey = sourceGroup === currentCodeSource ? codeId : sourceGroup;
   for (const s of selections) {
     if (!s.eventId) continue;
     const key = s.eventId+':'+(s.marketId||'')+':'+(s.outcomeId||'');
     if (!consensusMap.has(key)) consensusMap.set(key, {count:0, sources:new Set(), families:new Set(), sourceGroups:new Set(), eventId:s.eventId});
     const e = consensusMap.get(key);
-    // Only count if from a DIFFERENT family AND a DIFFERENT source group
+    // Only count if from a DIFFERENT family AND a DIFFERENT source
     if (!e.families.has(familyId)) {
       e.families.add(familyId);
-      // Only increment count for independent source groups
-      if (!e.sourceGroups.has(sourceGroup)) {
-        e.sourceGroups.add(sourceGroup);
+      if (!e.sourceGroups.has(sourceKey)) {
+        e.sourceGroups.add(sourceKey);
         e.count++;
       }
     }
@@ -2095,7 +2201,7 @@ function recordConsensus(selections, codeId) {
 function getConsensus(g) { return consensusMap.get(g.eventId+':'+(g.marketId||'')+':'+(g.outcomeId||''))?.count || 0; }
 
 // Gimmick/novelty markets that are unpredictable
-const GIMMICK_MARKETS = ['1 to 5 minute', '1 to 10 minute', '1 to 15 minute', '6 to 10 minute', '11 to 15 minute', 'correct score', 'exact goals', 'first goal', 'last goal', 'race to', 'minute of', 'corner'];
+const GIMMICK_MARKETS = ['exact goals', 'first goal', 'last goal', 'race to', 'minute of'];
 
 function isGimmickMarket(market) {
   if (!market) return false;
@@ -2742,6 +2848,7 @@ function pickEfficiency(g) {
 
 // ===== GENERATE CODES =====
 const excludedMarkets = new Set();
+const includedMarkets = new Set(); // when non-empty, ONLY these markets are used
 let selectedDaysRange = 0;
 document.getElementById('days-range-select').addEventListener('change', e => { selectedDaysRange = parseInt(e.target.value)||0; });
 document.querySelectorAll('#market-filter-chips .chip').forEach(b => {
@@ -2752,6 +2859,20 @@ document.querySelectorAll('#market-filter-chips .chip').forEach(b => {
       b.classList.remove('active');
     } else {
       excludedMarkets.add(mf);
+      b.classList.add('active');
+    }
+  };
+});
+
+// Include-only market filter
+document.querySelectorAll('#market-include-chips .chip').forEach(b => {
+  b.onclick = () => {
+    const mi = b.dataset.mi;
+    if (includedMarkets.has(mi)) {
+      includedMarkets.delete(mi);
+      b.classList.remove('active');
+    } else {
+      includedMarkets.add(mi);
       b.classList.add('active');
     }
   };
@@ -2930,6 +3051,28 @@ function getEligibleGames(targetOdds) {
   const dates = new Set();
   for (let d=0;d<maxDays;d++) { const dt = new Date(today); dt.setDate(dt.getDate()+d); dates.add(dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')); }
   let pool = gamePool.filter(g => !g.matchDate || dates.has(g.matchDate));
+  // Include-only filter (if any chips selected, ONLY those markets pass)
+  if (includedMarkets.size > 0) {
+    pool = pool.filter(g => {
+      const m = (g.market||'').toLowerCase();
+      for (const mi of includedMarkets) {
+        if (mi==='1x2' && (m==='1x2'||m==='match winner'||(m.includes('1x2')&&!m.includes('from')&&!m.includes('1up')&&!m.includes('2up')))) return true;
+        if (mi==='over/under' && (m==='over/under'||(m.includes('over/under')&&!m.includes('team')&&!m.includes('1st')&&!m.includes('2nd')&&!m.includes('early')&&!m.includes('corner')))) return true;
+        if (mi==='gg' && (m.includes('both teams')||m.includes('btts')||m==='gg/ng')) return true;
+        if (mi==='double chance' && m==='double chance') return true;
+        if (mi==='1-5min' && m.includes('from 1 to 5')) return true;
+        if (mi==='1-10min' && (m.includes('from 1 to 10')||m.includes('10 minutes'))) return true;
+        if (mi==='1-15min' && m.includes('from 1 to 15')) return true;
+        if (mi==='corner' && m.includes('corner')) return true;
+        if (mi==='handicap' && m.includes('handicap')) return true;
+        if (mi==='halftime' && (m.includes('1st half')||m.includes('halftime'))) return true;
+        if (mi==='correct score' && m.includes('correct score')) return true;
+        if (mi==='team ou' && m.includes('over/under') && (m.includes('team')||/^[a-z].*over\/under/i.test(g.market||''))) return true;
+      }
+      return false;
+    });
+  }
+  // Exclude filter (applies after include)
   if (excludedMarkets.size > 0) {
     pool = pool.filter(g => {
       const m = (g.market||'').toLowerCase();
@@ -3578,6 +3721,130 @@ document.getElementById('custom-odds-input').addEventListener('keydown', e => { 
 // Quick gen from codes page
 document.getElementById('quick-gen').onclick = () => generateSafeCode(5, document.getElementById('quick-gen'));
 
+// Safe 2-Odds — picks the 2 highest-probability selections from all data
+document.getElementById('safe-2odds').onclick = async () => {
+  const btn = document.getElementById('safe-2odds');
+  const resultsDiv = document.getElementById('generated-code-result');
+  btnLoad(btn);
+  resultsDiv.style.display = 'block';
+  resultsDiv.innerHTML = '<div style="padding:16px;text-align:center"><div class="spinner" style="margin:0 auto 8px;width:24px;height:24px"></div><div style="font-size:13px;color:var(--text-2)">Finding safest 2 picks...</div></div>';
+
+  try {
+    // Make sure pool is populated
+    if (!discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) {
+      await runDiscoverySilent();
+    }
+    await Promise.all([fetchEnrichment(), fetchPinnacleOdds()]);
+
+    // Score and rank all games — only future, unsettled
+    const now = Date.now();
+    const candidates = gamePool
+      .filter(g => {
+        if (!g.estimateStartTime || g.estimateStartTime < now + 20*60000) return false;
+        const st = (g.matchStatus||'').toLowerCase();
+        if (st === 'live' || st === 'ended' || st === '1h' || st === '2h' || st === 'ht') return false;
+        return true;
+      })
+      .map(g => {
+        const prob = estimateProb(g);
+        const safety = safetyScore(g);
+        const con = getConsensus(g);
+        return { ...g, _prob: prob, _safety: safety, _consensus: con };
+      })
+      .filter(g => g._prob >= 0.70 && g._safety >= 50) // minimum 70% win prob, decent safety
+      .sort((a, b) => {
+        // Primary: probability. Tiebreak: consensus, then safety
+        const probDiff = b._prob - a._prob;
+        if (Math.abs(probDiff) > 0.01) return probDiff;
+        if (b._consensus !== a._consensus) return b._consensus - a._consensus;
+        return b._safety - a._safety;
+      });
+
+    // Pick top 2, ensuring different matches
+    const picked = [];
+    const usedEvents = new Set();
+    for (const g of candidates) {
+      if (usedEvents.has(g.eventId)) continue;
+      picked.push(g);
+      usedEvents.add(g.eventId);
+      if (picked.length >= 2) break;
+    }
+
+    if (picked.length < 2) {
+      btnDone(btn);
+      resultsDiv.innerHTML = '<div style="padding:14px;color:var(--amber);font-size:13px;background:var(--amber-soft);border-radius:var(--r-xs)">Not enough high-confidence picks right now. Need at least 2 selections with 70%+ win probability.</div>';
+      return;
+    }
+
+    // Create the code
+    const sels = picked.map(g => ({eventId:g.eventId, marketId:g.marketId, outcomeId:g.outcomeId, specifier:g.specifier||'', sportId:g.sportId}));
+    const res = await fetch('/predictions/create-code', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({selections:sels}) });
+    const data = await res.json();
+
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      const totalOdds = picked.reduce((a,g) => a * g.odds, 1).toFixed(2);
+      const winProb = Math.round(picked.reduce((p,g) => p * g._prob, 1) * 100);
+      const winCol = winProb >= 60 ? 'var(--green)' : winProb >= 40 ? 'var(--amber)' : 'var(--red)';
+
+      // Save to history
+      codeHistory.push({code, strategy:'safe-2odds', targetOdds:2, actualOdds:parseFloat(totalOdds), gamesCount:2, createdAt:new Date().toISOString(), status:'pending', wonCount:0, lostCount:0, pendingCount:2, lastChecked:null, picks:picked.map(g=>({homeTeam:g.homeTeam,awayTeam:g.awayTeam,league:g.league,market:g.market,pick:g.pick,odds:g.odds,eventId:g.eventId,outcome:null}))});
+      saveCHistory();
+
+      let picksHTML = picked.map(g => {
+        const prob = Math.round(g._prob * 100);
+        const con = g._consensus;
+        const probCol = prob >= 85 ? 'var(--green)' : prob >= 75 ? 'var(--blue)' : 'var(--amber)';
+        const kickoff = g.estimateStartTime ? new Date(g.estimateStartTime).toLocaleString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+        const league = normalizeLeague(g.league) || g.league || '';
+        return `<div style="padding:10px 12px;background:var(--bg);border-radius:var(--r-xs);margin-top:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:700">${g.homeTeam} vs ${g.awayTeam}</div>
+              <div style="font-size:11px;color:var(--text-3)">${league}${kickoff?' &middot; '+kickoff:''}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:15px;font-weight:800">@${g.odds}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--surface-2);color:var(--text)">${g.market} &mdash; ${g.pick}</span>
+            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:${prob>=80?'var(--green-soft)':'var(--blue-soft)'};color:${probCol}">${prob}% win</span>
+            ${con >= 2 ? '<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--amber-soft);color:var(--amber)">'+con+'x tipsters agree</span>' : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+      resultsDiv.innerHTML = `<div style="border:2px solid rgba(52,212,114,0.3);border-radius:var(--r);padding:16px;background:var(--green-soft);margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.5px">Safe 2-Odds Code</div>
+            <div style="font-size:28px;font-weight:900;letter-spacing:2px;margin-top:2px">${code}</div>
+          </div>
+          <button onclick="navigator.clipboard.writeText('${code}');showToast('Copied!','success')" class="btn btn-green btn-sm">Copy</button>
+        </div>
+        <div style="display:flex;gap:16px;margin-bottom:10px">
+          <div><span style="font-size:11px;color:var(--text-3)">Total Odds</span><div style="font-size:18px;font-weight:800">@${totalOdds}</div></div>
+          <div><span style="font-size:11px;color:var(--text-3)">Win Chance</span><div style="font-size:18px;font-weight:800;color:${winCol}">${winProb}%</div></div>
+          <div><span style="font-size:11px;color:var(--text-3)">Games</span><div style="font-size:18px;font-weight:800">2</div></div>
+        </div>
+        ${picksHTML}
+        <div style="margin-top:10px;padding:8px 12px;background:var(--bg);border-radius:var(--r-xs);font-size:11px;color:var(--text-3);line-height:1.6">
+          These are the 2 picks with the highest win probability from all ${gamePool.length} selections across ${allBookingCodes.length} codes. Load code <b style="color:var(--text)">${code}</b> on Sportybet to play.
+        </div>
+      </div>`;
+
+      showToast('Safe 2-odds code: ' + code, 'success');
+    } else {
+      resultsDiv.innerHTML = '<div style="padding:14px;color:var(--red);font-size:13px;background:var(--red-soft);border-radius:var(--r-xs)">Failed to create code. Sportybet API may be down.</div>';
+    }
+  } catch (e) {
+    resultsDiv.innerHTML = '<div style="padding:14px;color:var(--red);font-size:13px;background:var(--red-soft);border-radius:var(--r-xs)">Error: ' + e.message + '</div>';
+  } finally {
+    btnDone(btn);
+  }
+};
+
 // ===== SELECTION & CODE GENERATION =====
 function updateGenerateBar() {
   const checks = document.querySelectorAll('.sel-check:checked');
@@ -4092,7 +4359,7 @@ const VFL_TEAMS = ['MNC','LIV','ARS','CHE','MNU','TOT','EVE','LEI','SOU','WHU','
 const VFL_NAMES = {MNC:'Man City',LIV:'Liverpool',MNU:'Man United',CHE:'Chelsea',ARS:'Arsenal',TOT:'Tottenham',EVE:'Everton',LEI:'Leicester',SOU:'Southampton',WHU:'West Ham',CRY:'Crystal Palace',WOL:'Wolverhampton',BRI:'Brighton',BUR:'Burnley',LEE:'Leeds',WBA:'West Brom',ASV:'Aston Villa',NWC:'Newcastle',SHU:'Sheffield Utd',FUL:'Fulham'};
 
 // VFL sub-tab switching
-const vflSubs = ['vfl-input','vfl-table','vfl-analysis','vfl-picks'];
+const vflSubs = ['vfl-schedule','vfl-input','vfl-table','vfl-analysis','vfl-picks'];
 document.querySelectorAll('#vfl-tabs .chip').forEach(b => b.onclick = () => {
   document.querySelectorAll('#vfl-tabs .chip').forEach(c => c.classList.remove('active'));
   b.classList.add('active');
@@ -5056,6 +5323,283 @@ function renderVirtuals() {
 
   listEl.innerHTML = html;
 }
+
+// ===== ARBITRAGE =====
+let arbLoaded = false;
+
+function renderArbCard(arb) {
+  const kickoff = arb.kickoff ? new Date(arb.kickoff).toLocaleString('en-GB', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  let legsHTML = arb.legs.map(l =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:var(--r-xs)">
+      <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;${l.bookmaker==='Sportybet'?'background:var(--green-soft);color:var(--green)':'background:var(--blue-soft);color:var(--blue)'}">${l.bookmaker}</span>
+      <span style="flex:1;font-size:13px;font-weight:600">${l.pick}</span>
+      <span style="font-size:14px;font-weight:800">@${l.odds}</span>
+    </div>`
+  ).join('');
+
+  let stakesHTML = arb.stakes.map(s =>
+    `<span style="font-size:11px;color:var(--text-2)">${s.bookmaker} ${s.leg}: <b style="color:var(--text)">$${s.stake.toFixed(2)}</b> @${s.odds}</span>`
+  ).join('<span style="color:var(--text-3);margin:0 4px">|</span>');
+
+  return `<div class="card" style="border-color:rgba(52,212,114,0.2)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div class="card-icon" style="background:var(--green-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">${arb.homeTeam} vs ${arb.awayTeam}</div>
+        <div style="font-size:12px;color:var(--text-3)">${arb.league}${kickoff?' &middot; '+kickoff:''} &middot; ${arb.market}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:20px;font-weight:900;color:var(--green)">+${arb.profitPct}%</div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase">Profit</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">${legsHTML}</div>
+    <div style="padding:8px 10px;background:var(--surface-2);border-radius:var(--r-xs);font-size:11px">
+      <span style="font-weight:700;color:var(--amber);margin-right:6px">$100 stakes:</span>${stakesHTML}
+    </div>
+  </div>`;
+}
+
+function renderValueCard(vb) {
+  const isDropping = vb.signal === 'dropping';
+  const kickoff = vb.kickoff ? new Date(vb.kickoff).toLocaleString('en-GB', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+  const diff = (vb.sportyOdds - vb.fairOdds).toFixed(2);
+  const diffPct = ((vb.sportyOdds / vb.fairOdds - 1) * 100).toFixed(1);
+
+  // Action advice
+  let advice, adviceColor;
+  if (vb.edgePct >= 5) {
+    advice = 'Strong value — Sportybet is significantly overpaying. Bet this pick on Sportybet before odds drop.';
+    adviceColor = 'var(--green)';
+  } else if (vb.edgePct >= 2) {
+    advice = 'Moderate value — Sportybet odds are above fair price. Worth a bet if you like the pick.';
+    adviceColor = 'var(--amber)';
+  } else {
+    advice = 'Slim value — Sportybet odds are slightly above fair. Edge is thin but positive.';
+    adviceColor = 'var(--text-2)';
+  }
+
+  return `<div class="card" style="border-color:rgba(247,183,49,0.15)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--amber-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">${vb.homeTeam} vs ${vb.awayTeam}</div>
+        <div style="font-size:12px;color:var(--text-3)">${vb.league}${kickoff?' &middot; '+kickoff:''}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:20px;font-weight:900;color:var(--amber)">+${vb.edgePct}%</div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-3)">EV</div>
+      </div>
+    </div>
+
+    <!-- What to bet -->
+    <div style="margin-top:12px;padding:10px 12px;background:var(--surface-2);border-radius:var(--r-xs);border-left:3px solid var(--amber)">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">Bet: <span style="color:var(--amber)">${vb.market} &mdash; ${vb.pick}</span></div>
+      <div style="font-size:12px;color:${adviceColor}">${advice}</div>
+    </div>
+
+    <!-- Odds comparison -->
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px">
+      <div style="padding:10px 12px;background:var(--bg);border-radius:var(--r-xs)">
+        <div style="color:var(--text-3);font-size:10px;font-weight:600;margin-bottom:4px">SPORTYBET PAYS</div>
+        <div style="font-size:20px;font-weight:800;color:var(--green)">@${vb.sportyOdds}</div>
+        <div style="font-size:11px;color:var(--green);margin-top:2px">+${diff} above fair (${diffPct}% more)</div>
+      </div>
+      <div style="padding:10px 12px;background:var(--bg);border-radius:var(--r-xs)">
+        <div style="color:var(--text-3);font-size:10px;font-weight:600;margin-bottom:4px">FAIR VALUE (PINNACLE)</div>
+        <div style="font-size:20px;font-weight:800;color:var(--blue)">@${vb.fairOdds}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px">True prob: ${vb.fairProb}%</div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div style="margin-top:8px;padding:8px 12px;background:var(--bg);border-radius:var(--r-xs);font-size:11px;color:var(--text-3);line-height:1.5">
+      Pinnacle (sharpest bookmaker) says this outcome has a ${vb.fairProb}% chance, meaning fair odds are <b style="color:var(--text)">@${vb.fairOdds}</b>.
+      Sportybet is paying <b style="color:var(--green)">@${vb.sportyOdds}</b> — ${diff > 0 ? 'higher than fair' : 'at fair value'}.
+      If you bet this repeatedly at these odds, you'd profit <b style="color:var(--amber)">+${vb.edgePct}%</b> long-term.
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:8px;padding:6px 10px;font-size:11px;color:var(--text-3)">
+      <span>Code: <b style="color:var(--text)">${vb.sourceCode}</b></span>
+      <span>Pinnacle raw: @${vb.pinnacleOdds}</span>
+      ${isDropping ? '<span style="color:var(--red);font-weight:600">Odds likely to drop soon</span>' : ''}
+    </div>
+  </div>`;
+}
+
+async function loadArbitrage() {
+  const btn = document.getElementById('arb-scan-btn');
+  btnLoad(btn);
+  try {
+    const data = await api('/predictions/arbitrage');
+    arbLoaded = true;
+
+    const stats = data.stats || {};
+    document.getElementById('arb-count').textContent = stats.arbsFound ?? 0;
+    document.getElementById('arb-value-count').textContent = stats.valueBetsFound ?? 0;
+    document.getElementById('arb-matched').textContent = stats.pinnacleMatched ?? 0;
+
+    const arbList = document.getElementById('arb-list');
+    const arbs = data.arbs || [];
+    if (arbs.length) {
+      arbList.innerHTML = arbs.map(renderArbCard).join('');
+    } else {
+      arbList.innerHTML = '<div class="empty" style="padding:20px;font-size:13px">No guaranteed-profit arbs right now. Pure arbs are rare and last seconds — the scanner catches them when they appear.</div>';
+    }
+
+    const valueList = document.getElementById('arb-value-list');
+    const valueTitle = document.getElementById('arb-value-title');
+    const valueBets = data.valueBets || [];
+    if (valueBets.length) {
+      if (valueTitle) valueTitle.style.display = 'block';
+      valueList.innerHTML = valueBets.map(renderValueCard).join('');
+    } else {
+      if (valueTitle) valueTitle.style.display = 'block';
+      valueList.innerHTML = '<div class="empty" style="padding:20px;font-size:13px">No value bets found. Sportybet odds are at or below fair value for all matched events right now.</div>';
+    }
+
+    if (arbs.length) showToast(arbs.length + ' arb' + (arbs.length > 1 ? 's' : '') + ' found!', 'success');
+    else if (valueBets.length) showToast(valueBets.length + ' value bet' + (valueBets.length > 1 ? 's' : '') + ' found', 'info');
+    else showToast('No arbs right now', 'info');
+  } catch (e) {
+    showToast('Scan failed: ' + e.message, 'error');
+  } finally {
+    btnDone(btn, 'Scan for Arbitrage');
+  }
+}
+
+document.getElementById('arb-scan-btn').onclick = () => loadArbitrage();
+
+// ===== VIRTUAL SCHEDULE =====
+let vschedLoaded = false;
+
+function renderVirtualMatch(m) {
+  const p = m.prediction;
+  if (!p) {
+    return `<div class="card" style="padding:12px">
+      <div style="font-size:13px;font-weight:700">${m.home} vs ${m.away}</div>
+      <div style="font-size:11px;color:var(--text-3)">${m.country} Week ${m.week}</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="flex:1;text-align:center;padding:6px;background:var(--bg);border-radius:var(--r-xs);font-size:12px"><div style="font-weight:700">H</div>@${m.homeOdds}</div>
+        <div style="flex:1;text-align:center;padding:6px;background:var(--bg);border-radius:var(--r-xs);font-size:12px"><div style="font-weight:700">D</div>@${m.drawOdds}</div>
+        <div style="flex:1;text-align:center;padding:6px;background:var(--bg);border-radius:var(--r-xs);font-size:12px"><div style="font-weight:700">A</div>@${m.awayOdds}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:6px">No prediction data for these teams yet</div>
+    </div>`;
+  }
+
+  const vp = p.valuePick;
+  const predLabel = p.predictedOutcome === '1' ? m.home : p.predictedOutcome === '2' ? m.away : 'Draw';
+  const predCol = p.confidence >= 60 ? 'var(--green)' : p.confidence >= 45 ? 'var(--amber)' : 'var(--text-2)';
+  const borderCol = vp ? 'rgba(52,212,114,0.2)' : 'var(--border)';
+
+  function oddsCell(label, odds, prob, implied, pick) {
+    const isValue = vp === pick;
+    const isPred = p.predictedOutcome === pick;
+    const bg = isValue ? 'var(--green-soft)' : isPred ? 'var(--blue-soft)' : 'var(--bg)';
+    const border = isValue ? '2px solid var(--green)' : isPred ? '2px solid var(--blue)' : '1px solid var(--border)';
+    return `<div style="flex:1;text-align:center;padding:8px 4px;background:${bg};border:${border};border-radius:var(--r-xs)">
+      <div style="font-size:10px;color:var(--text-3);font-weight:600">${label}</div>
+      <div style="font-size:16px;font-weight:800">@${odds}</div>
+      <div style="font-size:11px;color:var(--text-2)">${prob}%</div>
+      ${isValue ? '<div style="font-size:9px;font-weight:700;color:var(--green);margin-top:2px">VALUE +' + p.valueEdge + '%</div>' : ''}
+    </div>`;
+  }
+
+  return `<div class="card" style="border-color:${borderCol};padding:14px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">${m.home} vs ${m.away}</div>
+        <div style="font-size:12px;color:var(--text-3)">${m.country} Week ${m.week}${m.startsAt ? ' &middot; ' + m.startsAt : ''}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:14px;font-weight:800;color:${predCol}">${predLabel}</div>
+        <div style="font-size:10px;color:var(--text-3)">${p.confidence}% conf</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px">
+      ${oddsCell('HOME', m.homeOdds, p.homeWinProb, p.impliedHome, '1')}
+      ${oddsCell('DRAW', m.drawOdds, p.drawProb, p.impliedDraw, 'X')}
+      ${oddsCell('AWAY', m.awayOdds, p.awayWinProb, p.impliedAway, '2')}
+    </div>
+    ${vp ? `<div style="margin-top:8px;padding:6px 10px;background:var(--green-soft);border-radius:var(--r-xs);font-size:11px;color:var(--green);font-weight:600">
+      Bet ${vp === '1' ? m.home + ' (Home)' : vp === '2' ? m.away + ' (Away)' : 'Draw'} — model sees +${p.valueEdge}% edge over the odds
+    </div>` : ''}
+  </div>`;
+}
+
+async function loadVirtualSchedule() {
+  const btn = document.getElementById('vfl-schedule-btn');
+  const list = document.getElementById('vfl-schedule-list');
+  btnLoad(btn);
+  list.innerHTML = '<div style="padding:24px;text-align:center"><div class="spinner" style="margin:0 auto 8px;width:24px;height:24px"></div><div style="font-size:13px;color:var(--text-2)">Scraping virtual matches (launching Chrome)...</div></div>';
+
+  try {
+    const data = await api('/predictions/virtual-schedule');
+    vschedLoaded = true;
+    const matches = data.data || [];
+    const countries = data.countries || [];
+
+    // Stats
+    const statsDiv = document.getElementById('vfl-schedule-stats');
+    const valuePicks = matches.filter(m => m.prediction?.valuePick);
+    statsDiv.style.display = 'grid';
+    statsDiv.style.gridTemplateColumns = 'repeat(3,1fr)';
+    statsDiv.style.gap = '8px';
+    const scanTime = data.scannedAt ? new Date(data.scannedAt).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '?';
+    statsDiv.innerHTML = `
+      <div class="hero-stat"><div class="hero-num" style="color:var(--blue)">${matches.length}</div><div class="hero-label">Matches</div></div>
+      <div class="hero-stat"><div class="hero-num" style="color:var(--green)">${valuePicks.length}</div><div class="hero-label">Value Picks</div></div>
+      <div class="hero-stat"><div class="hero-num" style="color:var(--amber)">${data.resultsCount || 0}</div><div class="hero-label">Results DB</div></div>
+      <div style="grid-column:1/-1;text-align:center;font-size:11px;color:var(--text-3);padding:4px">Scanned at ${scanTime} — hit Scan again to refresh</div>
+    `;
+
+    // Country filters
+    const filtersDiv = document.getElementById('vfl-schedule-filters');
+    filtersDiv.style.display = 'flex';
+    filtersDiv.style.gap = '4px';
+    filtersDiv.style.flexWrap = 'wrap';
+    filtersDiv.innerHTML = '<button class="chip active" data-vc="all" style="padding:4px 10px;font-size:11px">All</button>' +
+      countries.map(c => `<button class="chip" data-vc="${c}" style="padding:4px 10px;font-size:11px">${c}</button>`).join('');
+
+    let activeCountry = 'all';
+    function renderFiltered() {
+      const filtered = activeCountry === 'all' ? matches : matches.filter(m => m.country === activeCountry);
+      if (!filtered.length) {
+        list.innerHTML = '<div class="empty" style="padding:16px;font-size:13px">No matches for this league</div>';
+        return;
+      }
+      // Sort: value picks first, then by confidence
+      const sorted = [...filtered].sort((a, b) => {
+        const aVal = a.prediction?.valuePick ? 1 : 0;
+        const bVal = b.prediction?.valuePick ? 1 : 0;
+        if (bVal !== aVal) return bVal - aVal;
+        return (b.prediction?.confidence || 0) - (a.prediction?.confidence || 0);
+      });
+      list.innerHTML = sorted.map(renderVirtualMatch).join('');
+    }
+
+    filtersDiv.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+      filtersDiv.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      b.classList.add('active');
+      activeCountry = b.dataset.vc;
+      renderFiltered();
+    });
+
+    renderFiltered();
+    showToast(matches.length + ' virtual matches loaded, ' + valuePicks.length + ' value picks', 'success');
+  } catch (e) {
+    list.innerHTML = '<div class="empty" style="color:var(--red)">Failed to load: ' + e.message + '</div>';
+  } finally {
+    btnDone(btn, 'Scan Upcoming Matches');
+  }
+}
+
+document.getElementById('vfl-schedule-btn').onclick = () => loadVirtualSchedule();
 
 // ===== INIT =====
 (async () => {

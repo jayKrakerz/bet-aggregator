@@ -8,6 +8,11 @@
 import * as cheerio from 'cheerio';
 import { logger } from '../utils/logger.js';
 import { scrapeSocialMediaCodes } from './social-codes-scraper.js';
+import { scrapeTwitterCodes } from './twitter-codes-scraper.js';
+import { scrapeTelegramCodes } from './telegram-codes-scraper.js';
+import { scrapeMetaCodes } from './meta-codes-scraper.js';
+// Headless browser scraper — lazy-loaded to avoid crash when Chrome unavailable
+const headlessScraper = () => import('./headless-codes-scraper.js').then(m => m.scrapeHeadlessCodes()).catch(() => [] as BookingCode[]);
 
 export interface BookingCodeSelection {
   homeTeam: string;
@@ -310,82 +315,91 @@ async function scrapeConvertBetCodes(): Promise<BookingCode[]> {
   }
 }
 
-/** Scrape betloy.com — free converted codes for Sportybet */
+/** Scrape betloy.com — free converted codes for Sportybet, with pagination */
 async function scrapeBetloy(): Promise<BookingCode[]> {
-  const allCodes: BookingCode[] = [];
-  const regions = ['Sportybet%20Nigeria', 'Sportybet%20Ghana', 'Sportybet%20Kenya'];
+  const BETLOY_REGIONS = [
+    'Sportybet%20Nigeria', 'Sportybet%20Ghana', 'Sportybet%20Kenya',
+    'Sportybet%20Tanzania', 'Sportybet%20South%20Africa', 'Sportybet%20Cameroon',
+  ];
+  const BETLOY_PAGES = 15;
 
-  for (const region of regions) {
+  async function fetchPage(region: string, page: number): Promise<BookingCode[]> {
     try {
-      const res = await fetch(`https://betloy.com/free-betcodes?bookie=${region}`, {
+      const pageParam = page > 1 ? `&page=${page}` : '';
+      const res = await fetch(`https://betloy.com/free-betcodes?bookie=${region}${pageParam}`, {
         headers: HEADERS,
         signal: AbortSignal.timeout(12000),
       });
-      if (!res.ok) continue;
+      if (!res.ok) return [];
       const html = await res.text();
       const $ = cheerio.load(html);
+      const codes: BookingCode[] = [];
 
-      // Each code card: <div class="col-lg-4 col-md-6 code-card" data-destination-bookie="Sportybet Nigeria">
       $('div.code-card').each((_, card) => {
         const destBookie = $(card).attr('data-destination-bookie') || '';
         if (!destBookie.toLowerCase().includes('sportybet')) return;
 
-        // The second .site-info contains the Sportybet code
         const siteInfos = $(card).find('.site-info');
         if (siteInfos.length < 2) return;
 
         const sportyInfo = $(siteInfos[1]!);
-        // Code is in h2 or h1 inside the second site-info
         const codeText = (sportyInfo.find('h2').text().trim() || sportyInfo.find('h1').text().trim()).toUpperCase();
         if (!codeText || !isValidCode(codeText)) return;
-        if (allCodes.some(c => c.code === codeText)) return;
+        if (codes.some(c => c.code === codeText)) return;
 
-        // Odds from the spans
-        const oddsText = sportyInfo.find('span').first().text().trim();
-        const oddsMatch = oddsText.match(/([\d,.]+)\s*odds/i);
-        const odds = oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null;
-
-        // Events count
-        const eventsText = sportyInfo.text();
-        const eventsMatch = eventsText.match(/(\d{1,3})\s*events?/i);
-        const events = eventsMatch ? parseInt(eventsMatch[1]!) : null;
-
-        // Source bookmaker (first site-info)
-        const sourceInfo = $(siteInfos[0]!);
-        const sourceOddsText = sourceInfo.find('span').first().text().trim();
-        const sourceCode = (sourceInfo.find('h1').text().trim() || sourceInfo.find('h2').text().trim());
-
-        // Timestamp
+        const oddsMatch = sportyInfo.find('span').first().text().match(/([\d,.]+)\s*odds/i);
+        const eventsMatch = sportyInfo.text().match(/(\d{1,3})\s*events?/i);
         const timeText = $(card).find('.gen-time span').text().trim() || null;
 
-        // Like/dislike for quality signal
-        const likes = parseInt($(card).find('.like-count').text().trim()) || 0;
-        const dislikes = parseInt($(card).find('.dislike-count').text().trim()) || 0;
-
-        allCodes.push({
+        codes.push({
           code: codeText,
           source: `Betloy (${destBookie})`,
           sourceUrl: `https://betloy.com/free-betcodes?bookie=${region}`,
-          events,
-          totalOdds: odds,
+          events: eventsMatch ? parseInt(eventsMatch[1]!) : null,
+          totalOdds: oddsMatch ? parseFloat(oddsMatch[1]!.replace(/,/g, '')) : null,
           market: null,
           date: todayLocal(),
           status: 'pending',
           postedAgo: timeText,
-          validated: false,
-          isValid: false,
-          selections: [],
-          wonCount: 0,
-          lostCount: 0,
-          pendingCount: 0,
+          validated: false, isValid: false, selections: [],
+          wonCount: 0, lostCount: 0, pendingCount: 0,
         });
       });
-    } catch (err) {
-      logger.warn({ err, region }, 'Failed to scrape Betloy');
+
+      return codes;
+    } catch {
+      return [];
     }
   }
 
-  logger.info({ count: allCodes.length }, 'Betloy: codes scraped');
+  // Build all page requests
+  const requests: { region: string; page: number }[] = [];
+  for (const region of BETLOY_REGIONS) {
+    for (let page = 1; page <= BETLOY_PAGES; page++) {
+      requests.push({ region, page });
+    }
+  }
+
+  // Fetch in parallel batches of 8
+  const allCodes: BookingCode[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < requests.length; i += 8) {
+    const batch = requests.slice(i, i + 8);
+    const results = await Promise.allSettled(
+      batch.map(r => fetchPage(r.region, r.page)),
+    );
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      for (const code of r.value) {
+        if (seen.has(code.code)) continue;
+        seen.add(code.code);
+        allCodes.push(code);
+      }
+    }
+  }
+
+  logger.info({ count: allCodes.length, regions: BETLOY_REGIONS.length, pages: BETLOY_PAGES }, 'Betloy: codes scraped');
   return allCodes;
 }
 
@@ -396,7 +410,11 @@ const SPORTYBET_COUNTRIES = [
   { code: 'ke', name: 'Kenya' },
   { code: 'zm', name: 'Zambia' },
   { code: 'tz', name: 'Tanzania' },
+  { code: 'cm', name: 'Cameroon' },
 ];
+
+/** How many pages to fetch per endpoint (each page = up to 20 codes) */
+const CODE_HUB_PAGES = 30;
 
 type CodeHubEntry = {
   shareCode: string;
@@ -466,29 +484,46 @@ async function fetchCodeHubEndpoint(url: string, country: { code: string; name: 
   }
 }
 
-/** Scrape Sportybet Code Hub — all countries x 2 endpoints in parallel */
+/** Scrape Sportybet Code Hub — all countries x endpoints x pages */
 async function scrapeSportyBetCodeHub(): Promise<BookingCode[]> {
-  // Call both the default endpoint and football-filtered endpoint per country
-  // They return overlapping but different sets of codes
-  const requests = SPORTYBET_COUNTRIES.flatMap(c => [
-    fetchCodeHubEndpoint(`https://www.sportybet.com/api/${c.code}/orders/bookingCode/recommendedCode`, c),
-    fetchCodeHubEndpoint(`https://www.sportybet.com/api/${c.code}/orders/bookingCode/recommendedCode?sportId=sr%3Asport%3A1`, c),
-  ]);
-  const results = await Promise.allSettled(requests);
+  // Default endpoint returns all sports, football filter returns football-specific ranking
+  const SPORT_FILTERS = ['', 'sportId=sr%3Asport%3A1'];
+
+  const requests = SPORTYBET_COUNTRIES.flatMap(c => {
+    const urls: { url: string; country: typeof c }[] = [];
+    for (const sport of SPORT_FILTERS) {
+      for (let page = 1; page <= CODE_HUB_PAGES; page++) {
+        const q = [sport, `pageNum=${page}`].filter(Boolean).join('&');
+        urls.push({ url: `https://www.sportybet.com/api/${c.code}/orders/bookingCode/recommendedCode?${q}`, country: c });
+      }
+    }
+    return urls;
+  });
+
+  // Batch requests (15 concurrent)
+  const allResults: BookingCode[][] = [];
+  for (let i = 0; i < requests.length; i += 15) {
+    const batch = requests.slice(i, i + 15);
+    const results = await Promise.allSettled(
+      batch.map(r => fetchCodeHubEndpoint(r.url, r.country)),
+    );
+    for (const r of results) {
+      if (r.status === 'fulfilled') allResults.push(r.value);
+    }
+  }
 
   const allCodes: BookingCode[] = [];
   const seen = new Set<string>();
 
-  for (const r of results) {
-    if (r.status !== 'fulfilled') continue;
-    for (const code of r.value) {
-      if (seen.has(code.code)) continue; // dedup across countries
+  for (const batch of allResults) {
+    for (const code of batch) {
+      if (seen.has(code.code)) continue;
       seen.add(code.code);
       allCodes.push(code);
     }
   }
 
-  logger.info({ count: allCodes.length, countries: SPORTYBET_COUNTRIES.length }, 'Sportybet Code Hub: codes fetched');
+  logger.info({ count: allCodes.length, countries: SPORTYBET_COUNTRIES.length, pages: CODE_HUB_PAGES }, 'Sportybet Code Hub: codes fetched');
   return allCodes;
 }
 
@@ -611,13 +646,17 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
     return codesCache;
   }
 
-  const [sportPremi, paqBet, convertBet, social, codeHub, betloy] = await Promise.allSettled([
+  const [sportPremi, paqBet, convertBet, social, codeHub, betloy, twitter, telegram, meta, headless] = await Promise.allSettled([
     scrapeSportPremi(),
     scrapePaqBet(),
     scrapeConvertBetCodes(),
     scrapeSocialMediaCodes(),
     scrapeSportyBetCodeHub(),
     scrapeBetloy(),
+    scrapeTwitterCodes(),
+    scrapeTelegramCodes(),
+    scrapeMetaCodes(),
+    headlessScraper(),
   ]);
 
   const allCodes: BookingCode[] = [];
@@ -627,6 +666,10 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
   if (social.status === 'fulfilled') allCodes.push(...social.value);
   if (codeHub.status === 'fulfilled') allCodes.push(...codeHub.value);
   if (betloy.status === 'fulfilled') allCodes.push(...betloy.value);
+  if (twitter.status === 'fulfilled') allCodes.push(...twitter.value);
+  if (telegram.status === 'fulfilled') allCodes.push(...telegram.value);
+  if (meta.status === 'fulfilled') allCodes.push(...meta.value);
+  if (headless.status === 'fulfilled') allCodes.push(...headless.value);
 
   // Deduplicate
   const byCode = new Map<string, BookingCode>();
@@ -646,8 +689,8 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
 
   // Only validate codes that haven't been validated yet (Code Hub codes come pre-validated)
   const needsValidation = raw.filter(c => !c.validated);
-  for (let i = 0; i < needsValidation.length; i += 5) {
-    const batch = needsValidation.slice(i, i + 5);
+  for (let i = 0; i < needsValidation.length; i += 10) {
+    const batch = needsValidation.slice(i, i + 10);
     const validations = await Promise.all(
       batch.map(c => validateCode(c.code)),
     );
@@ -668,16 +711,12 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
   }
 
   // Quality filtering
-  const MAX_SELECTIONS = 20;    // 20+ legs = near-certain loss
   const MAX_TOTAL_ODDS = 500;   // astronomical accumulators rarely hit
   const result = raw.filter(c => {
     if (!c.isValid) return false;
     // Drop dead codes (any leg already lost)
     if (c.lostCount > 0) return false;
-    // Drop codes with no pending games (fully settled, nothing to play)
-    if (c.pendingCount === 0) return false;
-    // Drop mega-accumulators
-    if (c.events && c.events > MAX_SELECTIONS) return false;
+    // Keep fully-won codes (proves tipster quality) + pending codes
     // Drop astronomical odds
     if (c.totalOdds && c.totalOdds > MAX_TOTAL_ODDS) return false;
     return true;

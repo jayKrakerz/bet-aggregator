@@ -12,20 +12,36 @@ const PINNACLE_BASE = 'https://guest.api.arcadia.pinnacle.com/0.1';
 const CACHE_TTL = 30 * 60 * 1000; // 30 min (odds move fast)
 const REQUEST_TIMEOUT = 10_000;
 
-// Top soccer league IDs on Pinnacle
+// Soccer league IDs on Pinnacle (guest API)
 const PINNACLE_LEAGUES: Record<string, number> = {
+  // Top 5 European leagues
   'premier league': 1980,
-  'championship': 1977,
-  'champions league': 2627,
-  'europa league': 2630,
+  'laliga': 2196,
   'la liga': 2196,
   'bundesliga': 1842,
-  'ligue 1': 2036,
   'serie a': 2436,
+  'ligue 1': 2036,
+  // Other European leagues
+  'championship': 1977,
   'eredivisie': 1817,
-  'liga portugal': 2196,
-  'mls': 2663,
+  'liga portugal': 2245,
+  'primeira liga': 2245,
   'super lig': 2197,
+  'superliga': 1928,       // Denmark
+  'eliteserien': 1975,     // Norway
+  'allsvenskan': 2185,     // Sweden
+  'pro league': 2231,      // Belgium
+  // European cups
+  'champions league': 2627,
+  'europa league': 2630,
+  'conference league': 2635,
+  // Americas
+  'mls': 2663,
+  'libertadores': 2640,
+  'sudamericana': 2641,
+  // Other
+  'saudi pro': 7932,
+  'premiership': 2270,     // South Africa / Scotland
 };
 
 // ===== TYPES =====
@@ -192,6 +208,7 @@ async function getOdds(leagueId: number): Promise<Map<number, PinnacleOdds>> {
 // ===== NAME MATCHING =====
 
 function normName(name: string): string {
+  if (!name) return '';
   return name
     .toLowerCase()
     .replace(/\s*(fc|sc|cf|afc|srl|hd|ac|as|ss|us|rc)\s*$/i, '')
@@ -221,11 +238,12 @@ export async function findPinnacleOdds(
   awayTeam: string,
   league: string,
 ): Promise<PinnacleOdds | null> {
-  // Try to find the league
-  const leagueLower = (league || '').toLowerCase();
+  // Try to find the league — normalize spaces, dashes, accents
+  const leagueNorm = (league || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   let leagueId: number | null = null;
   for (const [name, id] of Object.entries(PINNACLE_LEAGUES)) {
-    if (leagueLower.includes(name)) { leagueId = id; break; }
+    const nameNorm = name.replace(/[^a-z0-9]/g, '');
+    if (leagueNorm.includes(nameNorm) || nameNorm.includes(leagueNorm)) { leagueId = id; break; }
   }
 
   // If no league match, try all major leagues
@@ -254,9 +272,10 @@ export async function batchPinnacleOdds(
   // Collect all needed league IDs
   const neededLeagues = new Set<number>();
   for (const m of matches) {
-    const ll = (m.league || '').toLowerCase();
+    const ll = (m.league || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     for (const [name, id] of Object.entries(PINNACLE_LEAGUES)) {
-      if (ll.includes(name)) { neededLeagues.add(id); break; }
+      const nn = name.replace(/[^a-z0-9]/g, '');
+      if (ll.includes(nn) || nn.includes(ll)) { neededLeagues.add(id); break; }
     }
   }
   // If no specific leagues found, fetch all

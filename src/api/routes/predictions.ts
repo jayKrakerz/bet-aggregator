@@ -4,9 +4,11 @@ import { enrichMatches, hasFootballApi } from '../football-enrichment.js';
 import { fotmobEnrichMatches } from '../fotmob-enrichment.js';
 import { discoverCodes, getMutationStats } from '../code-mutator.js';
 import { batchPinnacleOdds } from '../pinnacle-odds.js';
+import { scanArbitrage } from '../arbitrage-scanner.js';
 // Virtual imports are lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
 const virtualScraper = () => import('../virtual-scraper.js');
 const virtualResults = () => import('../virtual-results.js');
+const virtualSchedule = () => import('../virtual-schedule-scraper.js');
 
 // Strict alphanumeric pattern for booking codes
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
@@ -147,7 +149,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       });
     }
     const payload = JSON.stringify({ selections: validated });
-    const countries = ['ng', 'gh', 'ke', 'tz', 'zm'];
+    const countries = ['ng', 'gh', 'ke', 'tz', 'zm', 'cm'];
     for (const cc of countries) {
       try {
         const res = await fetch(`https://www.sportybet.com/api/${cc}/orders/share`, {
@@ -235,7 +237,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     const marketId = '1,18,29';
     const ts = Date.now();
 
-    const countries = ['ng', 'gh', 'ke', 'tz', 'zm'];
+    const countries = ['ng', 'gh', 'ke', 'tz', 'zm', 'cm'];
     const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
     for (const cc of countries) {
       try {
@@ -322,6 +324,71 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
+  // GET /predictions/virtual-schedule — upcoming scheduled virtual football with predictions
+  app.get('/virtual-schedule', async (_request, reply) => {
+    try {
+      const { scrapeVirtualSchedule, lastScanTime } = await virtualSchedule();
+      const matches = await scrapeVirtualSchedule();
+
+      // Get predictions for each match
+      const { predictMatch, getResultsCount } = await virtualResults();
+      const withPredictions = matches.map(m => {
+        const pred = predictMatch(m.home, m.away, m.country);
+        if (!pred) return { ...m, prediction: null };
+
+        // Compare predicted probs vs odds-implied probs
+        const oddsSum = 1 / m.homeOdds + 1 / m.drawOdds + 1 / m.awayOdds;
+        const impliedHome = (1 / m.homeOdds) / oddsSum;
+        const impliedDraw = (1 / m.drawOdds) / oddsSum;
+        const impliedAway = (1 / m.awayOdds) / oddsSum;
+
+        // Find value picks (predicted prob > implied prob)
+        const homeEdge = (pred.homeWinProb - impliedHome) * 100;
+        const drawEdge = (pred.drawProb - impliedDraw) * 100;
+        const awayEdge = (pred.awayWinProb - impliedAway) * 100;
+
+        let valuePick: string | null = null;
+        let valueEdge = 0;
+        if (homeEdge > 5) { valuePick = '1'; valueEdge = homeEdge; }
+        if (drawEdge > 5 && drawEdge > valueEdge) { valuePick = 'X'; valueEdge = drawEdge; }
+        if (awayEdge > 5 && awayEdge > valueEdge) { valuePick = '2'; valueEdge = awayEdge; }
+
+        // Best predicted outcome
+        let predictedOutcome: '1' | 'X' | '2' = '1';
+        if (pred.drawProb > pred.homeWinProb && pred.drawProb > pred.awayWinProb) predictedOutcome = 'X';
+        else if (pred.awayWinProb > pred.homeWinProb) predictedOutcome = '2';
+
+        const confidence = Math.round(Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb) * 100);
+
+        return {
+          ...m,
+          prediction: {
+            predictedOutcome,
+            confidence,
+            homeWinProb: Math.round(pred.homeWinProb * 100),
+            drawProb: Math.round(pred.drawProb * 100),
+            awayWinProb: Math.round(pred.awayWinProb * 100),
+            valuePick,
+            valueEdge: valuePick ? Math.round(valueEdge * 10) / 10 : null,
+            impliedHome: Math.round(impliedHome * 100),
+            impliedDraw: Math.round(impliedDraw * 100),
+            impliedAway: Math.round(impliedAway * 100),
+          },
+        };
+      });
+
+      return {
+        data: withPredictions,
+        count: withPredictions.length,
+        resultsCount: getResultsCount(),
+        countries: [...new Set(matches.map(m => m.country))],
+        scannedAt: new Date(lastScanTime).toISOString(),
+      };
+    } catch (err) {
+      return reply.status(502).send({ error: 'Failed to scrape virtual schedule' });
+    }
+  });
+
   // POST /predictions/discover — discover new codes by mutating known codes
   app.post('/discover', async (request, reply) => {
     const body = request.body as { seeds?: string[]; maxResults?: number };
@@ -348,5 +415,12 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       seeds: seeds.length,
       stats: getMutationStats(),
     };
+  });
+
+  // GET /predictions/arbitrage — scan for arb & value bet opportunities
+  app.get('/arbitrage', async (_request, reply) => {
+    const result = await scanArbitrage();
+    reply.header('Cache-Control', 'public, max-age=600');
+    return result;
   });
 };
