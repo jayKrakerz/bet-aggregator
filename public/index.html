@@ -575,13 +575,10 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     <div class="hdr-spacer"></div>
     <!-- Desktop tabs -->
     <div class="desktop-tabs" id="desktop-tabs" style="display:none;gap:4px;margin-right:16px">
-      <button class="chip active" data-page="codes">Codes</button>
-      <button class="chip" data-page="generate">Generate</button>
-      <button class="chip" data-page="tools">Tools</button>
-      <button class="chip" data-page="history">History</button>
+      <button class="chip active" data-page="today">Today</button>
+      <button class="chip" data-page="codes">Codes</button>
       <button class="chip" data-page="games">Games</button>
-      <button class="chip" data-page="vfl">VFL</button>
-      <button class="chip" data-page="arb">Arb</button>
+      <button class="chip" data-page="more">More</button>
     </div>
     <div class="hdr-status" id="health">
       <div class="hdr-dot"></div>
@@ -592,8 +589,88 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 
 <main class="container">
 
+<!-- ===== PAGE: TODAY (new home) ===== -->
+<div class="page active" id="page-today">
+
+  <!-- Best Bet Hero -->
+  <div id="today-hero-card" style="background:linear-gradient(135deg,rgba(52,212,114,0.12) 0%,rgba(78,148,255,0.08) 100%);border:1px solid rgba(52,212,114,0.2);border-radius:var(--r);padding:20px;margin-bottom:16px;position:relative;overflow:hidden">
+    <div style="position:absolute;top:-20px;right:-20px;width:120px;height:120px;background:radial-gradient(circle,rgba(52,212,114,0.08) 0%,transparent 70%);border-radius:50%"></div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:8px">Today's Best Bet</div>
+    <div id="today-hero-content">
+      <div style="display:flex;gap:8px">
+        <div class="skel" style="height:18px;width:60%;border-radius:6px"></div>
+        <div class="skel" style="height:18px;width:20%;border-radius:6px"></div>
+      </div>
+      <div class="skel" style="height:14px;width:40%;border-radius:6px;margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">
+    <button class="btn btn-green" id="today-safe-2odds" style="padding:14px 10px;font-size:14px;border-radius:var(--r-sm);display:flex;flex-direction:column;align-items:center;gap:4px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Safe 2-Odds</span>
+    </button>
+    <button class="btn btn-blue" id="today-quick-gen" style="padding:14px 10px;font-size:14px;border-radius:var(--r-sm);display:flex;flex-direction:column;align-items:center;gap:4px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      <span>Generate x5</span>
+    </button>
+  </div>
+
+  <!-- Quick bet result area -->
+  <div id="today-gen-result" style="display:none;margin-bottom:16px"></div>
+
+  <!-- Data bar -->
+  <div style="display:flex;gap:6px;margin-bottom:16px">
+    <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:var(--blue)" id="today-stat-codes">--</div>
+      <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Codes</div>
+    </div>
+    <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:var(--green)" id="today-stat-games">--</div>
+      <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Games</div>
+    </div>
+    <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:var(--amber)" id="today-stat-consensus">--</div>
+      <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px">Consensus</div>
+    </div>
+  </div>
+
+  <!-- Top Picks -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <h2 style="font-size:15px;font-weight:800">Top Picks</h2>
+    <span id="today-picks-count" style="font-size:11px;color:var(--text-3)"></span>
+  </div>
+  <div id="today-picks-bar" style="display:none;position:sticky;top:var(--header-h);z-index:50;background:rgba(19,22,32,0.95);backdrop-filter:blur(12px);padding:10px 14px;margin:0 -20px 12px;border-bottom:1px solid var(--border);align-items:center;gap:8px">
+    <span style="font-size:14px;font-weight:700;color:var(--blue)" id="today-picks-selected">0 selected</span>
+    <span style="font-size:13px;color:var(--text-2)" id="today-picks-odds">Total: --</span>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-sm" id="today-picks-clear">Clear</button>
+    <button class="btn btn-green btn-sm" id="today-picks-gen">Generate Code</button>
+  </div>
+  <div id="today-picks-list">
+    <!-- Skeleton loading -->
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div class="card" style="padding:14px"><div class="skel" style="height:16px;width:70%;border-radius:6px;margin-bottom:8px"></div><div class="skel" style="height:12px;width:50%;border-radius:6px"></div></div>
+      <div class="card" style="padding:14px"><div class="skel" style="height:16px;width:65%;border-radius:6px;margin-bottom:8px"></div><div class="skel" style="height:12px;width:45%;border-radius:6px"></div></div>
+      <div class="card" style="padding:14px"><div class="skel" style="height:16px;width:75%;border-radius:6px;margin-bottom:8px"></div><div class="skel" style="height:12px;width:55%;border-radius:6px"></div></div>
+    </div>
+  </div>
+
+  <!-- Ready Codes -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 10px">
+    <h2 style="font-size:15px;font-weight:800">Ready Codes</h2>
+    <button class="btn btn-ghost btn-sm" onclick="switchPage('codes')" style="font-size:11px">See all &rarr;</button>
+  </div>
+  <div id="today-ready-codes">
+    <div class="card" style="padding:12px"><div class="skel" style="height:16px;width:40%;border-radius:6px;margin-bottom:6px"></div><div class="skel" style="height:12px;width:60%;border-radius:6px"></div></div>
+    <div class="card" style="padding:12px;margin-top:6px"><div class="skel" style="height:16px;width:35%;border-radius:6px;margin-bottom:6px"></div><div class="skel" style="height:12px;width:55%;border-radius:6px"></div></div>
+  </div>
+
+</div>
+
 <!-- ===== PAGE: CODES ===== -->
-<div class="page active" id="page-codes">
+<div class="page" id="page-codes">
 
   <!-- Onboarding (first visit) -->
   <div class="onboard" id="onboard" style="display:none">
@@ -615,33 +692,11 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
-  <!-- Hero stats -->
-  <div class="hero" id="hero-stats">
-    <div class="hero-stat">
-      <div class="hero-num" id="stat-codes" style="color:var(--blue)">--</div>
-      <div class="hero-label">Codes</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-num" id="stat-games" style="color:var(--green)">--</div>
-      <div class="hero-label">Games Today</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-num" id="stat-consensus" style="color:var(--amber)">--</div>
-      <div class="hero-label">Consensus</div>
-    </div>
+  <!-- Stats moved to Today page; keep hidden elements for JS references -->
+  <div id="hero-stats" style="display:none">
+    <span id="stat-codes"></span><span id="stat-games"></span><span id="stat-consensus"></span>
   </div>
-
-  <!-- Quick generate buttons -->
-  <div style="display:flex;gap:8px;margin-bottom:20px">
-    <button class="btn btn-green" id="safe-2odds" style="flex:1;padding:16px;font-size:15px;border-radius:var(--r-sm)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Safe 2-Odds
-    </button>
-    <button class="btn btn-blue" id="quick-gen" style="flex:1;padding:16px;font-size:15px;border-radius:var(--r-sm)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      Generate x5
-    </button>
-  </div>
+  <div style="display:none"><button id="safe-2odds"></button><button id="quick-gen"></button></div>
 
   <!-- Search -->
   <div class="search-bar">
@@ -1218,37 +1273,115 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 
 </div>
 
+<!-- ===== PAGE: MORE (hub) ===== -->
+<div class="page" id="page-more">
+  <h2 style="font-size:18px;font-weight:800;margin-bottom:16px">More</h2>
+
+  <!-- Generate Code -->
+  <div class="card" style="border-color:rgba(78,148,255,0.15);cursor:pointer" onclick="switchPage('generate')">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--blue-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Generate Code</div>
+        <div style="font-size:12px;color:var(--text-3)">Custom odds, market filters, multi-strategy</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <!-- Check Code -->
+  <div class="card" onclick="switchPage('generate');setTimeout(()=>document.querySelector('[data-gtab=check]')?.click(),100)" style="cursor:pointer">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--purple-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Check Code</div>
+        <div style="font-size:12px;color:var(--text-3)">Validate any Sportybet booking code</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <!-- Arbitrage & Value -->
+  <div class="card" style="border-color:rgba(52,212,114,0.1);cursor:pointer" onclick="switchPage('arb')">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--green-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Arbitrage & Value</div>
+        <div style="font-size:12px;color:var(--text-3)">Compare Sportybet odds vs Pinnacle sharp lines</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <!-- Insights -->
+  <div class="card" onclick="switchPage('tools')" style="cursor:pointer">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--amber-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Insights & Tools</div>
+        <div style="font-size:12px;color:var(--text-3)">Early value, odds movers, tracker, bankroll</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="card" onclick="switchPage('history')" style="cursor:pointer">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:rgba(255,255,255,0.05)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">History</div>
+        <div style="font-size:12px;color:var(--text-3)">Track your generated codes — won, lost, pending</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <!-- VFL Analysis -->
+  <div class="card" onclick="switchPage('vfl')" style="cursor:pointer">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:rgba(255,255,255,0.05)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">VFL Analyzer</div>
+        <div style="font-size:12px;color:var(--text-3)">Virtual football league tables, analysis & picks</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
+</div>
+
 </main>
 
-<!-- BOTTOM NAV -->
+<!-- BOTTOM NAV — 4 tabs -->
 <nav class="nav" id="bottom-nav">
-  <button class="nav-btn active" data-page="codes">
+  <button class="nav-btn active" data-page="today">
+    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+    Today
+  </button>
+  <button class="nav-btn" data-page="codes">
     <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg></span>
     Codes
   </button>
-  <button class="nav-btn" data-page="generate">
-    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
-    Generate
-  </button>
-  <button class="nav-btn" data-page="tools">
-    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
-    Tools
-  </button>
-  <button class="nav-btn" data-page="history">
-    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
-    History
-  </button>
   <button class="nav-btn" data-page="games">
-    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg></span>
+    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg></span>
     Games
   </button>
-  <button class="nav-btn" data-page="arb">
-    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg></span>
-    Arb
-  </button>
-  <button class="nav-btn" data-page="vfl">
-    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></span>
-    VFL
+  <button class="nav-btn" data-page="more">
+    <span class="nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+    More
   </button>
 </nav>
 
@@ -1354,12 +1487,16 @@ function switchPage(name) {
   const page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
 
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+  // Highlight nav for main 4 tabs; sub-pages (generate, tools, history, arb, vfl) highlight "more"
+  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', vfl:'more' };
+  const navTarget = navMap[name] || name;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === navTarget));
   document.querySelectorAll('#desktop-tabs .chip').forEach(b => {
-    b.classList.toggle('active', b.dataset.page === name);
+    b.classList.toggle('active', b.dataset.page === navTarget);
   });
 
-  if (name === 'codes' && !codesLoaded) loadBookingCodes();
+  if ((name === 'today' || name === 'codes') && !codesLoaded) loadBookingCodes();
+  if (name === 'today' && codesLoaded) renderTopPicks();
   if (name === 'games') {
     if (gamesTimeline === 'virtual') { if (!virtualsLoaded) loadVirtuals(); }
     else if (!gamesLoaded) loadGames();
@@ -1486,6 +1623,8 @@ async function loadBookingCodes() {
 
     document.getElementById('codes-count').textContent = codes.length ? codes.length + ' codes' : '--';
     document.getElementById('stat-codes').textContent = codes.length;
+    // Sync Today page hero
+    document.getElementById('today-stat-codes').textContent = codes.length;
     document.getElementById('scraped-badge').textContent = '(' + codes.length + ')';
 
     startRefreshCountdown();
@@ -1503,6 +1642,7 @@ async function loadBookingCodes() {
 
     const conPicks = gamePool.filter(g => getConsensus(g) >= 2).length;
     document.getElementById('stat-consensus').textContent = conPicks;
+    document.getElementById('today-stat-consensus').textContent = conPicks;
 
     // Populate source dropdown
     const sourceSet = new Set(codes.map(c => c.source || 'Unknown'));
@@ -2235,6 +2375,7 @@ function addToGamePool(selections) {
   const todayCount = gamePool.filter(g => !g.matchDate || g.matchDate === todayStr).length;
   document.getElementById('pool-count').textContent = gamePool.length > 0 ? todayCount+' today / '+gamePool.length+' total' : 'load codes first';
   document.getElementById('stat-games').textContent = todayCount;
+  document.getElementById('today-stat-games').textContent = todayCount;
 }
 
 // ===== LEARNED WIN RATES =====
@@ -5601,9 +5742,255 @@ async function loadVirtualSchedule() {
 
 document.getElementById('vfl-schedule-btn').onclick = () => loadVirtualSchedule();
 
+// ===== TODAY PAGE =====
+
+function renderTopPicks() {
+  const list = document.getElementById('today-picks-list');
+  const countEl = document.getElementById('today-picks-count');
+  const heroContent = document.getElementById('today-hero-content');
+
+  if (!gamePool.length) return; // keep skeletons
+
+  const now = Date.now();
+  const candidates = gamePool
+    .filter(g => {
+      if (!g.estimateStartTime || g.estimateStartTime < now + 20*60000) return false;
+      const st = (g.matchStatus||'').toLowerCase();
+      if (st === 'live' || st === 'ended' || st === '1h' || st === '2h' || st === 'ht') return false;
+      return true;
+    })
+    .map(g => ({
+      ...g,
+      _prob: estimateProb(g),
+      _safety: safetyScore(g),
+      _consensus: getConsensus(g),
+    }))
+    .filter(g => g._prob > 0.5 && g._safety > 30)
+    .sort((a, b) => {
+      const conDiff = b._consensus - a._consensus;
+      if (Math.abs(conDiff) >= 2) return conDiff;
+      const probDiff = b._prob - a._prob;
+      if (Math.abs(probDiff) > 0.05) return probDiff;
+      return b._safety - a._safety;
+    });
+
+  // Deduplicate by event
+  const seen = new Set();
+  const picks = [];
+  for (const g of candidates) {
+    if (seen.has(g.eventId)) continue;
+    seen.add(g.eventId);
+    picks.push(g);
+    if (picks.length >= 10) break;
+  }
+
+  // Render hero card with #1 pick
+  if (picks.length > 0) {
+    const best = picks[0];
+    const bProb = Math.round(best._prob * 100);
+    const bCon = best._consensus;
+    const bKickoff = best.estimateStartTime ? new Date(best.estimateStartTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+    const bLeague = normalizeLeague ? normalizeLeague(best.league) || best.league : best.league;
+    const heroCard = document.getElementById('today-hero-card');
+    heroCard.style.borderColor = bProb >= 75 ? 'rgba(52,212,114,0.3)' : 'rgba(78,148,255,0.2)';
+    heroContent.innerHTML = `
+      <div style="font-size:18px;font-weight:900;margin-bottom:2px">${best.homeTeam} vs ${best.awayTeam}</div>
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:10px">${bLeague}${bKickoff?' &middot; '+bKickoff:''}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:800;padding:4px 12px;border-radius:6px;background:var(--surface);color:var(--text)">${best.market} &mdash; ${best.pick}</span>
+        <span style="font-size:16px;font-weight:900;color:var(--amber)">@${best.odds}</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${bProb>=75?'var(--green-soft)':'var(--blue-soft)'};color:${bProb>=75?'var(--green)':'var(--blue)'}">${bProb}% win</span>
+        ${bCon >= 2 ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--amber-soft);color:var(--amber)">${bCon}x tipsters agree</span>` : ''}
+      </div>`;
+  }
+
+  countEl.textContent = picks.length + ' picks';
+
+  if (!picks.length) {
+    list.innerHTML = '<div class="empty" style="padding:16px;font-size:13px">No strong picks right now. Check back closer to kickoff.</div>';
+    return;
+  }
+
+  list.innerHTML = picks.map((g, i) => {
+    const prob = Math.round(g._prob * 100);
+    const con = g._consensus;
+    const probCol = prob >= 80 ? 'var(--green)' : prob >= 65 ? 'var(--blue)' : 'var(--amber)';
+    const kickoff = g.estimateStartTime ? new Date(g.estimateStartTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+    const league = normalizeLeague ? normalizeLeague(g.league) || g.league : g.league;
+
+    // Confidence-based left border
+    const borderCol = prob >= 80 ? 'var(--green)' : prob >= 65 ? 'var(--blue)' : 'var(--amber)';
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${borderCol};border-radius:var(--r-xs);padding:12px;margin-bottom:6px;transition:border-color .2s">
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" class="today-pick-check" data-idx="${i}" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.homeTeam} vs ${g.awayTeam}</div>
+          <div style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${league}${kickoff?' &middot; '+kickoff:''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:16px;font-weight:900;color:var(--amber)">@${g.odds}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;margin-top:6px;margin-left:28px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:var(--bg);color:var(--text)">${g.market} &mdash; ${g.pick}</span>
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${prob>=75?'var(--green-soft)':'var(--blue-soft)'};color:${probCol}">${prob}%</span>
+        ${con >= 2 ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--amber-soft);color:var(--amber)">${con}x</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  window._todayPicks = picks;
+  list.querySelectorAll('.today-pick-check').forEach(cb => {
+    cb.onchange = updateTodayPicksBar;
+  });
+}
+
+function updateTodayPicksBar() {
+  const checks = document.querySelectorAll('.today-pick-check:checked');
+  const bar = document.getElementById('today-picks-bar');
+  const countEl = document.getElementById('today-picks-selected');
+  const oddsEl = document.getElementById('today-picks-odds');
+
+  if (checks.length > 0) {
+    bar.style.display = 'flex';
+    countEl.textContent = checks.length + ' selected';
+    let totalOdds = 1;
+    checks.forEach(cb => {
+      const g = window._todayPicks[parseInt(cb.dataset.idx)];
+      if (g) totalOdds *= g.odds;
+    });
+    oddsEl.textContent = 'Total: @' + totalOdds.toFixed(2);
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+document.getElementById('today-picks-clear').onclick = () => {
+  document.querySelectorAll('.today-pick-check').forEach(cb => cb.checked = false);
+  updateTodayPicksBar();
+};
+
+document.getElementById('today-picks-gen').onclick = async () => {
+  const checks = document.querySelectorAll('.today-pick-check:checked');
+  if (!checks.length) return;
+  const btn = document.getElementById('today-picks-gen');
+  const resultsDiv = document.getElementById('today-gen-result');
+  btnLoad(btn);
+
+  const picked = [];
+  checks.forEach(cb => {
+    const g = window._todayPicks[parseInt(cb.dataset.idx)];
+    if (g) picked.push(g);
+  });
+
+  try {
+    const sels = picked.map(g => ({eventId:g.eventId, marketId:g.marketId, outcomeId:g.outcomeId, specifier:g.specifier||'', sportId:g.sportId}));
+    const res = await fetch('/predictions/create-code', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({selections:sels}) });
+    const data = await res.json();
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      const totalOdds = picked.reduce((a,g) => a*g.odds, 1).toFixed(2);
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = `<div style="border:2px solid rgba(52,212,114,0.3);border-radius:var(--r);padding:14px;background:var(--green-soft)">
+        <div style="font-size:12px;font-weight:600;color:var(--green);text-transform:uppercase">Your Code</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+          <div style="font-size:26px;font-weight:900;letter-spacing:2px;flex:1">${code}</div>
+          <div style="font-size:14px;font-weight:700">@${totalOdds}</div>
+          <button onclick="navigator.clipboard.writeText('${code}');showToast('Copied!','success')" class="btn btn-green btn-sm">Copy</button>
+        </div>
+      </div>`;
+      showToast('Code: ' + code, 'success');
+    } else {
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Failed to create code</div>';
+    }
+  } catch (e) {
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Error: '+e.message+'</div>';
+  } finally {
+    btnDone(btn, 'Generate Code');
+  }
+};
+
+function renderReadyCodes() {
+  const list = document.getElementById('today-ready-codes');
+  if (!allBookingCodes.length) return; // keep skeletons
+
+  const scored = allBookingCodes
+    .filter(c => c.pendingCount > 0 && c.isValid)
+    .map(c => {
+      let conScore = 0;
+      for (const s of c.selections || []) {
+        conScore += getConsensus(s) || 0;
+      }
+      return { ...c, _conScore: conScore };
+    })
+    .sort((a, b) => b._conScore - a._conScore || b.pendingCount - a.pendingCount)
+    .slice(0, 6);
+
+  if (!scored.length) {
+    list.innerHTML = '<div class="empty" style="padding:12px;font-size:13px">No ready codes right now</div>';
+    return;
+  }
+
+  list.innerHTML = scored.map(c => {
+    const odds = c.totalOdds ? c.totalOdds.toFixed(2) : '?';
+    const games = c.events || c.selections?.length || '?';
+    const wonPct = c.wonCount > 0 ? Math.round(c.wonCount / (c.wonCount + c.pendingCount) * 100) : 0;
+    const barW = c.events ? Math.round((c.wonCount / c.events) * 100) : 0;
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px 12px;margin-bottom:6px;cursor:pointer" onclick="openDrawer('${esc(c.code)}',null)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-family:'SF Mono','Fira Code',monospace;font-size:15px;font-weight:800;color:var(--green);letter-spacing:1px;flex-shrink:0">${c.code}</div>
+        <button onclick="event.stopPropagation();navigator.clipboard.writeText('${esc(c.code)}');showToast('Copied!','success')" style="background:var(--green);color:#fff;border:none;border-radius:4px;padding:2px 8px;font-size:9px;font-weight:700;cursor:pointer;flex-shrink:0">COPY</button>
+        <div style="flex:1"></div>
+        <span style="font-size:13px;font-weight:800;color:var(--amber)">@${odds}</span>
+        <span style="font-size:10px;color:var(--text-3)">${games}g &middot; ${c.pendingCount} pending</span>
+      </div>
+      ${barW > 0 ? `<div style="margin-top:6px;height:3px;background:var(--bg);border-radius:2px;overflow:hidden"><div style="height:100%;width:${barW}%;background:var(--green);border-radius:2px"></div></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Wire Today page buttons to existing handlers
+document.getElementById('today-safe-2odds').onclick = async () => {
+  const btn = document.getElementById('today-safe-2odds');
+  const resultsDiv = document.getElementById('today-gen-result');
+  // Reuse the safe-2odds logic
+  document.getElementById('safe-2odds').click();
+  // Copy result from generated-code-result to today-gen-result
+  setTimeout(() => {
+    const src = document.getElementById('generated-code-result');
+    if (src && src.innerHTML) {
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = src.innerHTML;
+    }
+  }, 500);
+};
+
+document.getElementById('today-quick-gen').onclick = () => {
+  const resultsDiv = document.getElementById('today-gen-result');
+  document.getElementById('quick-gen').click();
+  const checkResult = setInterval(() => {
+    const src = document.getElementById('auto-gen-results');
+    if (src && src.innerHTML && src.innerHTML.length > 50) {
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = src.innerHTML;
+      clearInterval(checkResult);
+    }
+  }, 1000);
+  setTimeout(() => clearInterval(checkResult), 30000);
+};
+
 // ===== INIT =====
 (async () => {
   await Promise.all([loadBookingCodes(), checkHealth()]);
+  // Render Today page content
+  renderTopPicks();
+  renderReadyCodes();
   setInterval(checkHealth, 60000);
   // Auto-track pending codes every 10 minutes
   setTimeout(refreshHistoryStatuses, 5000);
