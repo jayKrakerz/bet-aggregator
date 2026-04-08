@@ -12,8 +12,14 @@ const PINNACLE_BASE = 'https://guest.api.arcadia.pinnacle.com/0.1';
 const CACHE_TTL = 30 * 60 * 1000; // 30 min (odds move fast)
 const REQUEST_TIMEOUT = 10_000;
 
-// Soccer league IDs on Pinnacle (guest API)
+// League IDs on Pinnacle (guest API) — soccer + basketball + tennis
 const PINNACLE_LEAGUES: Record<string, number> = {
+  // Basketball
+  'nba': 487,
+  'euroleague': 578,
+  'ncaa': 493,
+  'nbl': 5612,
+  'basketball': 487,        // fallback to NBA
   // Top 5 European leagues
   'premier league': 1980,
   'laliga': 2196,

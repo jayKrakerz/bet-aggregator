@@ -5,10 +5,12 @@ import { fotmobEnrichMatches } from '../fotmob-enrichment.js';
 import { discoverCodes, getMutationStats } from '../code-mutator.js';
 import { batchPinnacleOdds } from '../pinnacle-odds.js';
 import { scanArbitrage } from '../arbitrage-scanner.js';
-// Virtual imports are lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
-const virtualScraper = () => import('../virtual-scraper.js');
-const virtualResults = () => import('../virtual-results.js');
-const virtualSchedule = () => import('../virtual-schedule-scraper.js');
+import { scrapeAllTipsters, findMatchingPredictions, buildConsensus } from '../tipster-scrapers.js';
+// Lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
+const liveMonitor = () => import('../live-monitor.js');
+const oddsportal = () => import('../oddsportal-scraper.js');
+const oddsLagDetector = () => import('../odds-lag-detector.js');
+const crossOddsScanner = () => import('../cross-odds-scanner.js');
 
 // Strict alphanumeric pattern for booking codes
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
@@ -260,132 +262,44 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(502).send({ error: 'All Sportybet endpoints failed' });
   });
 
-  // GET /predictions/virtuals — scrape virtual football from Golden Race
-  app.get('/virtuals', async (_request, reply) => {
+  // GET /predictions/cross-odds — compare ALL Pinnacle vs Sportybet odds (football + basketball)
+  app.get('/cross-odds', async (_request, reply) => {
     try {
-      const { scrapeVirtuals } = await virtualScraper();
-      const leagues = await scrapeVirtuals();
-      void reply.header('Cache-Control', 'public, max-age=90');
-      return {
-        data: leagues,
-        count: leagues.length,
-        matches: leagues.reduce((s, l) => s + l.matches.length, 0),
-      };
-    } catch {
-      return reply.status(502).send({ error: 'Failed to scrape virtual games' });
-    }
-  });
-
-  // GET /predictions/virtual-stats — team stats from collected virtual results
-  app.get('/virtual-stats', async (request) => {
-    const { country } = request.query as { country?: string };
-    const { getAllStats, getResultsCount } = await virtualResults();
-    const stats = getAllStats();
-    const resultsCount = getResultsCount();
-    if (country) {
-      return { data: stats[country] || [], resultsCount, country };
-    }
-    return { data: stats, resultsCount };
-  });
-
-  // GET /predictions/virtual-predict — predict upcoming virtual matches
-  app.get('/virtual-predict', async (request, reply) => {
-    const { matches } = request.query as { matches?: string };
-    if (!matches) return reply.status(400).send({ error: 'Provide matches as JSON array' });
-    try {
-      const { predictMatch, getResultsCount } = await virtualResults();
-      const parsed = JSON.parse(matches) as Array<{ home: string; away: string; country: string }>;
-      const predictions = parsed
-        .slice(0, 50)
-        .map((m) => predictMatch(m.home, m.away, m.country))
-        .filter(Boolean);
-      return { data: predictions, resultsCount: getResultsCount() };
-    } catch {
-      return reply.status(400).send({ error: 'Invalid matches format' });
-    }
-  });
-
-  // GET /predictions/virtual-results — recent results
-  app.get('/virtual-results', async (request) => {
-    const { country, limit } = request.query as { country?: string; limit?: string };
-    const { getRecentResults, getResultsCount } = await virtualResults();
-    const results = getRecentResults(country, parseInt(limit || '50', 10));
-    return { data: results, total: getResultsCount() };
-  });
-
-  // POST /predictions/virtual-collect — trigger a results collection
-  app.post('/virtual-collect', async (_request, reply) => {
-    try {
-      const { scrapeResults } = await virtualResults();
-      const results = await scrapeResults();
-      return { collected: results.length, total: (await virtualResults()).getResultsCount() };
-    } catch {
-      return reply.status(502).send({ error: 'Failed to collect virtual results' });
-    }
-  });
-
-  // GET /predictions/virtual-schedule — upcoming scheduled virtual football with predictions
-  app.get('/virtual-schedule', async (_request, reply) => {
-    try {
-      const { scrapeVirtualSchedule, lastScanTime } = await virtualSchedule();
-      const matches = await scrapeVirtualSchedule();
-
-      // Get predictions for each match
-      const { predictMatch, getResultsCount } = await virtualResults();
-      const withPredictions = matches.map(m => {
-        const pred = predictMatch(m.home, m.away, m.country);
-        if (!pred) return { ...m, prediction: null };
-
-        // Compare predicted probs vs odds-implied probs
-        const oddsSum = 1 / m.homeOdds + 1 / m.drawOdds + 1 / m.awayOdds;
-        const impliedHome = (1 / m.homeOdds) / oddsSum;
-        const impliedDraw = (1 / m.drawOdds) / oddsSum;
-        const impliedAway = (1 / m.awayOdds) / oddsSum;
-
-        // Find value picks (predicted prob > implied prob)
-        const homeEdge = (pred.homeWinProb - impliedHome) * 100;
-        const drawEdge = (pred.drawProb - impliedDraw) * 100;
-        const awayEdge = (pred.awayWinProb - impliedAway) * 100;
-
-        let valuePick: string | null = null;
-        let valueEdge = 0;
-        if (homeEdge > 5) { valuePick = '1'; valueEdge = homeEdge; }
-        if (drawEdge > 5 && drawEdge > valueEdge) { valuePick = 'X'; valueEdge = drawEdge; }
-        if (awayEdge > 5 && awayEdge > valueEdge) { valuePick = '2'; valueEdge = awayEdge; }
-
-        // Best predicted outcome
-        let predictedOutcome: '1' | 'X' | '2' = '1';
-        if (pred.drawProb > pred.homeWinProb && pred.drawProb > pred.awayWinProb) predictedOutcome = 'X';
-        else if (pred.awayWinProb > pred.homeWinProb) predictedOutcome = '2';
-
-        const confidence = Math.round(Math.max(pred.homeWinProb, pred.drawProb, pred.awayWinProb) * 100);
-
-        return {
-          ...m,
-          prediction: {
-            predictedOutcome,
-            confidence,
-            homeWinProb: Math.round(pred.homeWinProb * 100),
-            drawProb: Math.round(pred.drawProb * 100),
-            awayWinProb: Math.round(pred.awayWinProb * 100),
-            valuePick,
-            valueEdge: valuePick ? Math.round(valueEdge * 10) / 10 : null,
-            impliedHome: Math.round(impliedHome * 100),
-            impliedDraw: Math.round(impliedDraw * 100),
-            impliedAway: Math.round(impliedAway * 100),
-          },
-        };
-      });
-
-      return {
-        data: withPredictions,
-        count: withPredictions.length,
-        resultsCount: getResultsCount(),
-        countries: [...new Set(matches.map(m => m.country))],
-        scannedAt: new Date(lastScanTime).toISOString(),
-      };
+      const { scanCrossOdds } = await crossOddsScanner();
+      return await scanCrossOdds();
     } catch (err) {
-      return reply.status(502).send({ error: 'Failed to scrape virtual schedule' });
+      return reply.status(502).send({ error: 'Cross odds scan failed' });
+    }
+  });
+
+  // GET /predictions/odds-lag — detect stale Sportybet odds vs Pinnacle sharp moves
+  app.get('/odds-lag', async (_request, reply) => {
+    try {
+      const { scanOddsLag } = await oddsLagDetector();
+      return await scanOddsLag();
+    } catch {
+      return reply.status(502).send({ error: 'Odds lag scan failed' });
+    }
+  });
+
+  // GET /predictions/live — live match monitor with Big Chance signals
+  app.get('/live', async (_request, reply) => {
+    try {
+      const { scrapeLiveMonitor } = await liveMonitor();
+      const data = await scrapeLiveMonitor();
+      return data;
+    } catch {
+      return reply.status(502).send({ error: 'Live monitor failed' });
+    }
+  });
+
+  // GET /predictions/live/cached — get cached live data without scraping
+  app.get('/live/cached', async (_request, reply) => {
+    try {
+      const { getLiveData } = await liveMonitor();
+      return getLiveData();
+    } catch {
+      return { matches: [], signals: [], scrapedAt: 0 };
     }
   });
 
@@ -422,5 +336,94 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     const result = await scanArbitrage();
     reply.header('Cache-Control', 'public, max-age=600');
     return result;
+  });
+
+  // GET /predictions/oddsportal — scrape today's football odds from OddsPortal (multi-bookmaker)
+  app.get('/oddsportal', async (request, reply) => {
+    try {
+      const { date } = request.query as { date?: string };
+      const { scrapeOddsPortal } = await oddsportal();
+      const result = await scrapeOddsPortal(date);
+      void reply.header('Cache-Control', 'public, max-age=900');
+      return result;
+    } catch {
+      return reply.status(502).send({ error: 'OddsPortal scrape failed' });
+    }
+  });
+
+  // GET /predictions/oddsportal/match — detailed per-bookmaker odds for a specific match
+  app.get('/oddsportal/match', async (request, reply) => {
+    const { url } = request.query as { url?: string };
+    if (!url || !url.startsWith('https://www.oddsportal.com/')) {
+      return reply.status(400).send({ error: 'Provide a valid OddsPortal match URL' });
+    }
+    try {
+      const { scrapeMatchOdds } = await oddsportal();
+      const result = await scrapeMatchOdds(url);
+      if (!result) return reply.status(404).send({ error: 'Match not found or no odds' });
+      return { data: result };
+    } catch {
+      return reply.status(502).send({ error: 'OddsPortal match scrape failed' });
+    }
+  });
+
+  // GET /predictions/tipster-consensus — aggregated predictions from 6 tipster sites
+  app.get('/tipster-consensus', async (request, reply) => {
+    const query = request.query as { home?: string; away?: string };
+
+    // Scrape all sources (cached for 30 min)
+    const allPredictions = await scrapeAllTipsters();
+
+    // If specific match requested, return consensus for that match
+    if (query.home && query.away) {
+      const matched = findMatchingPredictions(allPredictions, query.home, query.away);
+      const consensus = buildConsensus(matched, query.home, query.away);
+      return { data: consensus, matched: matched.length, sources: [...new Set(matched.map(m => m.source))] };
+    }
+
+    // Otherwise return all predictions grouped by source
+    const bySource: Record<string, number> = {};
+    for (const p of allPredictions) {
+      bySource[p.source] = (bySource[p.source] || 0) + 1;
+    }
+
+    void reply.header('Cache-Control', 'public, max-age=900');
+    return {
+      data: allPredictions,
+      count: allPredictions.length,
+      sources: bySource,
+      scrapedAt: new Date().toISOString(),
+    };
+  });
+
+  // POST /predictions/tipster-consensus — match multiple games against tipster data
+  app.post('/tipster-consensus', async (request) => {
+    const body = request.body as {
+      matches?: Array<{
+        homeTeam: string;
+        awayTeam: string;
+        odds?: { home?: number; draw?: number; away?: number; over25?: number; under25?: number };
+      }>;
+    };
+    if (!body?.matches || !Array.isArray(body.matches)) {
+      return { error: 'Provide matches array with homeTeam/awayTeam' };
+    }
+
+    const allPredictions = await scrapeAllTipsters();
+    const results = body.matches.slice(0, 50).map((m) => {
+      const matched = findMatchingPredictions(allPredictions, m.homeTeam, m.awayTeam);
+      return {
+        homeTeam: m.homeTeam,
+        awayTeam: m.awayTeam,
+        consensus: buildConsensus(matched, m.homeTeam, m.awayTeam, m.odds),
+        matchedSources: matched.length,
+      };
+    });
+
+    return {
+      data: results,
+      totalPredictions: allPredictions.length,
+      sourcesAvailable: [...new Set(allPredictions.map((p) => p.source))],
+    };
   });
 };

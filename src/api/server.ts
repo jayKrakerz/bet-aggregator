@@ -4,9 +4,6 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { healthRoutes } from './routes/health.js';
 import { predictionsRoutes } from './routes/predictions.js';
-import { vflRoutes } from './vfl/routes.js';
-import { initStore as initVflStore } from './vfl/store.js';
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function createServer() {
@@ -25,8 +22,6 @@ export async function createServer() {
   });
   await app.register(healthRoutes);
   await app.register(predictionsRoutes, { prefix: '/predictions' });
-  await initVflStore();
-  await app.register(vflRoutes, { prefix: '/vfl' });
 
   return app;
 }

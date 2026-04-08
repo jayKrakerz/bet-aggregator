@@ -597,7 +597,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <button class="chip" data-page="games">Games</button>
       <button class="chip" data-page="more">More</button>
     </div>
-    <div class="hdr-status" id="health">
+    <div class="hdr-status" id="health" style="cursor:pointer" onclick="switchPage('live')">
       <div class="hdr-dot"></div>
       <span>Live</span>
     </div>
@@ -1100,7 +1100,6 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   </div>
 </div>
 
-<!-- ===== PAGE: VFL ANALYZER ===== -->
 <!-- ===== PAGE: GAMES ===== -->
 <div class="page" id="page-games">
   <!-- Hero stats -->
@@ -1128,13 +1127,12 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     <div class="games-timeline" id="games-timeline-tabs">
       <button class="active" data-gt="prematch">Pre-match</button>
       <button data-gt="live" class="live-btn">Live</button>
-      <button data-gt="virtual" style="border-left:1px solid var(--border)">Virtuals</button>
     </div>
     <div class="games-search-wrap">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
       <input type="text" id="games-search" class="games-search" placeholder="Search team or league...">
     </div>
-    <button class="btn btn-ghost btn-sm" onclick="gamesTimeline==='virtual'?loadVirtuals():loadGames()" style="flex-shrink:0;gap:4px;display:inline-flex;align-items:center">
+    <button class="btn btn-ghost btn-sm" onclick="loadGames()" style="flex-shrink:0;gap:4px;display:inline-flex;align-items:center">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
       Refresh
     </button>
@@ -1148,7 +1146,6 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   </div>
 
   <!-- Virtual games list -->
-  <div id="virtuals-list" style="display:none"></div>
 
   <!-- Floating betslip -->
   <div class="slip-float" id="games-slip-bar">
@@ -1164,84 +1161,6 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   </div>
 </div>
 
-<div class="page" id="page-vfl">
-  <h2 style="font-size:18px;font-weight:700;margin-bottom:14px">VFL Analyzer</h2>
-  <!-- League selector -->
-  <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-    <input id="vfl-league" class="input" style="flex:1;letter-spacing:normal;text-transform:none;font-size:14px;padding:8px 12px" placeholder="League ID (e.g. season-1)" value="">
-    <button class="btn btn-blue btn-sm" onclick="vflLoad()">Load</button>
-  </div>
-
-  <!-- VFL Sub-tabs -->
-  <div class="filter-bar" id="vfl-tabs" style="margin-bottom:14px">
-    <button class="chip active" data-vt="schedule">Schedule</button>
-    <button class="chip" data-vt="input">Input</button>
-    <button class="chip" data-vt="table">Table</button>
-    <button class="chip" data-vt="analysis">Analysis</button>
-    <button class="chip" data-vt="picks">Picks</button>
-  </div>
-
-  <!-- SUB: Live Schedule (scraped from Golden Race) -->
-  <div id="vfl-schedule">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <button class="btn btn-green" id="vfl-schedule-btn" style="flex:1">Scan Upcoming Matches</button>
-    </div>
-    <div id="vfl-schedule-stats" style="display:none;margin-bottom:14px"></div>
-    <div id="vfl-schedule-filters" style="display:none;margin-bottom:12px"></div>
-    <div id="vfl-schedule-list">
-      <div class="empty" style="padding:20px;font-size:13px">
-        Tap <b>Scan</b> to scrape upcoming scheduled virtual football from Sportybet.<br>
-        <span style="color:var(--text-3);font-size:12px">Gets all 6 leagues with predictions based on ${'>'}2000 historical results.</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- SUB: Input Results -->
-  <div id="vfl-input" style="display:none">
-    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-      <label style="font-size:13px;color:var(--muted)">Week:</label>
-      <input id="vfl-week" type="number" class="input" style="width:60px;padding:8px;letter-spacing:normal" min="1" max="38" value="1">
-    </div>
-    <div id="vfl-match-rows" style="display:flex;flex-direction:column;gap:6px"></div>
-    <div style="margin-top:12px;display:flex;gap:8px">
-      <button class="btn btn-green" onclick="vflSubmitResults()" style="flex:1">Save Week Results</button>
-      <button class="btn btn-ghost btn-sm" onclick="vflAddRow()">+ Row</button>
-    </div>
-    <div id="vfl-input-status" style="margin-top:8px;font-size:12px"></div>
-  </div>
-
-  <!-- SUB: League Table -->
-  <div id="vfl-table" style="display:none">
-    <div id="vfl-disc-badge" style="margin-bottom:10px"></div>
-    <div id="vfl-league-table" style="overflow-x:auto"></div>
-  </div>
-
-  <!-- SUB: Analysis -->
-  <div id="vfl-analysis" style="display:none">
-    <div id="vfl-alerts" style="margin-bottom:12px"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div id="vfl-predators" class="card" style="padding:10px"></div>
-      <div id="vfl-activators" class="card" style="padding:10px"></div>
-    </div>
-    <h3 style="font-size:14px;margin-bottom:8px;color:var(--muted)">Team Form (Major Teams)</h3>
-    <div id="vfl-team-cards" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
-    <h3 style="font-size:14px;margin:14px 0 8px;color:var(--muted)">Top Scorers vs Top Conceders</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div id="vfl-scorers" class="card" style="padding:10px"></div>
-      <div id="vfl-conceders" class="card" style="padding:10px"></div>
-    </div>
-  </div>
-
-  <!-- SUB: Picks -->
-  <div id="vfl-picks" style="display:none">
-    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
-      <label style="font-size:13px;color:var(--muted)">Predict week:</label>
-      <input id="vfl-pick-week" type="number" class="input" style="width:60px;padding:8px;letter-spacing:normal" min="1" max="38" value="6">
-      <button class="btn btn-blue btn-sm" onclick="vflGetPicks()">Get Picks</button>
-    </div>
-    <div id="vfl-pick-results"></div>
-  </div>
-</div>
 
 <!-- ===== PAGE: HISTORY ===== -->
 <div class="page" id="page-history">
@@ -1291,6 +1210,45 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 </div>
 
 <!-- ===== PAGE: MORE (hub) ===== -->
+<!-- ===== PAGE: LIVE MONITOR ===== -->
+<div class="page" id="page-live">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h2 style="font-size:18px;font-weight:800">Live Monitor</h2>
+    <button class="btn btn-green btn-sm" id="live-scan-btn">Scan Live</button>
+  </div>
+  <div id="live-signals" style="margin-bottom:16px"></div>
+  <!-- Cross-Odds Comparison -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px">
+    <div class="section-title" style="margin:0">Sportybet vs Pinnacle</div>
+    <button class="btn btn-blue btn-sm" id="cross-odds-btn" style="font-size:11px">Compare Odds</button>
+  </div>
+  <div id="cross-odds-stats" style="display:none;margin-bottom:10px"></div>
+  <div id="cross-odds-list">
+    <div style="padding:10px;background:var(--surface);border-radius:var(--r-xs);font-size:12px;color:var(--text-3);text-align:center">
+      Tap <b>Compare Odds</b> to pull ALL upcoming events from Pinnacle + Sportybet and find where Sportybet overpays.
+    </div>
+  </div>
+
+  <!-- Odds Lag Alerts -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px">
+    <div class="section-title" style="margin:0">Odds Lag</div>
+    <button class="btn btn-ghost btn-sm" id="odds-lag-btn" style="font-size:11px">Scan Lag</button>
+  </div>
+  <div id="odds-lag-list">
+    <div style="padding:10px;background:var(--surface);border-radius:var(--r-xs);font-size:12px;color:var(--text-3);text-align:center">
+      Tap <b>Scan Lag</b> to find where Sportybet odds haven't caught up to Pinnacle's sharp line. Run every 10 min for best results.
+    </div>
+  </div>
+
+  <div class="section-title" style="margin-top:16px">Live Matches</div>
+  <div id="live-matches-list">
+    <div class="empty" style="padding:20px;font-size:13px">
+      Tap <b>Scan Live</b> to monitor ongoing matches for Big Chances, xG surges, and pressure signals.<br>
+      <span style="color:var(--text-3);font-size:12px">Scrapes FlashScore in real-time. Requires Chrome (local only).</span>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-more">
   <h2 style="font-size:18px;font-weight:800;margin-bottom:16px">More</h2>
 
@@ -1364,19 +1322,6 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
-  <!-- VFL Analysis -->
-  <div class="card" onclick="switchPage('vfl')" style="cursor:pointer">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div class="card-icon" style="background:rgba(255,255,255,0.05)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-      </div>
-      <div style="flex:1">
-        <div style="font-size:15px;font-weight:700">VFL Analyzer</div>
-        <div style="font-size:12px;color:var(--text-3)">Virtual football league tables, analysis & picks</div>
-      </div>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-    </div>
-  </div>
 
 </div>
 
@@ -1505,7 +1450,7 @@ function switchPage(name) {
   if (page) page.classList.add('active');
 
   // Highlight nav for main 4 tabs; sub-pages (generate, tools, history, arb, vfl) highlight "more"
-  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', vfl:'more' };
+  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', live:'more' };
   const navTarget = navMap[name] || name;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === navTarget));
   document.querySelectorAll('#desktop-tabs .chip').forEach(b => {
@@ -1515,8 +1460,7 @@ function switchPage(name) {
   if ((name === 'today' || name === 'codes') && !codesLoaded) loadBookingCodes();
   if (name === 'today' && codesLoaded) renderTopPicks();
   if (name === 'games') {
-    if (gamesTimeline === 'virtual') { if (!virtualsLoaded) loadVirtuals(); }
-    else if (!gamesLoaded) loadGames();
+    if (!gamesLoaded) loadGames();
   }
   if (name === 'history') { renderHistory(); refreshHistoryStatuses(); }
   if (name === 'arb' && !arbLoaded) loadArbitrage();
@@ -4525,211 +4469,6 @@ document.getElementById('refresh-btn').onclick = async () => {
   btn.disabled = false;
 };
 
-// ===== VFL ANALYZER =====
-const VFL_TEAMS = ['MNC','LIV','ARS','CHE','MNU','TOT','EVE','LEI','SOU','WHU','CRY','WOL','BRI','BUR','LEE','WBA','ASV','NWC','SHU','FUL'];
-const VFL_NAMES = {MNC:'Man City',LIV:'Liverpool',MNU:'Man United',CHE:'Chelsea',ARS:'Arsenal',TOT:'Tottenham',EVE:'Everton',LEI:'Leicester',SOU:'Southampton',WHU:'West Ham',CRY:'Crystal Palace',WOL:'Wolverhampton',BRI:'Brighton',BUR:'Burnley',LEE:'Leeds',WBA:'West Brom',ASV:'Aston Villa',NWC:'Newcastle',SHU:'Sheffield Utd',FUL:'Fulham'};
-
-// VFL sub-tab switching
-const vflSubs = ['vfl-schedule','vfl-input','vfl-table','vfl-analysis','vfl-picks'];
-document.querySelectorAll('#vfl-tabs .chip').forEach(b => b.onclick = () => {
-  document.querySelectorAll('#vfl-tabs .chip').forEach(c => c.classList.remove('active'));
-  b.classList.add('active');
-  const target = 'vfl-' + b.dataset.vt;
-  vflSubs.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = id === target ? 'block' : 'none';
-  });
-});
-
-function vflLeague() { return document.getElementById('vfl-league').value.trim() || 'season-1'; }
-
-function vflMatchRowHtml(idx) {
-  const opts = VFL_TEAMS.map(t => `<option value="${t}">${t}</option>`).join('');
-  return `<div class="vfl-row" style="display:flex;gap:4px;align-items:center;font-size:13px">
-    <select class="input vfl-home" style="flex:1;padding:6px">${opts}</select>
-    <input type="number" class="input vfl-hs" style="width:36px;text-align:center;padding:6px" min="0" max="9" value="0">
-    <span style="color:var(--muted)">-</span>
-    <input type="number" class="input vfl-as" style="width:36px;text-align:center;padding:6px" min="0" max="9" value="0">
-    <select class="input vfl-away" style="flex:1;padding:6px">${opts}</select>
-    <button class="btn btn-ghost" style="padding:2px 6px;font-size:11px" onclick="this.closest('.vfl-row').remove()">x</button>
-  </div>`;
-}
-
-function vflAddRow() {
-  const c = document.getElementById('vfl-match-rows');
-  c.insertAdjacentHTML('beforeend', vflMatchRowHtml(c.children.length));
-}
-
-function vflInitRows() {
-  const c = document.getElementById('vfl-match-rows');
-  c.innerHTML = '';
-  for (let i = 0; i < 10; i++) c.insertAdjacentHTML('beforeend', vflMatchRowHtml(i));
-}
-vflInitRows();
-
-async function vflSubmitResults() {
-  const league = vflLeague();
-  const week = parseInt(document.getElementById('vfl-week').value, 10);
-  const rows = document.querySelectorAll('#vfl-match-rows .vfl-row');
-  const matches = [];
-  for (const r of rows) {
-    matches.push({
-      home: r.querySelector('.vfl-home').value,
-      away: r.querySelector('.vfl-away').value,
-      homeScore: parseInt(r.querySelector('.vfl-hs').value, 10) || 0,
-      awayScore: parseInt(r.querySelector('.vfl-as').value, 10) || 0,
-    });
-  }
-  const st = document.getElementById('vfl-input-status');
-  try {
-    const res = await fetch('/vfl/results', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ league, week, matches }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      st.innerHTML = `<span style="color:var(--green)">Week ${week} saved (${data.matchCount} matches)</span>`;
-      document.getElementById('vfl-week').value = week + 1;
-    } else {
-      st.innerHTML = `<span style="color:var(--red)">${data.error || 'Error'}: ${(data.details||[]).map(d=>d.message).join(', ')}</span>`;
-    }
-  } catch (e) { st.innerHTML = `<span style="color:var(--red)">Network error</span>`; }
-}
-
-async function vflLoad() {
-  const league = vflLeague();
-  await Promise.all([vflLoadTable(league), vflLoadAnalysis(league)]);
-}
-
-async function vflLoadTable(league) {
-  try {
-    const res = await fetch(`/vfl/analysis?league=${encodeURIComponent(league)}`);
-    const data = await res.json();
-    const { table, disc } = data;
-
-    // Disc badge
-    const discColors = { CORD: 'var(--green)', MULTI_CORD: 'var(--amber)', BANK: 'var(--red)', UNKNOWN: 'var(--muted)' };
-    document.getElementById('vfl-disc-badge').innerHTML = `<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;background:rgba(255,255,255,0.05);font-size:12px">
-      <span style="width:8px;height:8px;border-radius:50%;background:${discColors[disc.type]||'var(--muted)'}"></span>
-      RNG ${disc.type.replace('_','-')} (${disc.confidence}% confidence)
-    </div>`;
-
-    // Table
-    if (!table.length) { document.getElementById('vfl-league-table').innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center">No data. Enter results first.</div>'; return; }
-    let html = `<table style="width:100%;font-size:12px;border-collapse:collapse">
-      <tr style="color:var(--muted);text-align:left"><th style="padding:4px">#</th><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th><th>Form</th></tr>`;
-    for (const t of table) {
-      const formDots = t.form.map(f => f === 'W' ? '<span style="color:var(--green)">W</span>' : f === 'L' ? '<span style="color:var(--red)">L</span>' : '<span style="color:var(--amber)">D</span>').join(' ');
-      const rowBg = t.position <= 4 ? 'rgba(34,197,94,0.06)' : t.position >= 18 ? 'rgba(239,68,68,0.06)' : 'transparent';
-      html += `<tr style="background:${rowBg};border-bottom:1px solid rgba(255,255,255,0.05)">
-        <td style="padding:4px;font-weight:600">${t.position}</td><td style="font-weight:600">${t.team}</td>
-        <td>${t.played}</td><td>${t.won}</td><td>${t.drawn}</td><td>${t.lost}</td>
-        <td>${t.goalsScored}</td><td>${t.goalsConceded}</td><td>${t.goalDifference}</td>
-        <td style="font-weight:700;color:var(--blue)">${t.points}</td><td>${formDots}</td></tr>`;
-    }
-    html += '</table>';
-    document.getElementById('vfl-league-table').innerHTML = html;
-  } catch (e) { document.getElementById('vfl-league-table').innerHTML = '<div style="color:var(--red);font-size:13px">Failed to load</div>'; }
-}
-
-async function vflLoadAnalysis(league) {
-  try {
-    const res = await fetch(`/vfl/analysis?league=${encodeURIComponent(league)}`);
-    const data = await res.json();
-
-    // Alerts
-    const alertsHtml = data.alerts.length ? data.alerts.map(a => `<div class="card" style="padding:8px;margin-bottom:6px;border-left:3px solid ${a.type==='LONG_UNDER_EXIT'?'var(--green)':'var(--amber)'}">
-      <div style="font-size:12px;font-weight:600">${a.team} - ${a.type.replace(/_/g,' ')}</div>
-      <div style="font-size:11px;color:var(--muted)">${a.message}</div>
-    </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">No alerts</div>';
-    document.getElementById('vfl-alerts').innerHTML = '<h3 style="font-size:14px;margin-bottom:8px;color:var(--muted)">Alerts</h3>' + alertsHtml;
-
-    // Predators & Activators
-    document.getElementById('vfl-predators').innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:4px">Predators (UNDER)</div>` +
-      (data.predators.length ? data.predators.map(t => `<span style="font-size:11px;background:rgba(239,68,68,0.1);padding:2px 6px;border-radius:4px;margin:2px">${t}</span>`).join(' ') : '<span style="font-size:11px;color:var(--muted)">None detected</span>');
-    document.getElementById('vfl-activators').innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px">Activators (OVER)</div>` +
-      (data.activators.length ? data.activators.map(t => `<span style="font-size:11px;background:rgba(34,197,94,0.1);padding:2px 6px;border-radius:4px;margin:2px">${t}</span>`).join(' ') : '<span style="font-size:11px;color:var(--muted)">None detected</span>');
-
-    // Team form cards (major teams)
-    const majorTeams = data.table.filter(t => ['MNC','LIV','ARS','EVE'].includes(t.team));
-    document.getElementById('vfl-team-cards').innerHTML = majorTeams.map(t => {
-      const formDots = t.form.map(f => `<span style="display:inline-block;width:16px;height:16px;border-radius:50%;text-align:center;line-height:16px;font-size:10px;font-weight:700;background:${f==='W'?'var(--green)':f==='L'?'var(--red)':'var(--amber)'};color:#000">${f}</span>`).join(' ');
-      const scores = t.scoringForm.map(s => `<span style="font-size:10px;color:${s.isOver?'var(--green)':'var(--muted)'}">${s.scored}-${s.conceded}</span>`).join(' ');
-      return `<div class="card" style="padding:10px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-          <span style="font-weight:700">${t.team}</span>
-          <span style="font-size:11px;color:var(--muted)">#${t.position} | ${t.points}pts</span>
-        </div>
-        <div style="margin-bottom:4px">${formDots}</div>
-        <div style="margin-bottom:4px">${scores}</div>
-        <div style="font-size:10px;display:flex;gap:6px;flex-wrap:wrap">
-          ${t.overStreak>0?`<span style="background:rgba(34,197,94,0.15);padding:1px 5px;border-radius:3px">OVER x${t.overStreak}</span>`:''}
-          ${t.underStreak>0?`<span style="background:rgba(239,68,68,0.15);padding:1px 5px;border-radius:3px">UNDER x${t.underStreak}</span>`:''}
-          ${t.ggStreak>0?`<span style="background:rgba(251,191,36,0.15);padding:1px 5px;border-radius:3px">GG x${t.ggStreak}</span>`:''}
-          <span style="color:var(--muted)">O:${(t.overRate*100).toFixed(0)}%</span>
-        </div>
-      </div>`;
-    }).join('');
-
-    // Top scorers & conceders
-    document.getElementById('vfl-scorers').innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px">JARGUA (Top Scorers)</div>` +
-      data.topScorers.map(t => `<div style="font-size:11px;display:flex;justify-content:space-between"><span>${t.team}</span><span style="color:var(--green)">${t.goals} GF</span></div>`).join('');
-    document.getElementById('vfl-conceders').innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:4px">PREY (Top Conceders)</div>` +
-      data.topConceders.map(t => `<div style="font-size:11px;display:flex;justify-content:space-between"><span>${t.team}</span><span style="color:var(--red)">${t.conceded} GA</span></div>`).join('');
-  } catch (e) { console.error('VFL analysis error:', e); }
-}
-
-async function vflGetPicks() {
-  const league = vflLeague();
-  const week = parseInt(document.getElementById('vfl-pick-week').value, 10);
-  const el = document.getElementById('vfl-pick-results');
-  try {
-    const res = await fetch(`/vfl/picks?league=${encodeURIComponent(league)}&week=${week}`);
-    const data = await res.json();
-
-    if (data.skipWeek) {
-      el.innerHTML = `<div class="card" style="padding:16px;text-align:center;border:1px solid var(--red)">
-        <div style="font-size:16px;font-weight:700;color:var(--red);margin-bottom:6px">RNG BANK DETECTED</div>
-        <div style="font-size:13px;color:var(--muted)">Skip this league entirely. Logout and try another season.</div>
-      </div>`;
-      return;
-    }
-
-    if (!data.picks.length) {
-      el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center">No picks available. Need more data or fixtures for week ' + week + '.</div>';
-      return;
-    }
-
-    const confColors = { HIGH: 'var(--green)', MEDIUM: 'var(--amber)', LOW: 'var(--muted)' };
-    const sugColors = { TRIO: 'var(--green)', OVER_2_5: 'var(--blue)', STRAIGHT_WIN: 'var(--amber)', SKIP: 'var(--red)' };
-
-    let html = '';
-
-    // Pro analysis
-    if (data.proAnalysis) {
-      html += `<div class="card" style="padding:10px;margin-bottom:10px;border-left:3px solid var(--blue)">
-        <div style="font-size:12px;font-weight:600;margin-bottom:4px">Expert Analysis</div>
-        <div style="font-size:11px">JARGUA: ${data.proAnalysis.jargua.map(j=>`${j.team} (${j.goals}G)`).join(', ')} | PREY: ${data.proAnalysis.prey.map(p=>`${p.team} (${p.conceded}GA)`).join(', ')}</div>
-      </div>`;
-    }
-
-    html += data.picks.map(p => {
-      const sugKey = p.suggestion.replace('.', '_');
-      return `<div class="card" style="padding:12px;margin-bottom:8px;border-left:3px solid ${confColors[p.confidence]||'var(--muted)'}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-weight:700;font-size:14px">${p.team} vs ${p.opponent}</span>
-          <span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600;background:${sugKey==='SKIP'?'rgba(239,68,68,0.15)':'rgba(34,197,94,0.15)'};color:${sugKey==='SKIP'?'var(--red)':'var(--green)'}">${p.suggestion.replace('_',' ')}</span>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${p.isHome?'Home':'Away'} | Criteria: ${p.criteriaPass}/5 | Confidence: ${p.confidence}</div>
-        <div style="font-size:11px">${p.reasons.map(r => r.startsWith('WARNING') ? `<div style="color:var(--red)">${r}</div>` : `<div style="color:var(--muted)">${r}</div>`).join('')}</div>
-      </div>`;
-    }).join('');
-
-    el.innerHTML = html;
-  } catch (e) { el.innerHTML = '<div style="color:var(--red);font-size:13px">Failed to load picks</div>'; }
-}
-
 // ===== GAMES PAGE =====
 let gamesTimeline = 'prematch';
 let gamesData = [];
@@ -4745,17 +4484,10 @@ document.querySelectorAll('#games-timeline-tabs button').forEach(b => {
     document.querySelectorAll('#games-timeline-tabs button').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
     gamesTimeline = b.dataset.gt;
-    const isVirtual = gamesTimeline === 'virtual';
-    document.getElementById('games-list').style.display = isVirtual ? 'none' : '';
-    document.getElementById('virtuals-list').style.display = isVirtual ? '' : 'none';
+    document.getElementById('games-list').style.display = '';
     document.getElementById('games-slip-bar').classList.toggle('show', false);
-    if (isVirtual) {
-      if (!virtualsLoaded) loadVirtuals();
-      else renderVirtuals();
-    } else {
-      gamesLoaded = false;
-      loadGames();
-    }
+    gamesLoaded = false;
+    loadGames();
   };
 });
 
@@ -5189,311 +4921,16 @@ async function createGamesCode() {
 }
 
 document.getElementById('games-search').addEventListener('input', () => {
-  if (gamesTimeline === 'virtual') { if (virtualsData.length) renderVirtuals(); }
-  else if (gamesLoaded) renderGames();
+  if (gamesLoaded) renderGames();
 });
 
-// ===== VIRTUAL GAMES =====
-let virtualsData = [];
-let virtualPredictions = {};
-let virtualsLoaded = false;
-let virtualResultsCount = 0;
+// Virtual games removed — RNG proven unbeatable (131K matches, -5% ROI)
+async function loadVirtuals() {}
+function renderVirtuals() {}
+const virtualsData = [];
+const virtualsLoaded = false;
 
-async function loadVirtuals() {
-  const listEl = document.getElementById('virtuals-list');
-  listEl.innerHTML = '<div class="empty"><div class="spinner" style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 10px"></div>Loading virtual games...<div style="font-size:11px;color:var(--text-3);margin-top:6px">First load may take ~15s (launching browser)</div></div>';
-  try {
-    const res = await fetch('/predictions/virtuals');
-    if (!res.ok) throw new Error('API error');
-    const json = await res.json();
-    virtualsData = json.data || [];
-    virtualsLoaded = true;
-    renderVirtuals();
-    // Fetch predictions in background
-    fetchVirtualPredictions();
-  } catch (e) {
-    console.error('Load virtuals error:', e);
-    listEl.innerHTML = '<div class="empty" style="color:var(--red)">Failed to load virtual games. Tap Refresh to retry.</div>';
-  }
-}
-
-async function fetchVirtualPredictions() {
-  // Build list of all matches for prediction
-  const matches = [];
-  for (const l of virtualsData) {
-    for (const m of l.matches) {
-      matches.push({ home: m.home, away: m.away, country: l.country });
-    }
-  }
-  if (!matches.length) return;
-  try {
-    const res = await fetch('/predictions/virtual-predict?matches=' + encodeURIComponent(JSON.stringify(matches)));
-    if (!res.ok) return;
-    const json = await res.json();
-    virtualResultsCount = json.resultsCount || 0;
-    virtualPredictions = {};
-    for (const p of (json.data || [])) {
-      virtualPredictions[p.home + ':' + p.away + ':' + p.country] = p;
-    }
-    // Generate auto-pick
-    generateVirtualPick();
-    // Re-render with predictions
-    renderVirtuals();
-  } catch (e) {
-    console.error('Virtual predictions error:', e);
-  }
-}
-
-let virtualAutoPick = null; // { picks: [...], totalOdds, timestamp }
-
-function generateVirtualPick() {
-  if (virtualResultsCount < 20) { virtualAutoPick = null; return; }
-
-  // Gather all predictions with their odds from virtualsData
-  const candidates = [];
-  for (const l of virtualsData) {
-    for (const m of l.matches) {
-      const pred = virtualPredictions[m.home + ':' + m.away + ':' + l.country];
-      if (!pred || pred.confidence < 40) continue;
-      const odds = pred.predictedOutcome === '1' ? parseFloat(m.homeOdds)
-                 : pred.predictedOutcome === '2' ? parseFloat(m.awayOdds)
-                 : parseFloat(m.drawOdds);
-      if (!odds || odds <= 1) continue;
-      candidates.push({
-        home: m.home, away: m.away, country: l.country,
-        league: l.title, timer: l.timer,
-        outcome: pred.predictedOutcome,
-        pick: pred.predictedOutcome === '1' ? m.home
-            : pred.predictedOutcome === '2' ? m.away
-            : 'Draw',
-        odds,
-        confidence: pred.confidence,
-        homeWinProb: pred.homeWinProb,
-        drawProb: pred.drawProb,
-        awayWinProb: pred.awayWinProb,
-      });
-    }
-  }
-
-  if (!candidates.length) { virtualAutoPick = null; return; }
-
-  // Sort by confidence (highest first)
-  candidates.sort((a, b) => b.confidence - a.confidence);
-
-  // Greedy pick: accumulate picks until total odds reach ~2.00
-  const targetOdds = 2.0;
-  const picks = [];
-  let totalOdds = 1;
-  const usedCountries = new Set();
-
-  for (const c of candidates) {
-    if (totalOdds >= targetOdds) break;
-    // Spread across leagues — max 1 per league per pick
-    if (usedCountries.has(c.country)) continue;
-    picks.push(c);
-    totalOdds *= c.odds;
-    usedCountries.add(c.country);
-  }
-
-  // If we didn't reach target, try adding from same leagues
-  if (totalOdds < 1.5 && picks.length < 3) {
-    for (const c of candidates) {
-      if (totalOdds >= targetOdds) break;
-      if (picks.some(p => p.home === c.home && p.away === c.away)) continue;
-      picks.push(c);
-      totalOdds *= c.odds;
-    }
-  }
-
-  if (!picks.length) { virtualAutoPick = null; return; }
-
-  virtualAutoPick = {
-    picks,
-    totalOdds: Math.round(totalOdds * 100) / 100,
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  };
-}
-
-function predColor(conf) {
-  if (conf >= 55) return 'var(--green)';
-  if (conf >= 45) return 'var(--amber)';
-  return 'var(--text-3)';
-}
-
-function formDots(form) {
-  if (!form) return '';
-  return form.split('').map(c => {
-    if (c === 'W') return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin:0 1px"></span>';
-    if (c === 'L') return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin:0 1px"></span>';
-    return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-3);margin:0 1px"></span>';
-  }).join('');
-}
-
-function renderVirtuals() {
-  const listEl = document.getElementById('virtuals-list');
-  const search = (document.getElementById('games-search').value || '').toLowerCase().trim();
-
-  let filtered = virtualsData;
-  if (search) {
-    filtered = virtualsData.filter(l =>
-      l.title.toLowerCase().includes(search) ||
-      l.country.toLowerCase().includes(search) ||
-      l.matches.some(m => m.home.toLowerCase().includes(search) || m.away.toLowerCase().includes(search))
-    );
-  }
-
-  if (!filtered.length) {
-    listEl.innerHTML = '<div class="empty">No virtual games found</div>';
-    return;
-  }
-
-  // Update hero stats for virtuals
-  const totalMatches = filtered.reduce((s, l) => s + l.matches.length, 0);
-  document.getElementById('gh-matches').textContent = totalMatches;
-  document.getElementById('gh-leagues').textContent = filtered.length;
-  document.getElementById('gh-today').textContent = virtualResultsCount > 0 ? virtualResultsCount : '--';
-  // Repurpose "Today" label for virtuals
-  const todayLabel = document.querySelector('#games-hero .games-hero-stat:nth-child(3) .games-hero-label');
-  if (todayLabel) todayLabel.textContent = gamesTimeline === 'virtual' ? 'Results' : 'Today';
-
-  let html = '';
-
-  // Auto-pick card
-  if (virtualAutoPick && virtualAutoPick.picks.length > 0) {
-    const ap = virtualAutoPick;
-    html += '<div style="background:linear-gradient(135deg,rgba(78,148,255,0.08),rgba(176,124,255,0.08));border:1px solid rgba(78,148,255,0.2);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:12px">';
-    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-    html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>';
-    html += '<span style="font-size:14px;font-weight:800;color:var(--text)">AI Pick</span>';
-    html += '<span style="font-size:20px;font-weight:900;color:var(--amber);margin-left:auto">' + ap.totalOdds.toFixed(2) + '</span>';
-    html += '<span style="font-size:10px;color:var(--text-3);font-weight:600">ODDS</span>';
-    html += '</div>';
-    for (const p of ap.picks) {
-      const confCol = predColor(p.confidence);
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,0.04);font-size:12px">';
-      html += '<span style="color:var(--text-3);min-width:50px;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.country) + '</span>';
-      html += '<span style="font-weight:700;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.home) + ' vs ' + esc(p.away) + '</span>';
-      html += '<span style="font-weight:800;color:' + confCol + ';min-width:40px;text-align:center">' + esc(p.pick) + '</span>';
-      html += '<span style="font-weight:700;color:var(--amber);min-width:36px;text-align:right">@' + p.odds.toFixed(2) + '</span>';
-      html += '<span style="font-size:10px;color:var(--text-3);min-width:28px;text-align:right">' + p.confidence + '%</span>';
-      html += '</div>';
-    }
-    html += '<div style="margin-top:8px;font-size:10px;color:var(--text-3);display:flex;align-items:center;gap:6px">';
-    html += '<span>Generated at ' + ap.timestamp + '</span>';
-    html += '<span style="margin-left:auto">' + virtualResultsCount + ' results analyzed</span>';
-    html += '</div>';
-    html += '</div>';
-  }
-
-  // Data collection status
-  if (virtualResultsCount > 0 && !virtualAutoPick) {
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;margin-bottom:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);font-size:12px">';
-    html += '<div style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:livePulse 1.5s ease-in-out infinite;flex-shrink:0"></div>';
-    html += '<span style="color:var(--text-2)">Collecting data: <b style="color:var(--text)">' + virtualResultsCount + '</b> results stored</span>';
-    html += '<span style="margin-left:auto;color:var(--text-3)">Predictions ' + (virtualResultsCount >= 30 ? 'active' : 'need ~30+ results') + '</span>';
-    html += '</div>';
-  }
-
-  for (const league of filtered) {
-    const flag = getCountryFlag(league.country);
-    const collapsed = collapsedLeagues.has(league.title);
-
-    html += '<div class="league-section' + (collapsed ? ' collapsed' : '') + '">';
-    html += '<div class="league-hdr" onclick="toggleLeague(this)">';
-    html += '<span class="flag">' + flag + '</span>';
-    html += '<span class="name">' + esc(league.title) + '</span>';
-    if (league.timer) {
-      html += '<span style="font-size:11px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + esc(league.timer) + '</span>';
-    }
-    html += '<span class="count">' + league.matches.length + '</span>';
-    html += '<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
-    html += '</div>';
-    html += '<div class="league-body">';
-
-    // Column headers
-    html += '<div class="odds-header">';
-    html += '<div class="odds-header-spacer"></div>';
-    html += '<div class="odds-header-group"><span class="odds-header-label">1</span><span class="odds-header-label">X</span><span class="odds-header-label">2</span></div>';
-    if (virtualResultsCount >= 30) {
-      html += '<div class="odds-header-sep"></div>';
-      html += '<div class="odds-header-group"><span class="odds-header-label" style="width:60px">Pred</span></div>';
-    }
-    html += '</div>';
-
-    for (const m of league.matches) {
-      const pred = virtualPredictions[m.home + ':' + m.away + ':' + league.country];
-
-      html += '<div class="gm" style="flex-wrap:wrap">';
-      html += '<div class="gm-info">';
-      html += '<div class="gm-time-col"><div style="font-size:11px;font-weight:700;color:var(--purple)">' + esc(m.num) + '</div></div>';
-      html += '<div class="gm-teams">';
-      html += '<div class="gm-team">' + esc(m.home) + '</div>';
-      html += '<div class="gm-team">' + esc(m.away) + '</div>';
-      html += '</div></div>';
-
-      // Odds
-      const odds = [
-        { label: '1', val: m.homeOdds },
-        { label: 'X', val: m.drawOdds },
-        { label: '2', val: m.awayOdds },
-      ];
-      const lowestOdds = Math.min(...odds.map(o => parseFloat(o.val) || 99));
-
-      html += '<div class="gm-odds"><div class="odds-header-group">';
-      for (const o of odds) {
-        const oval = parseFloat(o.val) || 0;
-        const isFav = oval === lowestOdds && oval < 2.5;
-        html += '<button class="ob' + (isFav ? ' fav' : '') + '" style="pointer-events:none">' + (oval > 0 ? oval.toFixed(2) : '-') + '</button>';
-      }
-      html += '</div>';
-
-      // Prediction badge
-      if (pred) {
-        const outcomeLabel = pred.predictedOutcome === '1' ? m.home : pred.predictedOutcome === '2' ? m.away : 'Draw';
-        const color = predColor(pred.confidence);
-        html += '<div class="gm-odds-sep"></div>';
-        html += '<div style="min-width:60px;text-align:center">';
-        html += '<div style="font-size:11px;font-weight:800;color:' + color + '">' + esc(outcomeLabel) + '</div>';
-        html += '<div style="font-size:9px;color:var(--text-3)">' + pred.confidence + '%</div>';
-        html += '</div>';
-      }
-      html += '</div>';
-
-      // Expandable prediction details
-      if (pred) {
-        html += '<div style="width:100%;padding:4px 16px 6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:10px;color:var(--text-3)">';
-        html += '<span>H:' + Math.round(pred.homeWinProb*100) + '%</span>';
-        html += '<span>D:' + Math.round(pred.drawProb*100) + '%</span>';
-        html += '<span>A:' + Math.round(pred.awayWinProb*100) + '%</span>';
-        html += '<span style="color:var(--text-2)">O2.5:' + Math.round(pred.overProb*100) + '%</span>';
-        html += '<span style="color:var(--text-2)">GG:' + Math.round(pred.ggProb*100) + '%</span>';
-        if (pred.h2h.played > 0) {
-          html += '<span>H2H:' + pred.h2h.homeWins + 'W/' + pred.h2h.draws + 'D/' + pred.h2h.awayWins + 'L</span>';
-        }
-        html += '<span style="margin-left:auto">' + formDots(pred.homeForm) + '</span>';
-        html += '<span>vs</span>';
-        html += '<span>' + formDots(pred.awayForm) + '</span>';
-        html += '</div>';
-      }
-
-      html += '</div>';
-    }
-
-    html += '</div></div>';
-  }
-
-  // Footer
-  html += '<div style="text-align:center;padding:12px;font-size:11px;color:var(--text-3)">';
-  html += 'Virtual rounds every ~3 min. Tap Refresh for latest. ';
-  if (virtualResultsCount > 0) {
-    html += 'Data: ' + virtualResultsCount + ' results collected.';
-  } else {
-    html += 'Collecting data in background — predictions improve over time.';
-  }
-  html += '</div>';
-
-  listEl.innerHTML = html;
-}
+// (virtual prediction/rendering code removed)
 
 // ===== ARBITRAGE =====
 let arbLoaded = false;
@@ -5644,133 +5081,6 @@ async function loadArbitrage() {
 }
 
 document.getElementById('arb-scan-btn').onclick = () => loadArbitrage();
-
-// ===== VIRTUAL SCHEDULE =====
-let vschedLoaded = false;
-
-function renderVirtualMatch(m) {
-  const p = m.prediction;
-  if (!p) {
-    return `<div class="card" style="padding:12px">
-      <div style="font-size:13px;font-weight:700">${m.home} vs ${m.away}</div>
-      <div style="font-size:11px;color:var(--text-3)">${m.country} Week ${m.week}</div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <div style="flex:1;text-align:center;padding:6px;background:var(--bg);border-radius:var(--r-xs);font-size:12px"><div style="font-weight:700">H</div>@${m.homeOdds}</div>
-        <div style="flex:1;text-align:center;padding:6px;background:var(--bg);border-radius:var(--r-xs);font-size:12px"><div style="font-weight:700">D</div>@${m.drawOdds}</div>
-        <div style="flex:1;text-align:center;padding:6px;background:var(--bg);border-radius:var(--r-xs);font-size:12px"><div style="font-weight:700">A</div>@${m.awayOdds}</div>
-      </div>
-      <div style="font-size:11px;color:var(--text-3);margin-top:6px">No prediction data for these teams yet</div>
-    </div>`;
-  }
-
-  const vp = p.valuePick;
-  const predLabel = p.predictedOutcome === '1' ? m.home : p.predictedOutcome === '2' ? m.away : 'Draw';
-  const predCol = p.confidence >= 60 ? 'var(--green)' : p.confidence >= 45 ? 'var(--amber)' : 'var(--text-2)';
-  const borderCol = vp ? 'rgba(52,212,114,0.2)' : 'var(--border)';
-
-  function oddsCell(label, odds, prob, implied, pick) {
-    const isValue = vp === pick;
-    const isPred = p.predictedOutcome === pick;
-    const bg = isValue ? 'var(--green-soft)' : isPred ? 'var(--blue-soft)' : 'var(--bg)';
-    const border = isValue ? '2px solid var(--green)' : isPred ? '2px solid var(--blue)' : '1px solid var(--border)';
-    return `<div style="flex:1;text-align:center;padding:8px 4px;background:${bg};border:${border};border-radius:var(--r-xs)">
-      <div style="font-size:10px;color:var(--text-3);font-weight:600">${label}</div>
-      <div style="font-size:16px;font-weight:800">@${odds}</div>
-      <div style="font-size:11px;color:var(--text-2)">${prob}%</div>
-      ${isValue ? '<div style="font-size:9px;font-weight:700;color:var(--green);margin-top:2px">VALUE +' + p.valueEdge + '%</div>' : ''}
-    </div>`;
-  }
-
-  return `<div class="card" style="border-color:${borderCol};padding:14px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <div style="flex:1">
-        <div style="font-size:15px;font-weight:700">${m.home} vs ${m.away}</div>
-        <div style="font-size:12px;color:var(--text-3)">${m.country} Week ${m.week}${m.startsAt ? ' &middot; ' + m.startsAt : ''}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:14px;font-weight:800;color:${predCol}">${predLabel}</div>
-        <div style="font-size:10px;color:var(--text-3)">${p.confidence}% conf</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:6px">
-      ${oddsCell('HOME', m.homeOdds, p.homeWinProb, p.impliedHome, '1')}
-      ${oddsCell('DRAW', m.drawOdds, p.drawProb, p.impliedDraw, 'X')}
-      ${oddsCell('AWAY', m.awayOdds, p.awayWinProb, p.impliedAway, '2')}
-    </div>
-    ${vp ? `<div style="margin-top:8px;padding:6px 10px;background:var(--green-soft);border-radius:var(--r-xs);font-size:11px;color:var(--green);font-weight:600">
-      Bet ${vp === '1' ? m.home + ' (Home)' : vp === '2' ? m.away + ' (Away)' : 'Draw'} — model sees +${p.valueEdge}% edge over the odds
-    </div>` : ''}
-  </div>`;
-}
-
-async function loadVirtualSchedule() {
-  const btn = document.getElementById('vfl-schedule-btn');
-  const list = document.getElementById('vfl-schedule-list');
-  btnLoad(btn);
-  list.innerHTML = '<div style="padding:24px;text-align:center"><div class="spinner" style="margin:0 auto 8px;width:24px;height:24px"></div><div style="font-size:13px;color:var(--text-2)">Scraping virtual matches (launching Chrome)...</div></div>';
-
-  try {
-    const data = await api('/predictions/virtual-schedule');
-    vschedLoaded = true;
-    const matches = data.data || [];
-    const countries = data.countries || [];
-
-    // Stats
-    const statsDiv = document.getElementById('vfl-schedule-stats');
-    const valuePicks = matches.filter(m => m.prediction?.valuePick);
-    statsDiv.style.display = 'grid';
-    statsDiv.style.gridTemplateColumns = 'repeat(3,1fr)';
-    statsDiv.style.gap = '8px';
-    const scanTime = data.scannedAt ? new Date(data.scannedAt).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '?';
-    statsDiv.innerHTML = `
-      <div class="hero-stat"><div class="hero-num" style="color:var(--blue)">${matches.length}</div><div class="hero-label">Matches</div></div>
-      <div class="hero-stat"><div class="hero-num" style="color:var(--green)">${valuePicks.length}</div><div class="hero-label">Value Picks</div></div>
-      <div class="hero-stat"><div class="hero-num" style="color:var(--amber)">${data.resultsCount || 0}</div><div class="hero-label">Results DB</div></div>
-      <div style="grid-column:1/-1;text-align:center;font-size:11px;color:var(--text-3);padding:4px">Scanned at ${scanTime} — hit Scan again to refresh</div>
-    `;
-
-    // Country filters
-    const filtersDiv = document.getElementById('vfl-schedule-filters');
-    filtersDiv.style.display = 'flex';
-    filtersDiv.style.gap = '4px';
-    filtersDiv.style.flexWrap = 'wrap';
-    filtersDiv.innerHTML = '<button class="chip active" data-vc="all" style="padding:4px 10px;font-size:11px">All</button>' +
-      countries.map(c => `<button class="chip" data-vc="${c}" style="padding:4px 10px;font-size:11px">${c}</button>`).join('');
-
-    let activeCountry = 'all';
-    function renderFiltered() {
-      const filtered = activeCountry === 'all' ? matches : matches.filter(m => m.country === activeCountry);
-      if (!filtered.length) {
-        list.innerHTML = '<div class="empty" style="padding:16px;font-size:13px">No matches for this league</div>';
-        return;
-      }
-      // Sort: value picks first, then by confidence
-      const sorted = [...filtered].sort((a, b) => {
-        const aVal = a.prediction?.valuePick ? 1 : 0;
-        const bVal = b.prediction?.valuePick ? 1 : 0;
-        if (bVal !== aVal) return bVal - aVal;
-        return (b.prediction?.confidence || 0) - (a.prediction?.confidence || 0);
-      });
-      list.innerHTML = sorted.map(renderVirtualMatch).join('');
-    }
-
-    filtersDiv.querySelectorAll('.chip').forEach(b => b.onclick = () => {
-      filtersDiv.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-      b.classList.add('active');
-      activeCountry = b.dataset.vc;
-      renderFiltered();
-    });
-
-    renderFiltered();
-    showToast(matches.length + ' virtual matches loaded, ' + valuePicks.length + ' value picks', 'success');
-  } catch (e) {
-    list.innerHTML = '<div class="empty" style="color:var(--red)">Failed to load: ' + e.message + '</div>';
-  } finally {
-    btnDone(btn, 'Scan Upcoming Matches');
-  }
-}
-
-document.getElementById('vfl-schedule-btn').onclick = () => loadVirtualSchedule();
 
 // ===== TODAY PAGE =====
 
@@ -6079,6 +5389,236 @@ document.getElementById('today-safe-2odds').onclick = async () => {
 document.getElementById('today-quick-gen').onclick = () => {
   generateSafeCode(5, document.getElementById('today-quick-gen'));
 };
+
+// ===== LIVE MONITOR =====
+
+function renderSignalCard(s) {
+  const sigColors = {
+    big_chance: { bg: 'var(--red-soft)', border: 'rgba(240,96,96,0.3)', color: 'var(--red)', icon: '!', label: 'BIG CHANCE' },
+    goal_likely: { bg: 'var(--amber-soft)', border: 'rgba(247,183,49,0.3)', color: 'var(--amber)', icon: '~', label: 'GOAL LIKELY' },
+    pressure: { bg: 'var(--blue-soft)', border: 'rgba(78,148,255,0.2)', color: 'var(--blue)', icon: '^', label: 'PRESSURE' },
+    domination: { bg: 'var(--green-soft)', border: 'rgba(52,212,114,0.2)', color: 'var(--green)', icon: '*', label: 'DOMINATION' },
+  };
+  const c = sigColors[s.signal] || sigColors.pressure;
+  const team = s.side === 'home' ? s.home : s.away;
+  const strengthBar = Array(s.strength).fill('<span style="display:inline-block;width:6px;height:12px;background:'+c.color+';border-radius:2px;margin-right:1px"></span>').join('');
+
+  return `<div style="background:${c.bg};border:1px solid ${c.border};border-radius:var(--r-xs);padding:12px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;background:${c.color};color:#fff;letter-spacing:.5px">${c.label}</span>
+      <span style="font-size:12px;font-weight:700;color:${c.color}">${team}</span>
+      <div style="flex:1"></div>
+      <span style="font-size:11px;color:var(--text-3)">${s.time}</span>
+    </div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:4px">${s.home} ${s.score} ${s.away}</div>
+    <div style="font-size:12px;color:var(--text-2)">${s.reason}</div>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:4px">
+      <span style="font-size:10px;color:var(--text-3)">Strength:</span> ${strengthBar}
+    </div>
+  </div>`;
+}
+
+function renderLiveMatch(m) {
+  const hasStats = m.xgHome !== null || m.shotsHome > 0;
+  return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px 12px;margin-bottom:6px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;font-weight:700;color:var(--green);background:var(--green-soft);padding:2px 6px;border-radius:4px">${m.time || 'LIVE'}</span>
+      <div style="flex:1;font-size:13px;font-weight:700">${m.home} <span style="color:var(--amber)">${m.score}</span> ${m.away}</div>
+    </div>
+    ${hasStats ? `<div style="display:flex;gap:8px;margin-top:6px;font-size:11px;color:var(--text-2);flex-wrap:wrap">
+      ${m.xgHome !== null ? `<span>xG: <b style="color:var(--text)">${m.xgHome.toFixed(2)}</b> - <b style="color:var(--text)">${(m.xgAway||0).toFixed(2)}</b></span>` : ''}
+      ${m.shotsHome ? `<span>Shots: <b>${m.shotsHome}</b> - <b>${m.shotsAway}</b></span>` : ''}
+      ${m.shotsOnTargetHome ? `<span>On target: <b>${m.shotsOnTargetHome}</b> - <b>${m.shotsOnTargetAway}</b></span>` : ''}
+      ${m.bigChancesHome || m.bigChancesAway ? `<span style="color:var(--red);font-weight:700">Big chances: ${m.bigChancesHome} - ${m.bigChancesAway}</span>` : ''}
+      ${m.possession ? `<span>Poss: ${m.possession[0]}% - ${m.possession[1]}%</span>` : ''}
+    </div>` : `<div style="font-size:11px;color:var(--text-3);margin-top:4px">${m.league || 'Loading stats...'}</div>`}
+  </div>`;
+}
+
+async function loadLiveMonitor() {
+  const btn = document.getElementById('live-scan-btn');
+  const signalsDiv = document.getElementById('live-signals');
+  const matchesDiv = document.getElementById('live-matches-list');
+  btnLoad(btn);
+  matchesDiv.innerHTML = '<div style="padding:16px;text-align:center"><div class="spinner" style="margin:0 auto 6px;width:20px;height:20px"></div><div style="font-size:13px;color:var(--text-2)">Scanning live matches on FlashScore...</div></div>';
+
+  try {
+    const data = await api('/predictions/live');
+    const sigs = data.signals || [];
+    const matches = data.matches || [];
+
+    // Render signals
+    if (sigs.length) {
+      signalsDiv.innerHTML = '<div class="section-title" style="color:var(--red)">Signals (' + sigs.length + ')</div>' + sigs.map(renderSignalCard).join('');
+    } else {
+      signalsDiv.innerHTML = '<div style="padding:10px;background:var(--surface);border-radius:var(--r-xs);font-size:12px;color:var(--text-3);text-align:center">No strong signals right now — check back during peak hours</div>';
+    }
+
+    // Render matches
+    if (matches.length) {
+      matchesDiv.innerHTML = matches.map(renderLiveMatch).join('');
+    } else {
+      matchesDiv.innerHTML = '<div class="empty" style="padding:16px;font-size:13px">No live matches right now. Try again during match hours (evening GMT).</div>';
+    }
+
+    const scanTime = data.scrapedAt ? new Date(data.scrapedAt).toLocaleTimeString('en-GB') : 'just now';
+    showToast(matches.length + ' live matches, ' + sigs.length + ' signals (scanned ' + scanTime + ')', sigs.length ? 'success' : 'info');
+  } catch (e) {
+    matchesDiv.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Error: ' + e.message + '</div>';
+  } finally {
+    btnDone(btn, 'Scan Live');
+  }
+}
+
+document.getElementById('live-scan-btn').onclick = () => loadLiveMonitor();
+
+// Odds Lag
+async function loadOddsLag() {
+  const btn = document.getElementById('odds-lag-btn');
+  const list = document.getElementById('odds-lag-list');
+  btnLoad(btn);
+  list.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--text-2)"><div class="spinner" style="margin:0 auto 6px;width:18px;height:18px"></div>Comparing Sportybet vs Pinnacle...</div>';
+
+  try {
+    const data = await api('/predictions/odds-lag');
+    const alerts = data.alerts || [];
+    const stats = data.stats || {};
+
+    if (!alerts.length) {
+      list.innerHTML = `<div style="padding:12px;background:var(--surface);border-radius:var(--r-xs);font-size:12px;color:var(--text-3);text-align:center">
+        No lag detected. Sportybet odds are in sync with Pinnacle. (Tracked ${stats.eventsTracked || 0} events, matched ${stats.pinnacleMatched || 0})<br>
+        <span style="color:var(--text-3)">Run again in 10 min — lag appears when Pinnacle moves and Sportybet hasn't adjusted.</span>
+      </div>`;
+      showToast('No lag found — run again in 10 min', 'info');
+    } else {
+      list.innerHTML = alerts.map(a => {
+        const sevColors = { hot: { bg: 'var(--red-soft)', border: 'rgba(240,96,96,0.3)', color: 'var(--red)', label: 'HOT' },
+          warm: { bg: 'var(--amber-soft)', border: 'rgba(247,183,49,0.3)', color: 'var(--amber)', label: 'WARM' },
+          cool: { bg: 'var(--blue-soft)', border: 'rgba(78,148,255,0.2)', color: 'var(--blue)', label: 'COOL' } };
+        const c = sevColors[a.severity] || sevColors.cool;
+        const kickoff = a.kickoff ? new Date(a.kickoff).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+
+        return `<div style="background:${c.bg};border:1px solid ${c.border};border-radius:var(--r-xs);padding:12px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;background:${c.color};color:#fff">${c.label}</span>
+            <span style="font-size:11px;color:var(--text-3)">${a.league}${kickoff?' &middot; '+kickoff:''}</span>
+            <div style="flex:1"></div>
+            <span style="font-size:11px;font-weight:700;color:${c.color}">+${a.edgePct}% edge</span>
+          </div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:4px">${a.homeTeam} vs ${a.awayTeam}</div>
+          <div style="font-size:12px;margin-bottom:6px">
+            <span style="font-weight:700">${a.market} — ${a.pick}</span>
+          </div>
+          <div style="display:flex;gap:12px;font-size:12px;margin-bottom:6px">
+            <div><span style="color:var(--text-3)">Sportybet:</span> <b style="color:var(--green)">@${a.sportyOdds}</b> <span style="color:var(--text-3)">(stale)</span></div>
+            <div><span style="color:var(--text-3)">Fair:</span> <b style="color:var(--blue)">@${a.fairOdds.toFixed(2)}</b> <span style="color:var(--text-3)">(sharp)</span></div>
+          </div>
+          <div style="font-size:11px;color:var(--text-2)">Pinnacle moved ${a.pinnacleMovePct}% — Sportybet hasn't adjusted yet</div>
+          <div style="margin-top:6px;padding:6px 10px;background:var(--bg);border-radius:var(--r-xs);font-size:11px;color:${c.color};font-weight:600">${a.action}</div>
+          <div style="font-size:10px;color:var(--text-3);margin-top:4px">Code: ${a.sourceCode}</div>
+        </div>`;
+      }).join('');
+      showToast(alerts.length + ' odds lag alert' + (alerts.length > 1 ? 's' : '') + ' found!', 'success');
+    }
+  } catch (e) {
+    list.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Error: ' + e.message + '</div>';
+  } finally {
+    btnDone(btn, 'Scan Lag');
+  }
+}
+
+document.getElementById('odds-lag-btn').onclick = () => loadOddsLag();
+
+// Cross-Odds Comparison
+async function loadCrossOdds() {
+  const btn = document.getElementById('cross-odds-btn');
+  const list = document.getElementById('cross-odds-list');
+  const statsDiv = document.getElementById('cross-odds-stats');
+  btnLoad(btn);
+  list.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:var(--text-2)"><div class="spinner" style="margin:0 auto 6px;width:18px;height:18px"></div>Pulling odds from Pinnacle + Sportybet...</div>';
+
+  try {
+    const data = await api('/predictions/cross-odds');
+    const events = data.events || [];
+    const stats = data.stats || {};
+
+    // Stats bar
+    statsDiv.style.display = 'flex';
+    statsDiv.style.gap = '6px';
+    statsDiv.innerHTML = `
+      <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:var(--blue)">${stats.pinnacleEvents||0}</div>
+        <div style="font-size:9px;color:var(--text-3);text-transform:uppercase">Pinnacle</div>
+      </div>
+      <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:var(--green)">${stats.sportyEvents||0}</div>
+        <div style="font-size:9px;color:var(--text-3);text-transform:uppercase">Sportybet</div>
+      </div>
+      <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:var(--amber)">${stats.matched||0}</div>
+        <div style="font-size:9px;color:var(--text-3);text-transform:uppercase">Matched</div>
+      </div>
+      <div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px;text-align:center">
+        <div style="font-size:18px;font-weight:800;color:var(--green)">${stats.withEdge||0}</div>
+        <div style="font-size:9px;color:var(--text-3);text-transform:uppercase">Value</div>
+      </div>`;
+
+    // Only show events with positive edge
+    const withEdge = events.filter(e => e.bestEdge > 0);
+
+    if (!withEdge.length) {
+      list.innerHTML = '<div style="padding:12px;background:var(--surface);border-radius:var(--r-xs);font-size:12px;color:var(--text-3);text-align:center">No value found — Sportybet odds are at or below fair value for all ' + stats.matched + ' matched events.</div>';
+    } else {
+      list.innerHTML = withEdge.slice(0, 30).map(e => {
+        const edgeCol = e.bestEdge >= 5 ? 'var(--green)' : e.bestEdge >= 2 ? 'var(--amber)' : 'var(--text-2)';
+        const borderCol = e.bestEdge >= 5 ? 'rgba(52,212,114,0.2)' : e.bestEdge >= 2 ? 'rgba(247,183,49,0.15)' : 'var(--border)';
+        const sportIcon = e.sport === 'basketball' ? '🏀' : '⚽';
+        const kickoff = e.startTime ? new Date(e.startTime).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+
+        // Build odds comparison
+        const picks = [
+          { label: 'H', sporty: e.sportybet?.home, fair: e.pinnacle?.home, edge: e.homeEdge },
+          { label: 'D', sporty: e.sportybet?.draw, fair: e.pinnacle?.draw, edge: e.drawEdge },
+          { label: 'A', sporty: e.sportybet?.away, fair: e.pinnacle?.away, edge: e.awayEdge },
+        ].filter(p => p.sporty && p.sporty > 1);
+
+        return `<div style="background:var(--surface);border:1px solid ${borderCol};border-radius:var(--r-xs);padding:10px 12px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <span>${sportIcon}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.homeTeam} vs ${e.awayTeam}</div>
+              <div style="font-size:10px;color:var(--text-3)">${e.league}${kickoff?' &middot; '+kickoff:''}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:14px;font-weight:800;color:${edgeCol}">+${e.bestEdge}%</div>
+              <div style="font-size:9px;color:var(--text-3)">${e.bestPick}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px">
+            ${picks.map(p => {
+              const isValue = p.edge && p.edge > 0;
+              const bg = isValue ? 'var(--green-soft)' : 'var(--bg)';
+              const border = isValue ? '1px solid rgba(52,212,114,0.2)' : '1px solid var(--border)';
+              return `<div style="flex:1;text-align:center;padding:6px 4px;background:${bg};border:${border};border-radius:4px">
+                <div style="font-size:9px;color:var(--text-3)">${p.label}</div>
+                <div style="font-size:12px;font-weight:800;color:${isValue?'var(--green)':'var(--text)'}">${p.sporty?.toFixed(2)}</div>
+                <div style="font-size:9px;color:var(--text-3)">fair ${p.fair?.toFixed(2)}</div>
+                ${p.edge && p.edge > 0 ? '<div style="font-size:9px;font-weight:700;color:var(--green)">+'+p.edge+'%</div>' : ''}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('');
+      showToast(withEdge.length + ' value opportunities from ' + stats.matched + ' matched events', 'success');
+    }
+  } catch (e) {
+    list.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Error: ' + e.message + '</div>';
+  } finally {
+    btnDone(btn, 'Compare Odds');
+  }
+}
+
+document.getElementById('cross-odds-btn').onclick = () => loadCrossOdds();
 
 // ===== INIT =====
 (async () => {
