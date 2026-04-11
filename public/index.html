@@ -1397,6 +1397,21 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
+  <!-- Scraper Health -->
+  <div class="card" id="scraper-health-card" style="border-color:rgba(52,212,114,0.15);cursor:pointer">
+    <div style="display:flex;align-items:center;gap:10px" onclick="toggleScraperHealth()">
+      <div class="card-icon" style="background:var(--green-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Scraper Health</div>
+        <div style="font-size:12px;color:var(--text-3)" id="scraper-health-summary">Loading…</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" id="scraper-health-chevron"><path d="m6 9 6 6 6-6"/></svg>
+    </div>
+    <div id="scraper-health-detail" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
+  </div>
+
 
 </div>
 
@@ -1539,6 +1554,12 @@ function switchPage(name) {
   }
   if (name === 'history') { renderHistory(); refreshHistoryStatuses(); }
   if (name === 'arb' && !arbLoaded) loadArbitrage();
+  if (name === 'more') {
+    loadScraperHealth();
+    startScraperHealthPoll();
+  } else {
+    stopScraperHealthPoll();
+  }
 
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
@@ -5678,6 +5699,110 @@ async function loadArbitrage() {
 }
 
 document.getElementById('arb-scan-btn').onclick = () => loadArbitrage();
+
+// ===== SCRAPER HEALTH =====
+let scraperHealthPollId = null;
+
+function scraperHealthAgo(ms) {
+  if (!ms || ms < 0) return 'never';
+  if (ms < 60000) return Math.round(ms / 1000) + 's ago';
+  if (ms < 3600000) return Math.round(ms / 60000) + 'm ago';
+  if (ms < 86400000) return Math.round(ms / 3600000) + 'h ago';
+  return Math.round(ms / 86400000) + 'd ago';
+}
+
+function scraperEscape(s) {
+  return String(s || '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+async function loadScraperHealth() {
+  try {
+    const data = await api('/predictions/scrapers/health');
+    const summary = data.summary || {};
+    const scrapers = data.scrapers || [];
+
+    // Summary line
+    const parts = [];
+    if (summary.failing) parts.push('<span style="color:var(--red);font-weight:700">' + summary.failing + ' failing</span>');
+    if (summary.stale) parts.push('<span style="color:var(--amber);font-weight:700">' + summary.stale + ' stale</span>');
+    if (summary.degraded) parts.push('<span style="color:var(--amber)">' + summary.degraded + ' degraded</span>');
+    if (summary.healthy) parts.push('<span style="color:var(--green)">' + summary.healthy + ' healthy</span>');
+    if (!parts.length) parts.push('<span style="color:var(--text-3)">' + (summary.total || 0) + ' tracked (no runs yet)</span>');
+
+    const summaryEl = document.getElementById('scraper-health-summary');
+    if (summaryEl) summaryEl.innerHTML = parts.join(' · ');
+
+    // Color the card border based on worst status
+    const card = document.getElementById('scraper-health-card');
+    if (card) {
+      if (summary.failing) card.style.borderColor = 'rgba(239,68,68,0.35)';
+      else if (summary.stale || summary.degraded) card.style.borderColor = 'rgba(245,158,11,0.3)';
+      else card.style.borderColor = 'rgba(52,212,114,0.15)';
+    }
+
+    // Detail rows
+    const detail = document.getElementById('scraper-health-detail');
+    if (detail) {
+      if (!scrapers.length) {
+        detail.innerHTML = '<div class="empty" style="padding:12px;font-size:12px">No scraper data yet — load codes or tipster predictions first.</div>';
+      } else {
+        const now = Date.now();
+        const colors = {
+          failing: 'var(--red)',
+          stale: 'var(--amber)',
+          degraded: 'var(--amber)',
+          healthy: 'var(--green)',
+          unknown: 'var(--text-3)',
+        };
+        detail.innerHTML = scrapers.map((s) => {
+          const c = colors[s.status] || 'var(--text-3)';
+          const ago = s.lastRunAt ? scraperHealthAgo(now - s.lastRunAt) : 'never';
+          const wr = s.totalRuns > 0 ? Math.round(s.successRate * 100) + '%' : '—';
+          const err = s.lastError ? ' · <span style="color:var(--red)">' + scraperEscape(s.lastError).slice(0, 60) + '</span>' : '';
+          const dur = s.lastDurationMs ? ' · ' + (s.lastDurationMs < 1000 ? s.lastDurationMs + 'ms' : (s.lastDurationMs / 1000).toFixed(1) + 's') : '';
+          return (
+            '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+              '<div style="width:8px;height:8px;border-radius:50%;background:' + c + ';flex-shrink:0"></div>' +
+              '<div style="flex:1;min-width:0">' +
+                '<div style="font-size:13px;font-weight:600">' + scraperEscape(s.name) + '</div>' +
+                '<div style="font-size:11px;color:var(--text-3)">' +
+                  ago + ' · ' + s.successes + '/' + s.totalRuns + ' (' + wr + ') · ' +
+                  (s.lastCount || 0) + ' items' + dur + err +
+                '</div>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }
+    }
+  } catch (e) {
+    const el = document.getElementById('scraper-health-summary');
+    if (el) el.textContent = 'Failed to load';
+  }
+}
+
+function toggleScraperHealth() {
+  const detail = document.getElementById('scraper-health-detail');
+  const chevron = document.getElementById('scraper-health-chevron');
+  if (!detail) return;
+  const isOpen = detail.style.display !== 'none';
+  detail.style.display = isOpen ? 'none' : 'block';
+  if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function startScraperHealthPoll() {
+  if (scraperHealthPollId) return;
+  scraperHealthPollId = setInterval(loadScraperHealth, 30000);
+}
+
+function stopScraperHealthPoll() {
+  if (scraperHealthPollId) {
+    clearInterval(scraperHealthPollId);
+    scraperHealthPollId = null;
+  }
+}
 
 // ===== TODAY PAGE =====
 
