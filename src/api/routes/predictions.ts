@@ -281,10 +281,14 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // GET /predictions/odds-lag — detect stale Sportybet odds vs Pinnacle sharp moves
-  app.get('/odds-lag', async (_request, reply) => {
+  // Optional ?threshold=-1 query param to tune Pinnacle move sensitivity (default -2%).
+  app.get('/odds-lag', async (request, reply) => {
     try {
+      const { threshold } = request.query as { threshold?: string };
+      const t = threshold !== undefined ? Number(threshold) : undefined;
+      const safeThreshold = t !== undefined && Number.isFinite(t) && t <= 0 && t >= -20 ? t : undefined;
       const { scanOddsLag } = await oddsLagDetector();
-      return await scanOddsLag();
+      return await scanOddsLag(safeThreshold);
     } catch {
       return reply.status(502).send({ error: 'Odds lag scan failed' });
     }
@@ -302,7 +306,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // GET /predictions/live/cached — get cached live data without scraping
-  app.get('/live/cached', async (_request, reply) => {
+  app.get('/live/cached', async (_request, _reply) => {
     try {
       const { getLiveData } = await liveMonitor();
       return getLiveData();

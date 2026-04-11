@@ -93,11 +93,15 @@ function recordSnapshot(snap: OddsSnapshot) {
 // Detection
 // =========================================================================
 
-function detectLags(): OddsLagAlert[] {
+// Pinnacle must drop by at least this % for us to count it as a sharp move.
+// Lower = more alerts (including noise); higher = only big moves.
+const LAG_MOVE_THRESHOLD_PCT = -2;
+
+function detectLags(moveThresholdPct = LAG_MOVE_THRESHOLD_PCT): OddsLagAlert[] {
   const alerts: OddsLagAlert[] = [];
   const now = Date.now();
 
-  for (const [key, history] of oddsHistory) {
+  for (const [, history] of oddsHistory) {
     if (history.length < 2) continue;
 
     const latest = history[history.length - 1]!;
@@ -111,7 +115,7 @@ function detectLags(): OddsLagAlert[] {
 
     // Pinnacle odds DROPPED (sharp money came in on this outcome)
     // But Sportybet still has the old (higher) odds = value window
-    if (pinnacleMove < -2) {
+    if (pinnacleMove < moveThresholdPct) {
       // Sportybet edge = how much Sportybet overpays vs new fair line
       const edge = ((latest.sportyOdds * (1 / latest.fairOdds)) - 1) * 100;
 
@@ -209,8 +213,11 @@ export interface OddsLagResult {
 /**
  * Scan for odds lag: compare Sportybet vs Pinnacle, record snapshots, detect stale odds.
  * Call this every 5-10 minutes for best results.
+ *
+ * @param moveThresholdPct Pinnacle drop % required to count as a sharp move.
+ *   Default -2. Lower (e.g. -1) = more alerts + noise. Higher = only big moves.
  */
-export async function scanOddsLag(): Promise<OddsLagResult> {
+export async function scanOddsLag(moveThresholdPct?: number): Promise<OddsLagResult> {
   const start = Date.now();
 
   // 1. Get all validated codes
@@ -309,7 +316,7 @@ export async function scanOddsLag(): Promise<OddsLagResult> {
   }
 
   // 5. Detect lags
-  const alerts = detectLags();
+  const alerts = detectLags(moveThresholdPct);
 
   const scanTime = Date.now() - start;
   logger.info({

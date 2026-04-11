@@ -300,7 +300,17 @@ function recordOdds(pinnId: number, pinn: { home: number; draw: number; away: nu
 // Public API
 // =========================================================================
 
+// Odds move fast but a full scan hits 18 Pinnacle leagues + 20 Sportybet
+// pages per call, so we cache the aggregated result for 5 min.
+let crossCache: CrossScanResult | null = null;
+let crossCacheTime = 0;
+const CROSS_CACHE_TTL = 5 * 60 * 1000;
+
 export async function scanCrossOdds(): Promise<CrossScanResult> {
+  if (crossCache && Date.now() - crossCacheTime < CROSS_CACHE_TTL) {
+    return crossCache;
+  }
+
   const start = Date.now();
 
   // Fetch both in parallel
@@ -395,7 +405,7 @@ export async function scanCrossOdds(): Promise<CrossScanResult> {
     scanTime: Date.now() - start,
   }, 'Cross odds scan complete');
 
-  return {
+  const result: CrossScanResult = {
     events: results.filter(r => r.matched), // only show matched events
     stats: {
       pinnacleEvents: pinnEvents.length,
@@ -405,4 +415,9 @@ export async function scanCrossOdds(): Promise<CrossScanResult> {
       scanTime: Date.now() - start,
     },
   };
+
+  crossCache = result;
+  crossCacheTime = Date.now();
+
+  return result;
 }

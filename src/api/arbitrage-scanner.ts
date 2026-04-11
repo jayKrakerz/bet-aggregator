@@ -47,9 +47,15 @@ interface ArbLeg {
 // Cache
 // =========================================================================
 
-let resultCache: { arbs: ArbOpportunity[]; valueBets: ValueBet[] } | null = null;
+let resultCache: ArbitrageScanResult | null = null;
 let resultCacheTime = 0;
 const CACHE_TTL = 10 * 60 * 1000; // 10 min — odds are time-sensitive
+
+// Minimum value-bet edge to report. Below this, name-match and stale-odds
+// errors dominate real signal and the dashboard fills with noise.
+const MIN_VALUE_EDGE_PCT = 2;
+// Cap value-bet list to avoid flooding the UI when a scan produces many weak hits.
+const MAX_VALUE_BETS = 50;
 
 // =========================================================================
 // Helpers
@@ -421,8 +427,9 @@ function pushValueBet(
 
   // sportyOdds > fairOdds → value (Sportybet overpaying, likely to drop)
   // sportyOdds ≈ fairOdds → no edge
-  // We show anything with positive EV
-  if (ev <= 0) return;
+  // Require a meaningful edge — sub-2% EV is dominated by name-match and
+  // stale-odds noise and floods the UI with false positives.
+  if (ev < MIN_VALUE_EDGE_PCT) return;
 
   // Signal: if sportyOdds is significantly above fair, it's likely to drop
   const signal: 'value' | 'dropping' = sportyOdds > fairOdds * 1.05 ? 'dropping' : 'value';
@@ -497,7 +504,7 @@ function findValueBets(
   }
 
   valueBets.sort((a, b) => b.edgePct - a.edgePct);
-  return valueBets;
+  return valueBets.slice(0, MAX_VALUE_BETS);
 }
 
 // =========================================================================
@@ -522,11 +529,7 @@ export interface ArbitrageScanResult {
  */
 export async function scanArbitrage(): Promise<ArbitrageScanResult> {
   if (resultCache && Date.now() - resultCacheTime < CACHE_TTL) {
-    return {
-      arbs: resultCache.arbs,
-      valueBets: resultCache.valueBets,
-      stats: { codesAnalyzed: 0, eventsScanned: 0, pinnacleMatched: 0, arbsFound: resultCache.arbs.length, valueBetsFound: resultCache.valueBets.length, scanTime: 0 },
-    };
+    return resultCache;
   }
 
   const start = Date.now();
@@ -561,19 +564,7 @@ export async function scanArbitrage(): Promise<ArbitrageScanResult> {
 
   const scanTime = Date.now() - start;
 
-  resultCache = { arbs, valueBets };
-  resultCacheTime = Date.now();
-
-  logger.info({
-    codesAnalyzed: codes.length,
-    eventsScanned: matchList.length,
-    pinnacleMatched: pinnacleMap.size,
-    arbsFound: arbs.length,
-    valueBetsFound: valueBets.length,
-    scanTime,
-  }, 'Arbitrage scan complete');
-
-  return {
+  const result: ArbitrageScanResult = {
     arbs,
     valueBets,
     stats: {
@@ -585,4 +576,11 @@ export async function scanArbitrage(): Promise<ArbitrageScanResult> {
       scanTime,
     },
   };
+
+  resultCache = result;
+  resultCacheTime = Date.now();
+
+  logger.info(result.stats, 'Arbitrage scan complete');
+
+  return result;
 }
