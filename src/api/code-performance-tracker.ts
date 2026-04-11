@@ -6,8 +6,106 @@
  * and market type.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { logger } from '../utils/logger.js';
 import { getAllBookingCodes, type BookingCode } from './booking-codes-scraper.js';
 import { getStats as getConsensusStats } from './consensus-tracker.js';
+
+// ── Historical archive ─────────────────────────────────────
+//
+// The booking codes disk cache in booking-codes-scraper is a 2-hour
+// rolling snapshot, so computing stats directly over it gives a
+// ~2-hour-wide track record. This archive appends every newly-settled
+// code (keyed by code string, so duplicates are idempotent) and lets
+// getCodePerformance() compute stats over months of history.
+
+const ARCHIVE_FILE = path.join(process.cwd(), 'data', 'code_archive.json');
+const MAX_ARCHIVE_ENTRIES = 10_000;
+
+interface ArchivedCode {
+  code: string;
+  source: string;
+  totalOdds: number;
+  won: boolean;
+  legs: number;
+  selections: Array<{
+    homeTeam: string;
+    awayTeam: string;
+    league: string;
+    market: string;
+    pick: string;
+    odds: number;
+    isWinning: number | null;
+    score: string | null;
+  }>;
+  settledAt: number;
+}
+
+let archive: Map<string, ArchivedCode> | null = null;
+
+function loadArchive(): Map<string, ArchivedCode> {
+  try {
+    if (fs.existsSync(ARCHIVE_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(ARCHIVE_FILE, 'utf8')) as ArchivedCode[];
+      if (Array.isArray(raw)) return new Map(raw.map((c) => [c.code, c]));
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Code archive: failed to load — starting fresh');
+  }
+  return new Map();
+}
+
+function saveArchive(): void {
+  if (!archive) return;
+  try {
+    fs.mkdirSync(path.dirname(ARCHIVE_FILE), { recursive: true });
+    // Keep newest N by settledAt
+    const sorted = [...archive.values()].sort((a, b) => b.settledAt - a.settledAt);
+    const trimmed = sorted.slice(0, MAX_ARCHIVE_ENTRIES);
+    fs.writeFileSync(ARCHIVE_FILE, JSON.stringify(trimmed));
+    if (trimmed.length < sorted.length) {
+      archive = new Map(trimmed.map((c) => [c.code, c]));
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Code archive: failed to save');
+  }
+}
+
+function archiveCode(c: BookingCode, won: boolean): void {
+  if (!archive) archive = loadArchive();
+  archive.set(c.code, {
+    code: c.code,
+    source: c.source,
+    totalOdds: c.totalOdds || 0,
+    won,
+    legs: c.selections.length,
+    selections: c.selections.map((s) => ({
+      homeTeam: s.homeTeam,
+      awayTeam: s.awayTeam,
+      league: s.league,
+      market: s.market,
+      pick: s.pick,
+      odds: s.odds,
+      isWinning: s.isWinning,
+      score: s.score,
+    })),
+    settledAt: Date.now(),
+  });
+}
+
+// ── Bayesian shrinkage ─────────────────────────────────────
+//
+// Same Beta(5, 5) prior as consensus-tracker: new buckets start at 0.5
+// and move toward the observed rate as evidence accumulates. Prevents a
+// bucket with 1/1 wins from looking like a 100% edge.
+const PRIOR_WINS = 5;
+const PRIOR_TOTAL = 10;
+
+function shrunkRate(won: number, lost: number): number {
+  const total = won + lost;
+  return Math.round(((won + PRIOR_WINS) / (total + PRIOR_TOTAL)) * 1000) / 10;
+}
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -18,6 +116,7 @@ interface SourceStats {
   lost: number;
   pending: number;
   winRate: number;
+  shrunkWinRate: number; // Bayesian-shrunk; use this for weighting
   avgOdds: number;
   roi: number; // assuming $1 flat bet per code
 }
@@ -28,6 +127,7 @@ interface OddsRangeStats {
   won: number;
   lost: number;
   winRate: number;
+  shrunkWinRate: number;
 }
 
 interface MarketStats {
@@ -36,16 +136,19 @@ interface MarketStats {
   won: number;
   lost: number;
   winRate: number;
+  shrunkWinRate: number;
 }
 
 export interface CodePerformance {
   summary: {
     totalCodes: number;
+    archived: number;     // cumulative settled codes in the persistent archive
     settled: number;
     won: number;
     lost: number;
     pending: number;
     winRate: number;
+    shrunkWinRate: number;
     roi: number;
     avgOdds: number;
     bestStreak: number;
@@ -92,15 +195,49 @@ function isWon(c: BookingCode): boolean {
 // ── Main tracker ───────────────────────────────────────────
 
 /**
- * Build full performance report from current booking codes.
+ * Build full performance report from the code archive + current codes.
+ *
+ * Side effect: every newly-settled code encountered here is appended
+ * to the persistent archive so the next call has a longer history.
  */
 export async function getCodePerformance(): Promise<CodePerformance> {
+  if (!archive) archive = loadArchive();
+
   const codes = await getAllBookingCodes();
 
-  const settled = codes.filter(isSettled);
+  // Append any freshly-settled codes to the archive so stats span multiple
+  // scrape cycles instead of just the last 2 hours.
+  let archiveDirty = false;
+  for (const c of codes) {
+    if (isSettled(c) && !archive.has(c.code)) {
+      archiveCode(c, isWon(c));
+      archiveDirty = true;
+    }
+  }
+  if (archiveDirty) saveArchive();
+
+  // Pending codes are pulled live from the current scrape (archive has
+  // only settled entries by definition).
+  const pending = codes.filter((c) => c.validated && c.isValid && c.pendingCount > 0 && c.lostCount === 0);
+
+  // Unified "settled view" = archived codes (long history). We re-expose
+  // them as BookingCode-shaped enough for the existing aggregation logic.
+  const archivedAsCodes: BookingCode[] = [...archive.values()].map((a) => ({
+    code: a.code,
+    source: a.source,
+    totalOdds: a.totalOdds,
+    events: a.legs,
+    validated: true,
+    isValid: true,
+    wonCount: a.won ? 1 : 0,
+    lostCount: a.won ? 0 : 1,
+    pendingCount: 0,
+    selections: a.selections as BookingCode['selections'],
+  } as BookingCode));
+
+  const settled = archivedAsCodes;
   const won = settled.filter(isWon);
   const lost = settled.filter((c) => !isWon(c));
-  const pending = codes.filter((c) => c.validated && c.isValid && c.pendingCount > 0 && c.lostCount === 0);
 
   // Overall ROI: assuming $1 flat bet, payout = totalOdds if won, 0 if lost
   const totalStaked = settled.length;
@@ -127,23 +264,29 @@ export async function getCodePerformance(): Promise<CodePerformance> {
     }
   }
 
-  // By source
+  // By source — merge archive (settled) + current live codes (pending)
   const srcMap = new Map<string, { total: number; won: number; lost: number; pending: number; oddsSum: number; returnSum: number }>();
-  for (const c of codes) {
-    if (!c.validated || !c.isValid) continue;
-    const s = srcMap.get(c.source) || { total: 0, won: 0, lost: 0, pending: 0, oddsSum: 0, returnSum: 0 };
+
+  const touchSrc = (source: string) =>
+    srcMap.get(source) || { total: 0, won: 0, lost: 0, pending: 0, oddsSum: 0, returnSum: 0 };
+
+  for (const c of settled) {
+    const s = touchSrc(c.source);
     s.total++;
     s.oddsSum += c.totalOdds || 0;
-    if (isSettled(c)) {
-      if (isWon(c)) {
-        s.won++;
-        s.returnSum += c.totalOdds || 0;
-      } else {
-        s.lost++;
-      }
-    } else if (c.pendingCount > 0 && c.lostCount === 0) {
-      s.pending++;
+    if (isWon(c)) {
+      s.won++;
+      s.returnSum += c.totalOdds || 0;
+    } else {
+      s.lost++;
     }
+    srcMap.set(c.source, s);
+  }
+  for (const c of pending) {
+    const s = touchSrc(c.source);
+    s.total++;
+    s.oddsSum += c.totalOdds || 0;
+    s.pending++;
     srcMap.set(c.source, s);
   }
 
@@ -155,10 +298,12 @@ export async function getCodePerformance(): Promise<CodePerformance> {
       lost: s.lost,
       pending: s.pending,
       winRate: (s.won + s.lost) > 0 ? Math.round((s.won / (s.won + s.lost)) * 1000) / 10 : 0,
+      shrunkWinRate: shrunkRate(s.won, s.lost),
       avgOdds: s.total > 0 ? Math.round((s.oddsSum / s.total) * 100) / 100 : 0,
       roi: (s.won + s.lost) > 0 ? Math.round(((s.returnSum - (s.won + s.lost)) / (s.won + s.lost)) * 1000) / 10 : 0,
     }))
-    .sort((a, b) => b.winRate - a.winRate);
+    // Sort by shrunk rate — naive winRate rewards tiny samples
+    .sort((a, b) => b.shrunkWinRate - a.shrunkWinRate);
 
   // By odds range
   const rangeMap = new Map<string, { total: number; won: number; lost: number }>();
@@ -178,6 +323,7 @@ export async function getCodePerformance(): Promise<CodePerformance> {
       won: s.won,
       lost: s.lost,
       winRate: s.total > 0 ? Math.round((s.won / s.total) * 1000) / 10 : 0,
+      shrunkWinRate: shrunkRate(s.won, s.lost),
     }))
     .sort((a, b) => {
       const order = ['1.0-1.99', '2.0-2.99', '3.0-4.99', '5.0-9.99', '10+'];
@@ -204,8 +350,9 @@ export async function getCodePerformance(): Promise<CodePerformance> {
       won: s.won,
       lost: s.lost,
       winRate: (s.won + s.lost) > 0 ? Math.round((s.won / (s.won + s.lost)) * 1000) / 10 : 0,
+      shrunkWinRate: shrunkRate(s.won, s.lost),
     }))
-    .sort((a, b) => b.winRate - a.winRate);
+    .sort((a, b) => b.shrunkWinRate - a.shrunkWinRate);
 
   // Recent settled
   const recentSettled = settled.slice(-20).reverse().map((c) => ({
@@ -226,11 +373,13 @@ export async function getCodePerformance(): Promise<CodePerformance> {
   return {
     summary: {
       totalCodes: codes.filter((c) => c.validated && c.isValid).length,
+      archived: archive.size,
       settled: settled.length,
       won: won.length,
       lost: lost.length,
       pending: pending.length,
       winRate: settled.length > 0 ? Math.round((won.length / settled.length) * 1000) / 10 : 0,
+      shrunkWinRate: shrunkRate(won.length, lost.length),
       roi,
       avgOdds,
       bestStreak,
@@ -280,12 +429,29 @@ export interface LearnedWeights {
 }
 
 /**
- * Build learned weights from all scraped booking codes + consensus results.
+ * Build learned weights from the settled-code archive + consensus results.
  * The frontend merges this with its local codeHistory to make smarter picks.
+ *
+ * Uses the persistent archive (built by getCodePerformance) so weights
+ * reflect months of history, not just the last 2 hours of scrapes.
  */
 export async function getLearnedWeights(): Promise<LearnedWeights> {
-  const codes = await getAllBookingCodes();
-  const settled = codes.filter(isSettled);
+  // Ensure archive is populated with any brand-new settled codes.
+  await getCodePerformance();
+  if (!archive) archive = loadArchive();
+
+  const settled: BookingCode[] = [...archive.values()].map((a) => ({
+    code: a.code,
+    source: a.source,
+    totalOdds: a.totalOdds,
+    events: a.legs,
+    validated: true,
+    isValid: true,
+    wonCount: a.won ? 1 : 0,
+    lostCount: a.won ? 0 : 1,
+    pendingCount: 0,
+    selections: a.selections as BookingCode['selections'],
+  } as BookingCode));
 
   const byMarket: Record<string, WL> = {};
   const byLeague: Record<string, WL> = {};
