@@ -710,22 +710,122 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
     await sleep(2000);
     await dismissDialogs(aviatorPage);
 
-    // Step 5: Click Aviator — it's the first game card (#game_item19) in the lobby
-    logger.info('Looking for Aviator game card...');
-    let foundAviator = false;
+    // Step 5: Click Aviator — the lobby renders a grid of game cards and
+    // positional selectors (#game_item19, .list-item) keep drifting. Find
+    // the card by its actual content instead: title text, image alt, or
+    // an href pointing at /aviator.
+    logger.info('Waiting for games lobby to render...');
+    // Wait for at least a few game tiles to appear before searching
     try {
-      // Aviator is #game_item19 (first game, "POPULAR", ~765 players)
-      // Also try clicking the first .list-item as fallback
-      const aviatorBtn = await aviatorPage.$('#game_item19') || await aviatorPage.$('.list-item');
-      if (aviatorBtn) {
-        await aviatorBtn.click();
-        foundAviator = true;
-        logger.info('Clicked Aviator game card (#game_item19)');
-      }
-    } catch { /* fallback below */ }
+      await aviatorPage.waitForFunction(
+        () => {
+          // Any element with "aviator" in its text, alt, or href counts as rendered
+          const hit = Array.from(document.querySelectorAll('*')).some((el) => {
+            const t = (el.textContent || '').toLowerCase();
+            const a = (el.getAttribute('alt') || '').toLowerCase();
+            const h = (el.getAttribute('href') || '').toLowerCase();
+            return t.includes('aviator') || a.includes('aviator') || h.includes('aviator');
+          });
+          return hit;
+        },
+        { timeout: 15000 },
+      );
+    } catch {
+      logger.warn('Aviator text never appeared in lobby DOM — proceeding anyway');
+    }
 
-    if (!foundAviator) {
-      logger.warn('Aviator card not found — try clicking it manually in the browser');
+    logger.info('Looking for Aviator game card...');
+    const clickResult = await aviatorPage.evaluate(() => {
+      const strategies: Array<{ name: string; find: () => HTMLElement | null }> = [
+        // 1. Direct anchor link to /aviator (most reliable when available)
+        {
+          name: 'href*=aviator',
+          find: () => {
+            const a = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
+              .find((el) => el.href.toLowerCase().includes('aviator') && (el as HTMLElement).offsetHeight > 0);
+            return a || null;
+          },
+        },
+        // 2. Image alt containing "aviator" → click the closest clickable ancestor
+        {
+          name: 'img[alt*=aviator]',
+          find: () => {
+            const img = Array.from(document.querySelectorAll<HTMLImageElement>('img[alt]'))
+              .find((el) => el.alt.toLowerCase().includes('aviator') && el.offsetHeight > 0);
+            if (!img) return null;
+            // Walk up to the nearest clickable parent (link, button, card)
+            let node: HTMLElement | null = img;
+            while (node && node !== document.body) {
+              if (node.tagName === 'A' || node.tagName === 'BUTTON' || node.onclick ||
+                  node.className.match(/card|item|tile|game/i)) return node;
+              node = node.parentElement;
+            }
+            return img;
+          },
+        },
+        // 3. Element whose own textContent (not children) contains "aviator"
+        {
+          name: 'text=aviator',
+          find: () => {
+            const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
+            // Prefer leaf elements that are short and explicitly "Aviator"
+            const leafMatches = all.filter((el) => {
+              if (!el.offsetHeight) return false;
+              const txt = (el.textContent || '').trim().toLowerCase();
+              return txt === 'aviator' || txt === 'aviator ' || /^aviator\b/.test(txt);
+            });
+            if (leafMatches.length) {
+              // Walk up to clickable ancestor
+              let node: HTMLElement | null = leafMatches[0]!;
+              while (node && node !== document.body) {
+                if (node.tagName === 'A' || node.tagName === 'BUTTON' || node.onclick ||
+                    (node.className && node.className.match && node.className.match(/card|item|tile|game/i))) return node;
+                node = node.parentElement;
+              }
+              return leafMatches[0]!;
+            }
+            return null;
+          },
+        },
+        // 4. Legacy positional selectors as a last resort
+        {
+          name: 'legacy #game_item19',
+          find: () => document.querySelector('#game_item19') as HTMLElement | null,
+        },
+        {
+          name: 'legacy .list-item',
+          find: () => document.querySelector('.list-item') as HTMLElement | null,
+        },
+      ];
+
+      for (const strat of strategies) {
+        try {
+          const el = strat.find();
+          if (el) {
+            // scrollIntoView so the click lands on a visible element
+            el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' });
+            el.click();
+            return { ok: true, strategy: strat.name, tag: el.tagName, text: (el.textContent || '').trim().slice(0, 60) };
+          }
+        } catch { /* try next strategy */ }
+      }
+
+      // Nothing matched — collect visible game titles for debug logging
+      const visibleTitles = Array.from(document.querySelectorAll<HTMLElement>('*'))
+        .filter((el) => el.offsetHeight > 0 && el.offsetHeight < 80 && (el.textContent || '').trim().length > 0 && (el.textContent || '').trim().length < 30)
+        .map((el) => (el.textContent || '').trim())
+        .filter((t, i, arr) => arr.indexOf(t) === i)
+        .slice(0, 30);
+      return { ok: false, strategy: 'none', visibleTitles };
+    });
+
+    if (clickResult.ok) {
+      logger.info(`Clicked Aviator via strategy "${clickResult.strategy}" (<${clickResult.tag}> "${clickResult.text}")`);
+    } else {
+      logger.warn(
+        { visibleTitles: clickResult.visibleTitles },
+        'Aviator card not found — try clicking it manually in the browser',
+      );
     }
 
     // Step 6: Wait for game iframe to appear (instead of blind sleep)
