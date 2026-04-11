@@ -648,12 +648,18 @@ export function kellyEdge(decimalOdds: number, probabilityPct: number): number {
  * Build consensus prediction for a match by averaging predictions
  * from all matching sources. Optionally compute Kelly edge if
  * SportyBet odds are provided.
+ *
+ * If `weights` is provided (source → weight), the average is weighted by
+ * each source's historical Bayesian-shrunk win rate instead of a naive mean.
+ * Unknown sources fall back to a neutral 0.5 weight so new scrapers still
+ * participate but don't get outsized influence.
  */
 export function buildConsensus(
   matched: TipsterPrediction[],
   homeTeam: string,
   awayTeam: string,
   odds?: { home?: number; draw?: number; away?: number; over25?: number; under25?: number },
+  weights?: Map<string, number>,
 ): ConsensusPrediction | null {
   if (matched.length === 0) return null;
 
@@ -665,22 +671,32 @@ export function buildConsensus(
     return true;
   });
 
-  const avg = (vals: number[]) =>
-    vals.length > 0
-      ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
-      : 0;
-  const avgOrNull = (vals: (number | null)[]) => {
-    const nums = vals.filter((v): v is number => v !== null);
-    return nums.length > 0 ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null;
+  // Resolve per-source weight. Unknown sources default to 0.5 (neutral prior).
+  const weightFor = (source: string): number =>
+    weights?.get(source) ?? 0.5;
+
+  const wAvg = (pairs: { val: number; w: number }[]): number => {
+    const totalW = pairs.reduce((s, p) => s + p.w, 0);
+    if (totalW === 0) return 0;
+    const sum = pairs.reduce((s, p) => s + p.val * p.w, 0);
+    return Math.round((sum / totalW) * 10) / 10;
   };
 
-  const homePct = avg(unique.map((p) => p.homePct));
-  const drawPct = avg(unique.map((p) => p.drawPct));
-  const awayPct = avg(unique.map((p) => p.awayPct));
-  const over25Pct = avgOrNull(unique.map((p) => p.over25Pct));
-  const under25Pct = avgOrNull(unique.map((p) => p.under25Pct));
-  const btsPct = avgOrNull(unique.map((p) => p.btsPct));
-  const otsPct = avgOrNull(unique.map((p) => p.otsPct));
+  const wAvgOrNull = (pairs: { val: number | null; w: number }[]): number | null => {
+    const filtered = pairs.filter((p): p is { val: number; w: number } => p.val !== null);
+    if (filtered.length === 0) return null;
+    return wAvg(filtered);
+  };
+
+  const withWeights = unique.map((p) => ({ p, w: weightFor(p.source) }));
+
+  const homePct = wAvg(withWeights.map(({ p, w }) => ({ val: p.homePct, w })));
+  const drawPct = wAvg(withWeights.map(({ p, w }) => ({ val: p.drawPct, w })));
+  const awayPct = wAvg(withWeights.map(({ p, w }) => ({ val: p.awayPct, w })));
+  const over25Pct = wAvgOrNull(withWeights.map(({ p, w }) => ({ val: p.over25Pct, w })));
+  const under25Pct = wAvgOrNull(withWeights.map(({ p, w }) => ({ val: p.under25Pct, w })));
+  const btsPct = wAvgOrNull(withWeights.map(({ p, w }) => ({ val: p.btsPct, w })));
+  const otsPct = wAvgOrNull(withWeights.map(({ p, w }) => ({ val: p.otsPct, w })));
 
   // Best pick
   const picks: [string, number][] = [

@@ -42,9 +42,15 @@ export interface TrackerStats {
   winRate: number;
   byPick: Record<string, { total: number; won: number; lost: number; winRate: number }>;
   bySourceCount: Record<string, { total: number; won: number; lost: number; winRate: number }>;
+  bySource: Record<string, { total: number; won: number; lost: number; winRate: number; weight: number }>;
   streak: { current: number; type: 'W' | 'L' | null };
   recentResults: TrackedPick[];
 }
+
+// Bayesian shrinkage prior: every source starts at 50% with 10 pseudo-bets.
+// Prevents a brand-new source with 1 win from getting 100% weight.
+const PRIOR_TOTAL = 10;
+const PRIOR_WINS = 5;
 
 // ── ESPN Score Fetcher ─────────────────────────────────────
 
@@ -185,6 +191,47 @@ function evaluatePick(
 const picks: TrackedPick[] = [];
 const MAX_PICKS = 500;
 
+// Per-source accumulated settled picks (wins/losses). Populated during
+// settleResults() — every source that contributed to a settled pick gets
+// credit/blame for the outcome.
+const sourceStats = new Map<string, { total: number; won: number; lost: number }>();
+
+function recordSourceOutcome(source: string, result: 'won' | 'lost'): void {
+  let stat = sourceStats.get(source);
+  if (!stat) {
+    stat = { total: 0, won: 0, lost: 0 };
+    sourceStats.set(source, stat);
+  }
+  stat.total++;
+  if (result === 'won') stat.won++;
+  else stat.lost++;
+}
+
+/**
+ * Bayesian-shrunk win rate for a source. Returns the posterior mean under
+ * a Beta(PRIOR_WINS, PRIOR_TOTAL - PRIOR_WINS) prior. New sources land at
+ * 0.5 and move toward their observed rate as evidence accumulates.
+ */
+function sourceWeight(source: string): number {
+  const stat = sourceStats.get(source);
+  const won = stat?.won ?? 0;
+  const total = stat?.total ?? 0;
+  return (won + PRIOR_WINS) / (total + PRIOR_TOTAL);
+}
+
+/**
+ * Get Bayesian-shrunk win-rate weights for all known sources. Used by
+ * buildConsensus to compute an accuracy-weighted average instead of a
+ * naive unweighted mean.
+ */
+export function getSourceWeights(): Map<string, number> {
+  const weights = new Map<string, number>();
+  for (const [source] of sourceStats) {
+    weights.set(source, sourceWeight(source));
+  }
+  return weights;
+}
+
 function pickId(home: string, away: string, date: string, pick: string): string {
   // Normalize date to YYYY-MM-DD
   const d = date.includes('-') && date.length === 10 ? date : (() => {
@@ -218,9 +265,11 @@ export async function snapshotConsensus(minSources = 2, minPct = 50): Promise<Tr
 
   const added: TrackedPick[] = [];
 
+  const weights = getSourceWeights();
+
   for (const [, { home, away }] of matchMap) {
     const matched = findMatchingPredictions(allPredictions, home, away);
-    const consensus = buildConsensus(matched, home, away);
+    const consensus = buildConsensus(matched, home, away, undefined, weights);
     if (!consensus || consensus.sourceCount < minSources || consensus.bestPickPct < minPct) continue;
 
     const key = pickId(home, away, today, consensus.bestPick);
@@ -288,6 +337,11 @@ export async function settleResults(): Promise<{ settled: number; pending: numbe
     pick.result = evaluatePick(pick.pick, score.homeGoals, score.awayGoals);
     pick.settledAt = new Date().toISOString();
     settled++;
+
+    // Credit / blame every source that contributed to this pick
+    for (const src of pick.sources) {
+      recordSourceOutcome(src, pick.result as 'won' | 'lost');
+    }
   }
 
   const stillPending = picks.filter((p) => p.result === 'pending').length;
@@ -349,6 +403,18 @@ export function getStats(): TrackerStats {
   // Recent results (last 20)
   const recentResults = settledByTime.slice(0, 20);
 
+  // Per-source performance + Bayesian-shrunk weight (used by buildConsensus)
+  const bySource: TrackerStats['bySource'] = {};
+  for (const [source, stat] of sourceStats) {
+    bySource[source] = {
+      total: stat.total,
+      won: stat.won,
+      lost: stat.lost,
+      winRate: stat.total > 0 ? Math.round((stat.won / stat.total) * 1000) / 10 : 0,
+      weight: Math.round(sourceWeight(source) * 1000) / 1000,
+    };
+  }
+
   return {
     total: settled.length,
     won: won.length,
@@ -358,6 +424,7 @@ export function getStats(): TrackerStats {
     winRate: settled.length > 0 ? Math.round((won.length / settled.length) * 1000) / 10 : 0,
     byPick,
     bySourceCount,
+    bySource,
     streak: { current: streakCount, type: streakType },
     recentResults,
   };

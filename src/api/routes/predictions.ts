@@ -6,7 +6,7 @@ import { discoverCodes, getMutationStats } from '../code-mutator.js';
 import { batchPinnacleOdds } from '../pinnacle-odds.js';
 import { scanArbitrage } from '../arbitrage-scanner.js';
 import { scrapeAllTipsters, findMatchingPredictions, buildConsensus } from '../tipster-scrapers.js';
-import { snapshotConsensus, settleResults, getStats, getAllPicks, startAutoTracker } from '../consensus-tracker.js';
+import { snapshotConsensus, settleResults, getStats, getAllPicks, startAutoTracker, getSourceWeights } from '../consensus-tracker.js';
 import { getCodePerformance, getLearnedWeights } from '../code-performance-tracker.js';
 import { predictMatch, predictMatches, preloadLeagueData, getAvailableTeams } from '../stats-predictor.js';
 let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
@@ -435,6 +435,10 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
 
     const allPredictions = await scrapeAllTipsters();
 
+    // Per-source Bayesian-shrunk weights from the consensus tracker.
+    // Tipsters with a stronger historical track record get more influence.
+    const weights = getSourceWeights();
+
     // Batch Poisson predictions for all matches
     const poissonResults = await predictMatches(
       body.matches.slice(0, 50).map((m) => ({ homeTeam: m.homeTeam, awayTeam: m.awayTeam, league: m.league })),
@@ -465,7 +469,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       return {
         homeTeam: m.homeTeam,
         awayTeam: m.awayTeam,
-        consensus: buildConsensus(matched, m.homeTeam, m.awayTeam, m.odds),
+        consensus: buildConsensus(matched, m.homeTeam, m.awayTeam, m.odds, weights),
         matchedSources: matched.length,
         poissonModel: poisson || null,
       };
