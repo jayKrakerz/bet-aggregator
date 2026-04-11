@@ -710,34 +710,59 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
     await sleep(2000);
     await dismissDialogs(aviatorPage);
 
-    // Step 5: Click Aviator — the lobby renders a grid of game cards and
-    // positional selectors (#game_item19, .list-item) keep drifting. Find
-    // the card by its actual content instead: title text, image alt, or
-    // an href pointing at /aviator.
+    // Step 5: Click Aviator. Based on the observed DOM, cards are rendered
+    // as <button> elements inside .list-container with no text labels and
+    // no alt text — so we have to match them by the stable id/data-id
+    // SportyBet actually uses, or by positional/banner fallbacks.
+    //
+    // Wait for the actual card elements to render (not for a "aviator" text
+    // that never appears — that wait was the primary stall before).
     logger.info('Waiting for games lobby to render...');
-    // Wait for at least a few game tiles to appear before searching
     try {
-      await aviatorPage.waitForFunction(
-        () => {
-          // Any element with "aviator" in its text, alt, or href counts as rendered
-          const hit = Array.from(document.querySelectorAll('*')).some((el) => {
-            const t = (el.textContent || '').toLowerCase();
-            const a = (el.getAttribute('alt') || '').toLowerCase();
-            const h = (el.getAttribute('href') || '').toLowerCase();
-            return t.includes('aviator') || a.includes('aviator') || h.includes('aviator');
-          });
-          return hit;
-        },
-        { timeout: 15000 },
-      );
+      await aviatorPage.waitForSelector('.list-container button.list-item', { timeout: 15000 });
+      // Give the grid a beat to settle in case of late-mounting items
+      await sleep(500);
     } catch {
-      logger.warn('Aviator text never appeared in lobby DOM — proceeding anyway');
+      logger.warn('No .list-container button.list-item appeared — proceeding anyway');
     }
 
     logger.info('Looking for Aviator game card...');
     const clickResult = await aviatorPage.evaluate(() => {
+      // Aviator's stable identifiers on SportyBet's games lobby (as of the
+      // DOM dumped during the stall debug):
+      //   - element id: #game_item19
+      //   - game id:    data-id="34"
+      //   - banner url: contains "1648540504987.png"
+      //   - position:   first card inside .list-container
       const strategies: Array<{ name: string; find: () => HTMLElement | null }> = [
-        // 1. Direct anchor link to /aviator (most reliable when available)
+        {
+          name: 'data-id=34',
+          find: () => document.querySelector<HTMLElement>('button[data-id="34"]'),
+        },
+        {
+          name: '#game_item19',
+          find: () => document.querySelector<HTMLElement>('#game_item19'),
+        },
+        {
+          name: 'banner-url match',
+          find: () => {
+            const img = Array.from(document.querySelectorAll<HTMLImageElement>('.list-container img'))
+              .find((el) => (el.src || '').includes('1648540504987'));
+            if (!img) return null;
+            let node: HTMLElement | null = img;
+            while (node && node !== document.body) {
+              if (node.tagName === 'BUTTON') return node;
+              node = node.parentElement;
+            }
+            return img;
+          },
+        },
+        {
+          name: '.list-container button:first',
+          find: () => document.querySelector<HTMLElement>('.list-container button.list-item'),
+        },
+        // Fallback: any visible link whose URL contains "aviator"
+        // (covers a future redesign that swaps buttons for anchor cards)
         {
           name: 'href*=aviator',
           find: () => {
@@ -746,84 +771,45 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
             return a || null;
           },
         },
-        // 2. Image alt containing "aviator" → click the closest clickable ancestor
-        {
-          name: 'img[alt*=aviator]',
-          find: () => {
-            const img = Array.from(document.querySelectorAll<HTMLImageElement>('img[alt]'))
-              .find((el) => el.alt.toLowerCase().includes('aviator') && el.offsetHeight > 0);
-            if (!img) return null;
-            // Walk up to the nearest clickable parent (link, button, card)
-            let node: HTMLElement | null = img;
-            while (node && node !== document.body) {
-              if (node.tagName === 'A' || node.tagName === 'BUTTON' || node.onclick ||
-                  node.className.match(/card|item|tile|game/i)) return node;
-              node = node.parentElement;
-            }
-            return img;
-          },
-        },
-        // 3. Element whose own textContent (not children) contains "aviator"
-        {
-          name: 'text=aviator',
-          find: () => {
-            const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
-            // Prefer leaf elements that are short and explicitly "Aviator"
-            const leafMatches = all.filter((el) => {
-              if (!el.offsetHeight) return false;
-              const txt = (el.textContent || '').trim().toLowerCase();
-              return txt === 'aviator' || txt === 'aviator ' || /^aviator\b/.test(txt);
-            });
-            if (leafMatches.length) {
-              // Walk up to clickable ancestor
-              let node: HTMLElement | null = leafMatches[0]!;
-              while (node && node !== document.body) {
-                if (node.tagName === 'A' || node.tagName === 'BUTTON' || node.onclick ||
-                    (node.className && node.className.match && node.className.match(/card|item|tile|game/i))) return node;
-                node = node.parentElement;
-              }
-              return leafMatches[0]!;
-            }
-            return null;
-          },
-        },
-        // 4. Legacy positional selectors as a last resort
-        {
-          name: 'legacy #game_item19',
-          find: () => document.querySelector('#game_item19') as HTMLElement | null,
-        },
-        {
-          name: 'legacy .list-item',
-          find: () => document.querySelector('.list-item') as HTMLElement | null,
-        },
       ];
 
       for (const strat of strategies) {
         try {
           const el = strat.find();
-          if (el) {
-            // scrollIntoView so the click lands on a visible element
-            el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' });
-            el.click();
-            return { ok: true, strategy: strat.name, tag: el.tagName, text: (el.textContent || '').trim().slice(0, 60) };
+          if (el && (el as HTMLElement).offsetHeight > 0) {
+            (el as HTMLElement).scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'center' });
+            (el as HTMLElement).click();
+            return {
+              ok: true,
+              strategy: strat.name,
+              tag: el.tagName,
+              id: (el as HTMLElement).id || '',
+              dataId: el.getAttribute('data-id') || '',
+            };
           }
-        } catch { /* try next strategy */ }
+        } catch { /* try next */ }
       }
 
-      // Nothing matched — collect visible game titles for debug logging
-      const visibleTitles = Array.from(document.querySelectorAll<HTMLElement>('*'))
-        .filter((el) => el.offsetHeight > 0 && el.offsetHeight < 80 && (el.textContent || '').trim().length > 0 && (el.textContent || '').trim().length < 30)
-        .map((el) => (el.textContent || '').trim())
-        .filter((t, i, arr) => arr.indexOf(t) === i)
-        .slice(0, 30);
-      return { ok: false, strategy: 'none', visibleTitles };
+      // Nothing matched — dump identifying info from all visible cards so
+      // the next DOM change is easy to re-target.
+      const visibleCards = Array.from(document.querySelectorAll<HTMLElement>('.list-container button.list-item'))
+        .slice(0, 12)
+        .map((el) => ({
+          id: el.id,
+          dataId: el.getAttribute('data-id'),
+          imgSrc: el.querySelector('img')?.getAttribute('src')?.split('/').pop() || '',
+        }));
+      return { ok: false, strategy: 'none', visibleCards };
     });
 
     if (clickResult.ok) {
-      logger.info(`Clicked Aviator via strategy "${clickResult.strategy}" (<${clickResult.tag}> "${clickResult.text}")`);
+      logger.info(
+        `Clicked Aviator via strategy "${clickResult.strategy}" ` +
+        `(<${clickResult.tag}> id=${clickResult.id || '∅'} data-id=${clickResult.dataId || '∅'})`,
+      );
     } else {
       logger.warn(
-        { visibleTitles: clickResult.visibleTitles },
+        { visibleCards: clickResult.visibleCards },
         'Aviator card not found — try clicking it manually in the browser',
       );
     }
