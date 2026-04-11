@@ -56,13 +56,17 @@ export interface TrackerCoverage {
   barChanges: number;
   /** Rounds we recorded via the clean 1-step shift */
   cleanRecords: number;
-  /** Rounds we recorded via the multi-step overlap match (2-3 rounds passed) */
+  /** Rounds we recorded via the multi-step overlap match (2-6 rounds passed) */
   skipRecords: number;
   /** Rounds we recorded via the "no overlap found" conservative fallback
    *  — these are the suspicious ones, data may be missing around them */
   fallbackRecords: number;
   /** Count of detected gaps (either skip >1 or fallback path taken) */
   gapsDetected: number;
+  /** Polls where we saw a shorter/shrinking bar — usually a UI loading state */
+  shrinkGuardHits: number;
+  /** Polls where the bar had too few entries to diff reliably */
+  shortBarGuardHits: number;
   /** Rough coverage %: cleanRecords / (cleanRecords + skipRecords*avgSkip + fallbackRecords*2) */
   coveragePct: number;
   trackerStartedAt: number;
@@ -174,9 +178,16 @@ let coverage: TrackerCoverage = {
   skipRecords: 0,
   fallbackRecords: 0,
   gapsDetected: 0,
+  shrinkGuardHits: 0,
+  shortBarGuardHits: 0,
   coveragePct: 100,
   trackerStartedAt: 0,
 };
+
+// Capture loop tunables
+const POLL_INTERVAL_MS = 2000;        // tight enough to catch every round even during transient freezes
+const MAX_SKIP_SEARCH = 6;             // recover from up to 6 rounds passed between polls
+const MIN_BAR_LENGTH_TO_DIFF = 5;      // below this the scrape is probably mid-transition
 
 function computeCoverage(): void {
   // Rough estimate: "reliable" records = clean + skip (2x weight because a
@@ -697,6 +708,8 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
       skipRecords: 0,
       fallbackRecords: 0,
       gapsDetected: 0,
+      shrinkGuardHits: 0,
+      shortBarGuardHits: 0,
       coveragePct: 100,
       trackerStartedAt: Date.now(),
     };
@@ -713,11 +726,26 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
           // When a new round ends, a new value appears and the oldest shifts out.
           // We store the ENTIRE previous bar and compare — only the new value(s) at one end are new.
 
+          // Guard 1: too few entries → the game UI is mid-transition or loading.
+          // Diffing now would produce phantom records, so skip this tick.
+          if (mults.length < MIN_BAR_LENGTH_TO_DIFF) {
+            coverage.shortBarGuardHits++;
+            return;
+          }
+
           if (!lastBar || lastBar.length === 0) {
             // First scrape — store bar but don't log (we don't know which are new)
             lastBar = [...mults];
             logger.info(`Aviator: initial bar captured (${mults.length} values: ${mults.map(m => m + 'x').join(', ')})`);
           } else {
+            // Guard 2: bar shrank → the game UI is in a transient state
+            // (loading animation, round-start wipe, etc.). Do not diff —
+            // this is the primary hidden bias source on the legacy loop.
+            if (mults.length < lastBar.length) {
+              coverage.shrinkGuardHits++;
+              return;
+            }
+
             // Compare current bar to previous bar
             const curStr = mults.join(',');
             const prevStr = lastBar.join(',');
@@ -744,8 +772,9 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
                 provenance = 'clean';
               } else {
                 // Multiple rounds passed or bar restructured
-                // Find overlap by checking progressively
-                for (let skip = 1; skip <= Math.min(3, mults.length); skip++) {
+                // Find overlap by checking progressively — up to MAX_SKIP_SEARCH
+                // rounds passed between polls (covers transient freezes)
+                for (let skip = 1; skip <= Math.min(MAX_SKIP_SEARCH, mults.length); skip++) {
                   const oldCheck = lastBar.slice(0, lastBar.length - skip).join(',');
                   const newCheck = mults.slice(skip).join(',');
                   if (oldCheck === newCheck) {
@@ -818,7 +847,7 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
       } catch (err) {
         logger.debug({ err }, 'Aviator poll error');
       }
-    }, 5000); // Poll every 5 seconds (each Aviator round ~8-15s)
+    }, POLL_INTERVAL_MS); // Tuned to catch every round even during brief freezes
 
     logger.info('Aviator tracker started');
     return { success: true, message: 'Aviator opened and tracking' };
