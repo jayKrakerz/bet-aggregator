@@ -6,6 +6,8 @@
  * and overall accuracy stats.
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { logger } from '../utils/logger.js';
 import {
   scrapeAllTipsters,
@@ -186,15 +188,51 @@ function evaluatePick(
   }
 }
 
-// ── In-memory store ────────────────────────────────────────
+// ── Persisted store ─────────────────────────────────────────
 
-const picks: TrackedPick[] = [];
+const STATE_FILE = path.join(process.cwd(), 'data', 'consensus_tracker.json');
 const MAX_PICKS = 500;
+
+interface PersistedState {
+  picks: TrackedPick[];
+  sourceStats: Array<[string, { total: number; won: number; lost: number }]>;
+}
+
+function loadState(): { picks: TrackedPick[]; sourceStats: Map<string, { total: number; won: number; lost: number }> } {
+  try {
+    if (fs.existsSync(STATE_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) as PersistedState;
+      return {
+        picks: Array.isArray(raw.picks) ? raw.picks : [],
+        sourceStats: new Map(Array.isArray(raw.sourceStats) ? raw.sourceStats : []),
+      };
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Consensus tracker: failed to load state — starting fresh');
+  }
+  return { picks: [], sourceStats: new Map() };
+}
+
+function saveState(): void {
+  try {
+    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+    const state: PersistedState = {
+      picks: picks.slice(-MAX_PICKS),
+      sourceStats: [...sourceStats.entries()],
+    };
+    fs.writeFileSync(STATE_FILE, JSON.stringify(state));
+  } catch (err) {
+    logger.warn({ err }, 'Consensus tracker: failed to save state');
+  }
+}
+
+const _loaded = loadState();
+const picks: TrackedPick[] = _loaded.picks;
 
 // Per-source accumulated settled picks (wins/losses). Populated during
 // settleResults() — every source that contributed to a settled pick gets
 // credit/blame for the outcome.
-const sourceStats = new Map<string, { total: number; won: number; lost: number }>();
+const sourceStats = _loaded.sourceStats;
 
 function recordSourceOutcome(source: string, result: 'won' | 'lost'): void {
   let stat = sourceStats.get(source);
@@ -300,6 +338,8 @@ export async function snapshotConsensus(minSources = 2, minPct = 50): Promise<Tr
   // Trim old picks
   while (picks.length > MAX_PICKS) picks.shift();
 
+  if (added.length > 0) saveState();
+
   logger.info(`Consensus tracker: ${added.length} new picks snapshotted, ${picks.length} total`);
   return added;
 }
@@ -343,6 +383,8 @@ export async function settleResults(): Promise<{ settled: number; pending: numbe
       recordSourceOutcome(src, pick.result as 'won' | 'lost');
     }
   }
+
+  if (settled > 0) saveState();
 
   const stillPending = picks.filter((p) => p.result === 'pending').length;
   logger.info(`Consensus tracker: settled ${settled}, still pending ${stillPending}`);
