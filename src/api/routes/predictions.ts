@@ -624,6 +624,19 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
+  // GET /predictions/aviator/audit — data quality stats for the recorded history
+  app.get('/aviator/audit', async () => {
+    try {
+      const { getHistoryAudit, getAviatorState } = await aviatorTracker();
+      return {
+        history: getHistoryAudit(),
+        coverage: getAviatorState().coverage,
+      };
+    } catch (err) {
+      return { error: String(err) };
+    }
+  });
+
   // GET /predictions/aviator/backtest — replay strategies against full history
   app.get('/aviator/backtest', async () => {
     try {

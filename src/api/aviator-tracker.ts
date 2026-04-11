@@ -34,6 +34,38 @@ const MAX_HISTORY = 500;
 export interface CrashPoint {
   multiplier: number;
   timestamp: number;
+  /**
+   * Monotonically increasing synthetic round index. Not the game's real
+   * round ID (which lives on Spribe's server), but a local counter we can
+   * use to detect gaps and compute coverage. Older entries missing this
+   * field are backfilled sequentially on load.
+   */
+  roundIndex?: number;
+  /**
+   * True if a gap was detected immediately before this crash was recorded
+   * (e.g. we saw the bar skip >1 position between polls, or the overlap
+   * detection failed). Use this to filter audit-clean data.
+   */
+  gapBefore?: boolean;
+}
+
+export interface TrackerCoverage {
+  /** Total scrape cycles since tracker started */
+  totalPolls: number;
+  /** Polls where the history bar actually changed */
+  barChanges: number;
+  /** Rounds we recorded via the clean 1-step shift */
+  cleanRecords: number;
+  /** Rounds we recorded via the multi-step overlap match (2-3 rounds passed) */
+  skipRecords: number;
+  /** Rounds we recorded via the "no overlap found" conservative fallback
+   *  — these are the suspicious ones, data may be missing around them */
+  fallbackRecords: number;
+  /** Count of detected gaps (either skip >1 or fallback path taken) */
+  gapsDetected: number;
+  /** Rough coverage %: cleanRecords / (cleanRecords + skipRecords*avgSkip + fallbackRecords*2) */
+  coveragePct: number;
+  trackerStartedAt: number;
 }
 
 export interface AviatorSignal {
@@ -119,6 +151,7 @@ export interface AviatorState {
   predictionAccuracy: PredictionAccuracy;
   autoBet: AutoBetState;
   autoBetConfig: AutoBetConfig;
+  coverage: TrackerCoverage;
   lastUpdate: number;
 }
 
@@ -131,6 +164,38 @@ let tracking = false;
 let aviatorPage: Page | null = null;
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 let lastBar: number[] = []; // previous scrape's full history bar — for dedup
+
+// ── Audit / coverage state ─────────────────────────────────
+let nextRoundIndex = 0; // monotonic counter for synthetic round IDs
+let coverage: TrackerCoverage = {
+  totalPolls: 0,
+  barChanges: 0,
+  cleanRecords: 0,
+  skipRecords: 0,
+  fallbackRecords: 0,
+  gapsDetected: 0,
+  coveragePct: 100,
+  trackerStartedAt: 0,
+};
+
+function computeCoverage(): void {
+  // Rough estimate: "reliable" records = clean + skip (2x weight because a
+  // multi-skip means we recorded the new ones but confirm a gap happened).
+  // Fallback records penalize coverage because we don't know what we missed.
+  const clean = coverage.cleanRecords;
+  const skip = coverage.skipRecords;
+  const fallback = coverage.fallbackRecords;
+  const totalRecorded = clean + skip + fallback;
+  if (totalRecorded === 0) {
+    coverage.coveragePct = 100;
+    return;
+  }
+  // Fallback records each count as a miss (or potentially-miss)
+  const estimatedMissed = fallback;
+  coverage.coveragePct = Math.round(
+    (totalRecorded / (totalRecorded + estimatedMissed)) * 1000,
+  ) / 10;
+}
 
 const PREDICTIONS_FILE = path.join(process.cwd(), 'data', 'aviator_predictions.json');
 const MAX_PREDICTIONS = 1000;
@@ -279,6 +344,25 @@ function computeAccuracy(): PredictionAccuracy {
 // Init — deferred because detectSignals is defined below
 history = loadHistory();
 predictions = loadPredictions();
+
+// Backfill roundIndex on legacy entries so the audit counter is monotonic
+// from day one. Existing data is assumed gapless (we don't know otherwise).
+{
+  let maxIdx = -1;
+  for (const h of history) {
+    if (typeof h.roundIndex === 'number') maxIdx = Math.max(maxIdx, h.roundIndex);
+  }
+  if (maxIdx < 0) {
+    history.forEach((h, i) => { h.roundIndex = i; });
+    nextRoundIndex = history.length;
+  } else {
+    // Some already numbered — fill any gaps at the tail
+    history.forEach((h, i) => {
+      if (typeof h.roundIndex !== 'number') h.roundIndex = maxIdx + 1 + (i - history.findIndex((x) => typeof x.roundIndex !== 'number'));
+    });
+    nextRoundIndex = maxIdx + 1;
+  }
+}
 // pendingSignals set after detectSignals is defined (see bottom of file)
 
 // ── Ghana Direct Login ─────────────────────────────────────
@@ -605,10 +689,23 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
 
     tracking = true;
 
+    // Reset coverage counters for this tracking session
+    coverage = {
+      totalPolls: 0,
+      barChanges: 0,
+      cleanRecords: 0,
+      skipRecords: 0,
+      fallbackRecords: 0,
+      gapsDetected: 0,
+      coveragePct: 100,
+      trackerStartedAt: Date.now(),
+    };
+
     // Start polling for crash results
     pollInterval = setInterval(async () => {
       if (!aviatorPage || !tracking) return;
       try {
+        coverage.totalPolls++;
         await dismissDialogs(aviatorPage);
         const mults = await scrapeMultipliers(aviatorPage!);
         if (mults.length > 0) {
@@ -626,11 +723,15 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
             const prevStr = lastBar.join(',');
 
             if (curStr !== prevStr) {
+              coverage.barChanges++;
+
               // Bar changed — find the new value(s)
               // IMPORTANT: Newest values appear at the START (leftmost) of the bar.
               // The bar shifts right: old [A,B,C,D,E] → new [F,A,B,C,D] means F is new.
 
               let newValues: number[] = [];
+              // Provenance so we can tag recorded crashes correctly for the audit
+              let provenance: 'clean' | 'skip' | 'fallback' = 'fallback';
 
               // Try matching: if old bar's first N-1 values match new bar's last N-1
               // then the first value in new bar is the new crash
@@ -640,6 +741,7 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
               if (oldHead === newTail) {
                 // Perfect shift — exactly 1 new value at the start
                 newValues = [mults[0]!];
+                provenance = 'clean';
               } else {
                 // Multiple rounds passed or bar restructured
                 // Find overlap by checking progressively
@@ -648,27 +750,54 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
                   const newCheck = mults.slice(skip).join(',');
                   if (oldCheck === newCheck) {
                     newValues = mults.slice(0, skip);
+                    provenance = 'skip';
                     break;
                   }
                 }
                 // No overlap found — just take the first value as new (conservative)
                 if (newValues.length === 0) {
                   newValues = [mults[0]!];
+                  provenance = 'fallback';
                 }
               }
 
-              // Record each new crash + settle auto-bets
-              for (const m of newValues) {
+              // Update coverage counters
+              if (provenance === 'clean') {
+                coverage.cleanRecords += newValues.length;
+              } else if (provenance === 'skip') {
+                coverage.skipRecords += newValues.length;
+                coverage.gapsDetected++;
+              } else {
+                coverage.fallbackRecords += newValues.length;
+                coverage.gapsDetected++;
+              }
+
+              // Record each new crash + settle auto-bets. The FIRST value
+              // after a detected gap carries the gapBefore flag so audit
+              // tools can strip or downweight post-gap data.
+              for (let i = 0; i < newValues.length; i++) {
+                const m = newValues[i]!;
                 // Settle any pending auto-bet BEFORE recording prediction
                 settleAutoBet(m);
                 recordPrediction(m);
-                history.push({ multiplier: m, timestamp: Date.now() });
+                history.push({
+                  multiplier: m,
+                  timestamp: Date.now(),
+                  roundIndex: nextRoundIndex++,
+                  ...(i === 0 && provenance !== 'clean' ? { gapBefore: true } : {}),
+                });
               }
+
+              computeCoverage();
 
               if (history.length > MAX_HISTORY) history = history.slice(-MAX_HISTORY);
               saveHistory();
               pendingSignals = detectSignals(history);
-              logger.info(`Aviator: +${newValues.length} crash(es): ${newValues.map(m => m + 'x').join(', ')} | total ${history.length}`);
+              logger.info(
+                `Aviator: +${newValues.length} crash(es): ${newValues.map(m => m + 'x').join(', ')} ` +
+                `| total ${history.length} | coverage ${coverage.coveragePct}% ` +
+                `(clean ${coverage.cleanRecords}, skip ${coverage.skipRecords}, fallback ${coverage.fallbackRecords})`,
+              );
 
               // Auto-bet: check if we should place a bet for the NEXT round
               if (shouldAutoBet() && aviatorPage) {
@@ -1232,7 +1361,61 @@ export function getAviatorState(): AviatorState {
     predictionAccuracy: computeAccuracy(),
     autoBet: { ...autoBetState, betLog: autoBetState.betLog.slice(-20) },
     autoBetConfig: { ...autoBetConfig },
+    coverage: { ...coverage },
     lastUpdate: history.length > 0 ? history[history.length - 1]!.timestamp : 0,
+  };
+}
+
+/**
+ * Compute audit-clean coverage stats from the persisted history file.
+ * Counts entries flagged as gapBefore vs clean, and the density of recorded
+ * rounds over time. Useful for the analysis scripts to gate their verdicts.
+ */
+export function getHistoryAudit(): {
+  total: number;
+  clean: number;
+  postGap: number;
+  cleanPct: number;
+  firstIndex: number | null;
+  lastIndex: number | null;
+  sequentialGaps: number;
+  firstTimestamp: number | null;
+  lastTimestamp: number | null;
+} {
+  if (history.length === 0) {
+    return {
+      total: 0, clean: 0, postGap: 0, cleanPct: 100,
+      firstIndex: null, lastIndex: null, sequentialGaps: 0,
+      firstTimestamp: null, lastTimestamp: null,
+    };
+  }
+  let clean = 0;
+  let postGap = 0;
+  let sequentialGaps = 0;
+  for (let i = 0; i < history.length; i++) {
+    const h = history[i]!;
+    if (h.gapBefore) postGap++; else clean++;
+    if (i > 0) {
+      const prev = history[i - 1]!;
+      if (
+        typeof h.roundIndex === 'number' &&
+        typeof prev.roundIndex === 'number' &&
+        h.roundIndex - prev.roundIndex !== 1
+      ) {
+        sequentialGaps++;
+      }
+    }
+  }
+  return {
+    total: history.length,
+    clean,
+    postGap,
+    cleanPct: Math.round((clean / history.length) * 1000) / 10,
+    firstIndex: history[0]!.roundIndex ?? null,
+    lastIndex: history[history.length - 1]!.roundIndex ?? null,
+    sequentialGaps,
+    firstTimestamp: history[0]!.timestamp,
+    lastTimestamp: history[history.length - 1]!.timestamp,
   };
 }
 
