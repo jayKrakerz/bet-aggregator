@@ -63,10 +63,13 @@ export interface TrackerCoverage {
   fallbackRecords: number;
   /** Count of detected gaps (either skip >1 or fallback path taken) */
   gapsDetected: number;
-  /** Polls where we saw a shorter/shrinking bar — usually a UI loading state */
-  shrinkGuardHits: number;
   /** Polls where the bar had too few entries to diff reliably */
   shortBarGuardHits: number;
+  /** Polls where no valid prefix match could be found — probably a UI
+   *  transient or a complete bar re-render. We auto-reset after a few. */
+  noMatchHits: number;
+  /** Times we auto-reset lastBar after repeated no-match polls */
+  lastBarResets: number;
   /** Rough coverage %: cleanRecords / (cleanRecords + skipRecords*avgSkip + fallbackRecords*2) */
   coveragePct: number;
   trackerStartedAt: number;
@@ -178,16 +181,65 @@ let coverage: TrackerCoverage = {
   skipRecords: 0,
   fallbackRecords: 0,
   gapsDetected: 0,
-  shrinkGuardHits: 0,
   shortBarGuardHits: 0,
+  noMatchHits: 0,
+  lastBarResets: 0,
   coveragePct: 100,
   trackerStartedAt: 0,
 };
 
+// Counter for consecutive polls where we couldn't find a valid prefix match.
+// If this exceeds MAX_CONSECUTIVE_NO_MATCH, we reset lastBar to the current
+// scrape and resume tracking — losing a handful of rounds but escaping the
+// stuck state that kills long-running sessions.
+let consecutiveNoMatch = 0;
+
 // Capture loop tunables
-const POLL_INTERVAL_MS = 2000;        // tight enough to catch every round even during transient freezes
-const MAX_SKIP_SEARCH = 6;             // recover from up to 6 rounds passed between polls
-const MIN_BAR_LENGTH_TO_DIFF = 5;      // below this the scrape is probably mid-transition
+const POLL_INTERVAL_MS = 2000;             // tight enough to catch every round even during transient freezes
+const MAX_SKIP_SEARCH = 6;                  // recover from up to 6 rounds passed between polls
+const MIN_BAR_LENGTH_TO_DIFF = 5;           // below this the scrape is probably mid-transition
+const MIN_OVERLAP_FOR_MATCH = 3;            // require ≥3 overlapping entries before trusting a prefix match
+const MAX_CONSECUTIVE_NO_MATCH = 5;         // reset lastBar after this many stuck polls
+
+/**
+ * Compare a freshly-scraped history bar against the previous one and return
+ * the new values at the front. Handles: clean 1-step shifts, multi-step
+ * skips (missed rounds), and bar length changes (shrink or grow) — the last
+ * of which the old length-rigid diff could not cope with at all.
+ *
+ * Returns `null` if no valid prefix match was found → caller should treat
+ * the poll as a transient and not record anything.
+ */
+function diffHistoryBar(
+  newBar: number[],
+  oldBar: number[],
+): { newValues: number[]; provenance: 'clean' | 'skip' } | null {
+  // For each possible number of "new" values at the front of newBar (k),
+  // check whether newBar[k:] is a prefix of oldBar. The first k that
+  // works is the answer.
+  const maxK = Math.min(MAX_SKIP_SEARCH, newBar.length);
+  for (let k = 0; k <= maxK; k++) {
+    const suffix = newBar.slice(k);
+    // How many entries of suffix can we compare against oldBar?
+    const overlap = Math.min(suffix.length, oldBar.length);
+    if (overlap < MIN_OVERLAP_FOR_MATCH) continue; // not confident enough
+    let match = true;
+    for (let i = 0; i < overlap; i++) {
+      if (suffix[i] !== oldBar[i]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      const newValues = newBar.slice(0, k);
+      return {
+        newValues,
+        provenance: k <= 1 ? 'clean' : 'skip',
+      };
+    }
+  }
+  return null;
+}
 
 function computeCoverage(): void {
   // Rough estimate: "reliable" records = clean + skip (2x weight because a
@@ -708,11 +760,13 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
       skipRecords: 0,
       fallbackRecords: 0,
       gapsDetected: 0,
-      shrinkGuardHits: 0,
       shortBarGuardHits: 0,
+      noMatchHits: 0,
+      lastBarResets: 0,
       coveragePct: 100,
       trackerStartedAt: Date.now(),
     };
+    consecutiveNoMatch = 0;
 
     // Start polling for crash results
     pollInterval = setInterval(async () => {
@@ -726,8 +780,7 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
           // When a new round ends, a new value appears and the oldest shifts out.
           // We store the ENTIRE previous bar and compare — only the new value(s) at one end are new.
 
-          // Guard 1: too few entries → the game UI is mid-transition or loading.
-          // Diffing now would produce phantom records, so skip this tick.
+          // Guard: too few entries → the game UI is mid-transition or loading.
           if (mults.length < MIN_BAR_LENGTH_TO_DIFF) {
             coverage.shortBarGuardHits++;
             return;
@@ -738,110 +791,89 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
             lastBar = [...mults];
             logger.info(`Aviator: initial bar captured (${mults.length} values: ${mults.map(m => m + 'x').join(', ')})`);
           } else {
-            // Guard 2: bar shrank → the game UI is in a transient state
-            // (loading animation, round-start wipe, etc.). Do not diff —
-            // this is the primary hidden bias source on the legacy loop.
-            if (mults.length < lastBar.length) {
-              coverage.shrinkGuardHits++;
+            // Diff via prefix match (handles varying bar lengths)
+            const diff = diffHistoryBar(mults, lastBar);
+
+            if (!diff) {
+              // No valid prefix match. Usually a transient UI state — count
+              // it and bail. If we stay stuck for MAX_CONSECUTIVE_NO_MATCH
+              // polls, reset the baseline so we can resume capturing (we
+              // lose a few rounds but escape the permanent stall).
+              coverage.noMatchHits++;
+              consecutiveNoMatch++;
+              if (consecutiveNoMatch >= MAX_CONSECUTIVE_NO_MATCH) {
+                logger.warn(
+                  `Aviator: ${consecutiveNoMatch} consecutive no-match polls — resetting lastBar baseline`,
+                );
+                lastBar = [...mults];
+                coverage.lastBarResets++;
+                consecutiveNoMatch = 0;
+              }
               return;
             }
 
-            // Compare current bar to previous bar
-            const curStr = mults.join(',');
-            const prevStr = lastBar.join(',');
+            // Valid prefix match found — reset the no-match counter
+            consecutiveNoMatch = 0;
 
-            if (curStr !== prevStr) {
-              coverage.barChanges++;
-
-              // Bar changed — find the new value(s)
-              // IMPORTANT: Newest values appear at the START (leftmost) of the bar.
-              // The bar shifts right: old [A,B,C,D,E] → new [F,A,B,C,D] means F is new.
-
-              let newValues: number[] = [];
-              // Provenance so we can tag recorded crashes correctly for the audit
-              let provenance: 'clean' | 'skip' | 'fallback' = 'fallback';
-
-              // Try matching: if old bar's first N-1 values match new bar's last N-1
-              // then the first value in new bar is the new crash
-              const oldHead = lastBar.slice(0, lastBar.length - 1).join(','); // [A,B,C,D]
-              const newTail = mults.slice(1).join(','); // [A,B,C,D]
-
-              if (oldHead === newTail) {
-                // Perfect shift — exactly 1 new value at the start
-                newValues = [mults[0]!];
-                provenance = 'clean';
-              } else {
-                // Multiple rounds passed or bar restructured
-                // Find overlap by checking progressively — up to MAX_SKIP_SEARCH
-                // rounds passed between polls (covers transient freezes)
-                for (let skip = 1; skip <= Math.min(MAX_SKIP_SEARCH, mults.length); skip++) {
-                  const oldCheck = lastBar.slice(0, lastBar.length - skip).join(',');
-                  const newCheck = mults.slice(skip).join(',');
-                  if (oldCheck === newCheck) {
-                    newValues = mults.slice(0, skip);
-                    provenance = 'skip';
-                    break;
-                  }
-                }
-                // No overlap found — just take the first value as new (conservative)
-                if (newValues.length === 0) {
-                  newValues = [mults[0]!];
-                  provenance = 'fallback';
-                }
-              }
-
-              // Update coverage counters
-              if (provenance === 'clean') {
-                coverage.cleanRecords += newValues.length;
-              } else if (provenance === 'skip') {
-                coverage.skipRecords += newValues.length;
-                coverage.gapsDetected++;
-              } else {
-                coverage.fallbackRecords += newValues.length;
-                coverage.gapsDetected++;
-              }
-
-              // Record each new crash + settle auto-bets. The FIRST value
-              // after a detected gap carries the gapBefore flag so audit
-              // tools can strip or downweight post-gap data.
-              for (let i = 0; i < newValues.length; i++) {
-                const m = newValues[i]!;
-                // Settle any pending auto-bet BEFORE recording prediction
-                settleAutoBet(m);
-                recordPrediction(m);
-                history.push({
-                  multiplier: m,
-                  timestamp: Date.now(),
-                  roundIndex: nextRoundIndex++,
-                  ...(i === 0 && provenance !== 'clean' ? { gapBefore: true } : {}),
-                });
-              }
-
-              computeCoverage();
-
-              if (history.length > MAX_HISTORY) history = history.slice(-MAX_HISTORY);
-              saveHistory();
-              pendingSignals = detectSignals(history);
-              logger.info(
-                `Aviator: +${newValues.length} crash(es): ${newValues.map(m => m + 'x').join(', ')} ` +
-                `| total ${history.length} | coverage ${coverage.coveragePct}% ` +
-                `(clean ${coverage.cleanRecords}, skip ${coverage.skipRecords}, fallback ${coverage.fallbackRecords})`,
-              );
-
-              // Auto-bet: check if we should place a bet for the NEXT round
-              if (shouldAutoBet() && aviatorPage) {
-                const placed = await placeBet(aviatorPage, autoBetConfig.betAmount, autoBetConfig.cashoutAt);
-                if (placed) {
-                  pendingAutoBet = true;
-                  autoBetState.lastBetRound = Date.now();
-                  autoBetState.lastBetResult = 'pending';
-                  logger.info({ streak: computeStats(history).lastLowStreak }, 'Auto-bet: bet queued for next round');
-                }
-              }
-
-              // Update stored bar
+            // Zero-new case: the bar didn't actually shift (or it shrank
+            // without new values). Just update the stored baseline and
+            // move on. This is NOT a bar change for coverage purposes.
+            if (diff.newValues.length === 0) {
               lastBar = [...mults];
+              return;
             }
+
+            coverage.barChanges++;
+            const { newValues, provenance } = diff;
+
+            // Update coverage counters
+            if (provenance === 'clean') {
+              coverage.cleanRecords += newValues.length;
+            } else {
+              coverage.skipRecords += newValues.length;
+              coverage.gapsDetected++;
+            }
+
+            // Record each new crash + settle auto-bets. The FIRST value
+            // after a detected gap carries the gapBefore flag so audit
+            // tools can strip or downweight post-gap data.
+            for (let i = 0; i < newValues.length; i++) {
+              const m = newValues[i]!;
+              // Settle any pending auto-bet BEFORE recording prediction
+              settleAutoBet(m);
+              recordPrediction(m);
+              history.push({
+                multiplier: m,
+                timestamp: Date.now(),
+                roundIndex: nextRoundIndex++,
+                ...(i === 0 && provenance !== 'clean' ? { gapBefore: true } : {}),
+              });
+            }
+
+            computeCoverage();
+
+            if (history.length > MAX_HISTORY) history = history.slice(-MAX_HISTORY);
+            saveHistory();
+            pendingSignals = detectSignals(history);
+            logger.info(
+              `Aviator: +${newValues.length} crash(es): ${newValues.map(m => m + 'x').join(', ')} ` +
+              `| total ${history.length} | coverage ${coverage.coveragePct}% ` +
+              `(clean ${coverage.cleanRecords}, skip ${coverage.skipRecords}, fallback ${coverage.fallbackRecords})`,
+            );
+
+            // Auto-bet: check if we should place a bet for the NEXT round
+            if (shouldAutoBet() && aviatorPage) {
+              const placed = await placeBet(aviatorPage, autoBetConfig.betAmount, autoBetConfig.cashoutAt);
+              if (placed) {
+                pendingAutoBet = true;
+                autoBetState.lastBetRound = Date.now();
+                autoBetState.lastBetResult = 'pending';
+                logger.info({ streak: computeStats(history).lastLowStreak }, 'Auto-bet: bet queued for next round');
+              }
+            }
+
+            // Update stored bar
+            lastBar = [...mults];
           }
         }
       } catch (err) {
