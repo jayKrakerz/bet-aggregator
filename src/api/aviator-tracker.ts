@@ -668,6 +668,20 @@ export async function startAviator(): Promise<{ success: boolean; message: strin
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     );
 
+    // Shim esbuild's __name helper in the page context. tsx/esbuild's
+    // keep-names transform wraps compiled arrow functions with calls to
+    // __name(fn, "name") and injects the helper at the *module* level.
+    // page.evaluate serializes only the function body via .toString(),
+    // so when the browser executes it, __name is undefined and every
+    // evaluate throws "ReferenceError: __name is not defined".
+    //
+    // We pass a STRING (not a TS arrow) so tsx leaves it alone, and
+    // use evaluateOnNewDocument so the shim runs before any site script
+    // on every navigation in this page's lifetime.
+    await aviatorPage.evaluateOnNewDocument(
+      'window.__name = window.__name || function (t) { return t; };',
+    );
+
     // Step 1: Go to homepage first to handle login
     await aviatorPage.goto(SPORTYBET_HOME, {
       waitUntil: 'domcontentloaded',
