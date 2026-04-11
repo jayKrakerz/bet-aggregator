@@ -380,3 +380,67 @@ export async function scrapeLiveMonitor(): Promise<{ matches: LiveMatchStats[]; 
 export function getLiveData() {
   return { matches: liveData, signals, scrapedAt: lastScrapeTime };
 }
+
+/**
+ * Get a compact signal map keyed by normalized team names.
+ * Used by the frontend to boost safety scores for live matches with signals.
+ *
+ * Returns: { "team_name": { signals: [...], totalStrength: N, bestSignal: "big_chance", side: "home"|"away" } }
+ */
+export function getSignalMap(): Record<string, {
+  signals: string[];
+  totalStrength: number;
+  bestSignal: string;
+  side: string;
+  score: string;
+  time: string;
+  xgHome: number | null;
+  xgAway: number | null;
+  bigChancesHome: number;
+  bigChancesAway: number;
+}> {
+  const map: Record<string, {
+    signals: string[];
+    totalStrength: number;
+    bestSignal: string;
+    side: string;
+    score: string;
+    time: string;
+    xgHome: number | null;
+    xgAway: number | null;
+    bigChancesHome: number;
+    bigChancesAway: number;
+  }> = {};
+
+  for (const sig of signals) {
+    // Key by both home and away team (normalized)
+    const homeKey = sig.home.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const awayKey = sig.away.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const matchKey = `${homeKey}|${awayKey}`;
+
+    if (!map[matchKey]) {
+      map[matchKey] = {
+        signals: [],
+        totalStrength: 0,
+        bestSignal: sig.signal,
+        side: sig.side,
+        score: sig.score,
+        time: sig.time,
+        xgHome: sig.stats.xgHome,
+        xgAway: sig.stats.xgAway,
+        bigChancesHome: sig.stats.bigChancesHome,
+        bigChancesAway: sig.stats.bigChancesAway,
+      };
+    }
+
+    const entry = map[matchKey]!;
+    entry.signals.push(sig.signal);
+    entry.totalStrength += sig.strength;
+    if (sig.strength > (map[matchKey]!.totalStrength - sig.strength)) {
+      entry.bestSignal = sig.signal;
+      entry.side = sig.side;
+    }
+  }
+
+  return map;
+}

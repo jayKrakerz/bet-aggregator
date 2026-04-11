@@ -6,6 +6,14 @@ import { discoverCodes, getMutationStats } from '../code-mutator.js';
 import { batchPinnacleOdds } from '../pinnacle-odds.js';
 import { scanArbitrage } from '../arbitrage-scanner.js';
 import { scrapeAllTipsters, findMatchingPredictions, buildConsensus } from '../tipster-scrapers.js';
+import { snapshotConsensus, settleResults, getStats, getAllPicks, startAutoTracker } from '../consensus-tracker.js';
+import { getCodePerformance, getLearnedWeights } from '../code-performance-tracker.js';
+import { predictMatch, predictMatches, preloadLeagueData, getAvailableTeams } from '../stats-predictor.js';
+let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
+const aviatorTracker = async () => {
+  if (!_aviatorModule) _aviatorModule = await import('../aviator-tracker.js');
+  return _aviatorModule;
+};
 // Lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
 const liveMonitor = () => import('../live-monitor.js');
 const oddsportal = () => import('../oddsportal-scraper.js');
@@ -303,6 +311,17 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
+  // GET /predictions/live/signals — compact signal map for safety scoring
+  app.get('/live/signals', async (_request, reply) => {
+    try {
+      const { getSignalMap } = await liveMonitor();
+      void reply.header('Cache-Control', 'public, max-age=30');
+      return { data: getSignalMap() };
+    } catch {
+      return { data: {} };
+    }
+  });
+
   // POST /predictions/discover — discover new codes by mutating known codes
   app.post('/discover', async (request, reply) => {
     const body = request.body as { seeds?: string[]; maxResults?: number };
@@ -396,12 +415,13 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  // POST /predictions/tipster-consensus — match multiple games against tipster data
+  // POST /predictions/tipster-consensus — match multiple games against tipster data + Poisson model
   app.post('/tipster-consensus', async (request) => {
     const body = request.body as {
       matches?: Array<{
         homeTeam: string;
         awayTeam: string;
+        league?: string;
         odds?: { home?: number; draw?: number; away?: number; over25?: number; under25?: number };
       }>;
     };
@@ -410,20 +430,294 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const allPredictions = await scrapeAllTipsters();
+
+    // Batch Poisson predictions for all matches
+    const poissonResults = await predictMatches(
+      body.matches.slice(0, 50).map((m) => ({ homeTeam: m.homeTeam, awayTeam: m.awayTeam, league: m.league })),
+    );
+
     const results = body.matches.slice(0, 50).map((m) => {
       const matched = findMatchingPredictions(allPredictions, m.homeTeam, m.awayTeam);
+
+      // Inject Poisson model as an extra tipster source if available
+      const poisson = poissonResults.get(`${m.homeTeam} vs ${m.awayTeam}`);
+      if (poisson && poisson.confidence >= 25) {
+        matched.push({
+          source: 'poisson-model',
+          homeTeam: m.homeTeam,
+          awayTeam: m.awayTeam,
+          date: new Date().toISOString().slice(0, 10),
+          time: '',
+          homePct: poisson.homePct,
+          drawPct: poisson.drawPct,
+          awayPct: poisson.awayPct,
+          over25Pct: poisson.over25Pct,
+          under25Pct: poisson.under25Pct,
+          btsPct: poisson.btsPct,
+          otsPct: 100 - poisson.btsPct,
+        });
+      }
+
       return {
         homeTeam: m.homeTeam,
         awayTeam: m.awayTeam,
         consensus: buildConsensus(matched, m.homeTeam, m.awayTeam, m.odds),
         matchedSources: matched.length,
+        poissonModel: poisson || null,
       };
     });
 
     return {
       data: results,
       totalPredictions: allPredictions.length,
-      sourcesAvailable: [...new Set(allPredictions.map((p) => p.source))],
+      sourcesAvailable: [...new Set(allPredictions.map((p) => p.source)), 'poisson-model'],
     };
+  });
+
+  // ── Consensus Result Tracker ─────────────────────────────
+
+  // Start background auto-tracker on first load
+  startAutoTracker();
+
+  // GET /predictions/consensus-results — performance stats
+  app.get('/consensus-results', async () => {
+    return getStats();
+  });
+
+  // GET /predictions/consensus-picks — all tracked picks
+  app.get('/consensus-picks', async (request) => {
+    const { filter } = request.query as { filter?: 'pending' | 'won' | 'lost' };
+    const valid = ['pending', 'won', 'lost'] as const;
+    const f = filter && valid.includes(filter) ? filter : undefined;
+    return { data: getAllPicks(f) };
+  });
+
+  // POST /predictions/consensus-snapshot — manually snapshot current consensus
+  app.post('/consensus-snapshot', async (request) => {
+    const body = request.body as { minSources?: number; minPct?: number } | null;
+    const minSources = body?.minSources ?? 2;
+    const minPct = body?.minPct ?? 50;
+    const added = await snapshotConsensus(minSources, minPct);
+    return { added: added.length, total: getAllPicks().length, picks: added };
+  });
+
+  // POST /predictions/consensus-settle — manually trigger result settlement
+  app.post('/consensus-settle', async () => {
+    const result = await settleResults();
+    return { ...result, stats: getStats() };
+  });
+
+  // GET /predictions/code-performance — booking code win/loss/ROI stats by source, odds, market
+  app.get('/code-performance', async (_request, reply) => {
+    const data = await getCodePerformance();
+    void reply.header('Cache-Control', 'public, max-age=300');
+    return data;
+  });
+
+  // GET /predictions/learned-weights — aggregated win rates for the frontend's safety scoring
+  app.get('/learned-weights', async (_request, reply) => {
+    const data = await getLearnedWeights();
+    void reply.header('Cache-Control', 'public, max-age=600');
+    return data;
+  });
+
+  // ── Poisson Stats Predictor ──────────────────────────────
+
+  // Preload historical data on startup
+  void preloadLeagueData();
+
+  // GET /predictions/poisson?home=Barcelona&away=Atletico+Madrid&league=La+Liga
+  app.get('/poisson', async (request, reply) => {
+    const { home, away, league } = request.query as { home?: string; away?: string; league?: string };
+    if (!home || !away) return reply.status(400).send({ error: 'Provide home and away team names' });
+    const prediction = await predictMatch(home, away, league);
+    if (!prediction) return reply.status(404).send({ error: 'No data for this match — league may not be covered or team names not matched' });
+    return { data: prediction };
+  });
+
+  // POST /predictions/poisson — batch predict matches
+  app.post('/poisson', async (request, reply) => {
+    const body = request.body as { matches?: Array<{ homeTeam: string; awayTeam: string; league?: string }> };
+    if (!body?.matches || !Array.isArray(body.matches)) {
+      return reply.status(400).send({ error: 'Provide matches array with homeTeam/awayTeam' });
+    }
+    const results = await predictMatches(body.matches.slice(0, 50));
+    const data = Object.fromEntries(results);
+    return { data, matched: results.size, total: body.matches.length };
+  });
+
+  // GET /predictions/poisson/teams — list all teams with stats data available
+  app.get('/poisson/teams', async (_request, reply) => {
+    const teams = getAvailableTeams();
+    void reply.header('Cache-Control', 'public, max-age=3600');
+    return { data: teams, count: teams.length };
+  });
+
+  // ── Aviator Tracker ──────────────────────────────────────
+
+  // POST /predictions/aviator/start — open Aviator in browser and start tracking
+  app.post('/aviator/start', async () => {
+    try {
+      const { startAviator } = await aviatorTracker();
+      return await startAviator();
+    } catch (err) {
+      return { success: false, message: `Failed: ${err}` };
+    }
+  });
+
+  // POST /predictions/aviator/stop — stop tracking
+  app.post('/aviator/stop', async () => {
+    try {
+      const { stopAviator } = await aviatorTracker();
+      await stopAviator();
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
+  });
+
+  // GET /predictions/aviator — get current state, history, signals
+  app.get('/aviator', async () => {
+    try {
+      const { getAviatorState } = await aviatorTracker();
+      return getAviatorState();
+    } catch {
+      return { running: false, connected: false, history: [], signals: [], stats: { total: 0, avg: 0, median: 0, above2x: 0, above5x: 0, above10x: 0, lastLowStreak: 0, recentAvg: 0 }, lastUpdate: 0 };
+    }
+  });
+
+  // GET /predictions/aviator/history — full crash history
+  app.get('/aviator/history', async () => {
+    try {
+      const { getFullHistory } = await aviatorTracker();
+      return { data: getFullHistory() };
+    } catch {
+      return { data: [] };
+    }
+  });
+
+  // GET /predictions/aviator/predictions — prediction accuracy log
+  app.get('/aviator/predictions', async () => {
+    try {
+      const { getPredictions } = await aviatorTracker();
+      return { data: getPredictions() };
+    } catch {
+      return { data: [] };
+    }
+  });
+
+  // GET /predictions/aviator/backtest — replay strategies against full history
+  app.get('/aviator/backtest', async () => {
+    try {
+      const { runBacktestSuite } = await aviatorTracker();
+      return { data: runBacktestSuite() };
+    } catch (err) {
+      return { data: [], error: String(err) };
+    }
+  });
+
+  // ── Auto-Bet Endpoints ──────────────────────────────────
+
+  // POST /predictions/aviator/autobet/start — start auto-betting
+  app.post('/aviator/autobet/start', async (request, reply) => {
+    const body = request.body as {
+      initialBank?: number;
+      betAmount?: number;
+      cashoutAt?: number;
+      minStreak?: number;
+      maxBetsPerSession?: number;
+      takeProfitPct?: number;
+      stopLossPct?: number;
+      cooldownRounds?: number;
+    } | null;
+
+    const initialBank = Number(body?.initialBank ?? 100);
+    if (!Number.isFinite(initialBank) || initialBank <= 0 || initialBank > 100000) {
+      return reply.status(400).send({ error: 'initialBank must be 1-100000' });
+    }
+
+    try {
+      const { configureAutoBet, startAutoBet } = await aviatorTracker();
+
+      // Apply config from request (with safe defaults + bounds)
+      const config: Record<string, number | boolean> = {};
+      if (body?.betAmount !== undefined) {
+        const v = Number(body.betAmount);
+        if (!Number.isFinite(v) || v < 0.1 || v > initialBank * 0.5) {
+          return reply.status(400).send({ error: 'betAmount must be 0.1 to 50% of bank' });
+        }
+        config.betAmount = v;
+      }
+      if (body?.cashoutAt !== undefined) {
+        const v = Number(body.cashoutAt);
+        if (!Number.isFinite(v) || v < 1.01 || v > 100) {
+          return reply.status(400).send({ error: 'cashoutAt must be 1.01-100' });
+        }
+        config.cashoutAt = v;
+      }
+      if (body?.minStreak !== undefined) {
+        const v = Number(body.minStreak);
+        if (!Number.isInteger(v) || v < 0 || v > 10) {
+          return reply.status(400).send({ error: 'minStreak must be 0-10' });
+        }
+        config.minStreak = v;
+      }
+      if (body?.maxBetsPerSession !== undefined) {
+        const v = Number(body.maxBetsPerSession);
+        if (!Number.isInteger(v) || v < 1 || v > 500) {
+          return reply.status(400).send({ error: 'maxBetsPerSession must be 1-500' });
+        }
+        config.maxBetsPerSession = v;
+      }
+      if (body?.takeProfitPct !== undefined) {
+        const v = Number(body.takeProfitPct);
+        if (!Number.isFinite(v) || v < 1 || v > 1000) {
+          return reply.status(400).send({ error: 'takeProfitPct must be 1-1000' });
+        }
+        config.takeProfitPct = v;
+      }
+      if (body?.stopLossPct !== undefined) {
+        const v = Number(body.stopLossPct);
+        if (!Number.isFinite(v) || v < 1 || v > 100) {
+          return reply.status(400).send({ error: 'stopLossPct must be 1-100' });
+        }
+        config.stopLossPct = v;
+      }
+      if (body?.cooldownRounds !== undefined) {
+        const v = Number(body.cooldownRounds);
+        if (!Number.isInteger(v) || v < 0 || v > 20) {
+          return reply.status(400).send({ error: 'cooldownRounds must be 0-20' });
+        }
+        config.cooldownRounds = v;
+      }
+      config.enabled = true;
+
+      configureAutoBet(config as Parameters<typeof configureAutoBet>[0]);
+      const state = startAutoBet(initialBank);
+      return { success: true, state };
+    } catch (err) {
+      return reply.status(500).send({ error: `Failed to start auto-bet: ${err}` });
+    }
+  });
+
+  // POST /predictions/aviator/autobet/stop — stop auto-betting
+  app.post('/aviator/autobet/stop', async () => {
+    try {
+      const { stopAutoBet } = await aviatorTracker();
+      const state = stopAutoBet('Manually stopped via API');
+      return { success: true, state };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // GET /predictions/aviator/autobet — get current auto-bet state + config
+  app.get('/aviator/autobet', async () => {
+    try {
+      const { getAutoBetState, getAutoBetConfig } = await aviatorTracker();
+      return { state: getAutoBetState(), config: getAutoBetConfig() };
+    } catch {
+      return { state: null, config: null };
+    }
   });
 };

@@ -74,11 +74,16 @@ export async function launchBrowser(
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-gpu',
         '--disable-dev-shm-usage',
         '--disable-blink-features=AutomationControlled',
         '--no-first-run',
+        '--enable-webgl',
+        '--use-gl=swiftshader',
+        '--enable-accelerated-2d-canvas',
+        '--autoplay-policy=no-user-gesture-required',
+        '--window-size=1280,900',
       ],
+      defaultViewport: null, // use actual window size instead of 800x600 default
     });
 
     browser.on('disconnected', () => {

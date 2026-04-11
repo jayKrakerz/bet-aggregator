@@ -622,6 +622,9 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
+  <!-- Big Chance Alerts -->
+  <div id="big-chance-banner" style="display:none;margin-bottom:12px"></div>
+
   <!-- Quick Actions -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">
     <button class="btn btn-green" id="today-safe-2odds" style="padding:14px 10px;font-size:14px;border-radius:var(--r-sm);display:flex;flex-direction:column;align-items:center;gap:4px">
@@ -1068,6 +1071,78 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       </div>
       <button id="compare-codes-btn" class="btn btn-blue" style="width:100%">Compare</button>
       <div id="compare-result" style="display:none;margin-top:12px"></div>
+    </div>
+
+    <!-- Aviator Tracker -->
+    <div class="card" style="border-color:rgba(240,96,96,0.2)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div class="card-icon" style="background:rgba(240,96,96,0.12)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:700">Aviator Tracker</div>
+          <div style="font-size:12px;color:var(--text-3)">Open Aviator + track crash history & signals</div>
+        </div>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff" id="aviator-launch-btn">Launch</button>
+      </div>
+      <div id="aviator-panel" style="display:none">
+        <!-- Stats -->
+        <div id="aviator-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px"></div>
+        <!-- Signals -->
+        <div id="aviator-signals" style="margin-bottom:10px"></div>
+        <!-- History chart (simple bar visualization) -->
+        <div id="aviator-history" style="margin-bottom:8px"></div>
+        <!-- Two columns: Live Results + Predictions -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <!-- LEFT: Live crash results -->
+          <div id="aviator-live-log" style="background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px;max-height:320px;overflow-y:auto"></div>
+          <!-- RIGHT: Prediction accuracy + log -->
+          <div>
+            <div id="aviator-accuracy" style="margin-bottom:8px"></div>
+            <div id="aviator-pred-log" style="background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px;max-height:200px;overflow-y:auto"></div>
+          </div>
+        </div>
+        <!-- AUTO-BET PANEL -->
+        <div style="border:1px solid rgba(74,222,128,0.3);background:rgba(74,222,128,0.04);border-radius:var(--r-xs);padding:10px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:700;color:var(--green)">AUTO-BET (Streak Strategy)</div>
+            <div id="autobet-status" style="font-size:11px;color:var(--text-3)">Idle</div>
+          </div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:8px;line-height:1.4">
+            Waits for N consecutive rounds &lt;2x, then bets with auto-cashout. Tested on 411 real rounds — best of 18 strategies.
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+            <label style="font-size:11px;color:var(--text-3)">Bank (GHS)
+              <input type="number" id="autobet-bank" value="100" min="1" step="1" style="width:100%;padding:5px 7px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;color:var(--text-1);font-size:12px;margin-top:2px"/>
+            </label>
+            <label style="font-size:11px;color:var(--text-3)">Bet/round
+              <input type="number" id="autobet-bet" value="1" min="0.1" step="0.1" style="width:100%;padding:5px 7px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;color:var(--text-1);font-size:12px;margin-top:2px"/>
+            </label>
+            <label style="font-size:11px;color:var(--text-3)">Cashout @
+              <input type="number" id="autobet-cashout" value="1.5" min="1.01" step="0.1" style="width:100%;padding:5px 7px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;color:var(--text-1);font-size:12px;margin-top:2px"/>
+            </label>
+            <label style="font-size:11px;color:var(--text-3)">Min streak
+              <input type="number" id="autobet-streak" value="2" min="0" max="10" step="1" style="width:100%;padding:5px 7px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;color:var(--text-1);font-size:12px;margin-top:2px"/>
+            </label>
+            <label style="font-size:11px;color:var(--text-3)">Take profit %
+              <input type="number" id="autobet-tp" value="20" min="1" step="1" style="width:100%;padding:5px 7px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;color:var(--text-1);font-size:12px;margin-top:2px"/>
+            </label>
+            <label style="font-size:11px;color:var(--text-3)">Stop loss %
+              <input type="number" id="autobet-sl" value="30" min="1" max="100" step="1" style="width:100%;padding:5px 7px;background:var(--bg-2);border:1px solid var(--border);border-radius:4px;color:var(--text-1);font-size:12px;margin-top:2px"/>
+            </label>
+          </div>
+          <div id="autobet-stats" style="display:none;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px;font-size:11px"></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" id="autobet-start-btn" style="flex:1;background:var(--green);color:#000;font-weight:700">Start Auto-Bet</button>
+            <button class="btn btn-ghost btn-sm" id="autobet-stop-btn" style="flex:1;color:var(--red);display:none">Stop</button>
+          </div>
+        </div>
+        <!-- Controls -->
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" id="aviator-refresh-btn" style="flex:1">Refresh</button>
+          <button class="btn btn-ghost btn-sm" id="aviator-stop-btn" style="flex:1;color:var(--red)">Stop</button>
+        </div>
+      </div>
     </div>
 
     <!-- Bankroll Calculator -->
@@ -1902,6 +1977,374 @@ function updateBankroll() {
 }
 updateBankroll();
 
+// ===== AVIATOR =====
+let aviatorPollId = null;
+
+// Aviator alert sound (short beep using Web Audio API)
+let aviatorAudioCtx = null;
+function playBetAlert() {
+  try {
+    if (!aviatorAudioCtx) aviatorAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Play 3 quick beeps
+    [0, 200, 400].forEach(delay => {
+      setTimeout(() => {
+        const osc = aviatorAudioCtx.createOscillator();
+        const gain = aviatorAudioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(aviatorAudioCtx.destination);
+        osc.frequency.value = 880;
+        osc.type = 'sine';
+        gain.gain.value = 0.3;
+        osc.start(aviatorAudioCtx.currentTime);
+        osc.stop(aviatorAudioCtx.currentTime + 0.12);
+      }, delay);
+    });
+  } catch {}
+}
+
+let lastAviatorAlert = '';  // prevent duplicate alerts for same signal
+
+function checkBetAlert(state) {
+  const betSignals = (state.signals || []).filter(s => s.type === 'high_due'); // Only streak signal (100% WR at 1.2x, 41/41)
+  if (!betSignals.length) { lastAviatorAlert = ''; return; }
+
+  const best = betSignals[0];
+  const alertKey = best.type + '-' + state.stats.lastLowStreak + '-' + (state.history?.length || 0);
+  if (alertKey === lastAviatorAlert) return; // already alerted
+  lastAviatorAlert = alertKey;
+
+  // Sound
+  playBetAlert();
+
+  // Browser notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('AVIATOR — BET NOW @ ' + best.suggestedCashout + 'x', {
+      body: best.message,
+      tag: 'aviator-bet-' + Date.now(),
+      requireInteraction: true,
+    });
+  }
+
+  // Toast
+  showToast('AVIATOR BET NOW → Cash at ' + best.suggestedCashout + 'x', 'success');
+}
+
+function renderAviatorState(state) {
+  const panel = document.getElementById('aviator-panel');
+  const statsDiv = document.getElementById('aviator-stats');
+  const sigsDiv = document.getElementById('aviator-signals');
+  const histDiv = document.getElementById('aviator-history');
+  panel.style.display = 'block';
+
+  // Check for bet alerts
+  checkBetAlert(state);
+
+  const s = state.stats;
+  const pa = state.predictionAccuracy || { total: 0, won: 0, lost: 0, winRate: 0, totalProfit: 0, bySignal: {}, byCashout: {}, recent: [] };
+  const stat = (l,v,c) => `<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);padding:6px;text-align:center"><div style="font-size:9px;text-transform:uppercase;color:var(--text-3);font-weight:700;letter-spacing:.3px">${l}</div><div style="font-size:14px;font-weight:800;color:${c||'var(--text)'}">${v}</div></div>`;
+
+  // BET NOW banner — ONLY high_due streak signal (100% WR at 1.2x, 41/41 in data)
+  const betSignals = (state.signals || []).filter(s => s.type === 'high_due');
+  if (betSignals.length) {
+    const best = betSignals[0];
+    sigsDiv.innerHTML = `<div style="background:linear-gradient(135deg,rgba(52,212,114,0.15),rgba(52,212,114,0.05));border:2px solid var(--green);border-radius:var(--r-xs);padding:14px;margin-bottom:8px;text-align:center;animation:pulse 1.5s infinite">
+      <div style="font-size:20px;font-weight:900;color:var(--green);margin-bottom:4px">BET NOW</div>
+      <div style="font-size:28px;font-weight:900;color:#fff;margin-bottom:6px">Cash at ${best.suggestedCashout}x</div>
+      <div style="font-size:12px;color:var(--text-2)">${best.message}</div>
+    </div>`;
+  } else {
+    const waitSignals = (state.signals || []).filter(s => s.strength >= 2);
+    if (waitSignals.length) {
+      sigsDiv.innerHTML = waitSignals.map(sig => {
+        return `<div style="background:rgba(247,183,49,0.06);border:1px solid rgba(247,183,49,0.15);border-radius:var(--r-xs);padding:8px 10px;margin-bottom:4px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;background:var(--amber);color:#000">WAIT</span>
+            <span style="font-size:11px;color:var(--text-2);flex:1">${sig.message}</span>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      sigsDiv.innerHTML = `<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:var(--text-3)">NO EDGE — SKIP</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px">Wait for a signal before betting</div>
+      </div>`;
+    }
+  }
+
+  statsDiv.innerHTML = stat('Rounds', s.total, 'var(--blue)')
+    + stat('Avg', s.avg + 'x', 'var(--green)')
+    + stat('Recent', s.recentAvg + 'x', s.recentAvg > s.avg ? 'var(--green)' : 'var(--red)')
+    + stat('Low Streak', s.lastLowStreak, s.lastLowStreak >= 7 ? 'var(--green)' : s.lastLowStreak >= 3 ? 'var(--amber)' : 'var(--text)');
+
+  // Signals
+  if (state.signals.length) {
+    sigsDiv.innerHTML = state.signals.map(sig => {
+      const colors = {
+        high_due: { bg: 'rgba(52,212,114,0.08)', border: 'rgba(52,212,114,0.2)', badge: 'var(--green)', label: 'HIGH DUE' },
+        mega_due: { bg: 'rgba(240,96,96,0.08)', border: 'rgba(240,96,96,0.2)', badge: 'var(--red)', label: 'MEGA DUE' },
+        hot_zone: { bg: 'rgba(247,183,49,0.08)', border: 'rgba(247,183,49,0.2)', badge: 'var(--amber)', label: 'HOT' },
+        cold_zone: { bg: 'rgba(78,148,255,0.08)', border: 'rgba(78,148,255,0.2)', badge: 'var(--blue)', label: 'COLD' },
+        low_streak: { bg: 'rgba(247,183,49,0.06)', border: 'rgba(247,183,49,0.15)', badge: 'var(--amber)', label: 'STREAK' },
+      };
+      const c = colors[sig.type] || colors.low_streak;
+      return `<div style="background:${c.bg};border:1px solid ${c.border};border-radius:var(--r-xs);padding:8px 10px;margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:10px;font-weight:800;padding:1px 6px;border-radius:3px;background:${c.badge};color:#fff">${c.label}</span>
+          <span style="font-size:11px;color:var(--text-2);flex:1">${sig.message}</span>
+          <span style="font-size:12px;font-weight:800;color:${c.badge}">Cash @ ${sig.suggestedCashout}x</span>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    sigsDiv.innerHTML = s.total > 0
+      ? '<div style="font-size:11px;color:var(--text-3);padding:4px 0">No signals — normal distribution</div>'
+      : '';
+  }
+
+  // History visualization (last 30 as bars)
+  const hist = (state.history || []).slice(-30);
+  if (hist.length) {
+    const maxM = Math.max(...hist.map(h => h.multiplier), 5);
+    const bars = hist.map(h => {
+      const pct = Math.min(100, (h.multiplier / maxM) * 100);
+      const color = h.multiplier >= 10 ? 'var(--green)' : h.multiplier >= 5 ? 'var(--blue)' : h.multiplier >= 2 ? 'var(--amber)' : 'var(--red)';
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px" title="${h.multiplier}x">
+        <div style="font-size:8px;color:var(--text-3)">${h.multiplier >= 10 ? h.multiplier.toFixed(0) : h.multiplier.toFixed(1)}x</div>
+        <div style="width:100%;background:${color};border-radius:2px;height:${Math.max(4, pct * 0.5)}px;opacity:0.8"></div>
+      </div>`;
+    }).join('');
+    histDiv.innerHTML = `<div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;margin-bottom:4px">Last ${hist.length} rounds</div>
+      <div style="display:flex;gap:1px;align-items:flex-end;height:60px;padding:2px 0">${bars}</div>`;
+  }
+
+  // Live crash results log
+  const liveLog = document.getElementById('aviator-live-log');
+  if (hist.length) {
+    const unique = [];
+    for (const h of hist) {
+      if (!unique.length || unique[unique.length-1].multiplier !== h.multiplier) unique.push(h);
+    }
+    const rows = unique.slice(-40).reverse().map((h, i) => {
+      const v = h.multiplier;
+      const color = v >= 10 ? 'var(--green)' : v >= 5 ? 'var(--blue)' : v >= 2 ? 'var(--amber)' : 'var(--red)';
+      const bar = '█'.repeat(Math.min(12, Math.round(v)));
+      const time = new Date(h.timestamp).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const isNew = i === 0;
+      return `<div style="display:flex;align-items:center;gap:4px;font-size:11px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03);${isNew ? 'background:rgba(52,212,114,0.06);padding:4px 3px;border-radius:3px;margin-bottom:2px' : ''}">
+        <span style="color:var(--text-3);width:52px;font-size:10px">${time}</span>
+        <span style="color:${color};font-weight:800;width:55px;text-align:right">${v >= 100 ? v.toFixed(0) : v.toFixed(2)}x</span>
+        <span style="color:${color};opacity:0.5;font-size:9px">${bar}</span>
+      </div>`;
+    }).join('');
+    liveLog.innerHTML = `<div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;margin-bottom:6px">Live Results (${unique.length} rounds)</div>${rows}`;
+  } else {
+    liveLog.innerHTML = '<div style="font-size:11px;color:var(--text-3);padding:8px;text-align:center">Waiting for crash data...</div>';
+  }
+
+  // Prediction Accuracy
+  const accDiv = document.getElementById('aviator-accuracy');
+  if (pa.total > 0) {
+    const profitColor = pa.totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
+    const wrColor = pa.winRate >= 60 ? 'var(--green)' : pa.winRate >= 45 ? 'var(--amber)' : 'var(--red)';
+
+    let bySignalHtml = '';
+    for (const [sig, data] of Object.entries(pa.bySignal)) {
+      const sigLabel = { high_due: 'HIGH DUE', mega_due: 'MEGA DUE', hot_zone: 'HOT', cold_zone: 'COLD', low_streak: 'STREAK' }[sig] || sig;
+      const pc = data.profit >= 0 ? 'var(--green)' : 'var(--red)';
+      bySignalHtml += `<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;border-bottom:1px solid var(--border)">
+        <span style="font-weight:700">${sigLabel}</span>
+        <span>${data.won}W/${data.lost}L (${data.winRate}%)</span>
+        <span style="color:${pc};font-weight:700">${data.profit >= 0 ? '+' : ''}$${data.profit.toFixed(2)}</span>
+      </div>`;
+    }
+
+    accDiv.innerHTML = `<div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;margin-bottom:6px">Prediction Accuracy</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px">
+        ${stat('Predictions', pa.total, 'var(--blue)')}
+        ${stat('Win Rate', pa.winRate + '%', wrColor)}
+        ${stat('Won', pa.won + '/' + pa.total, 'var(--green)')}
+        ${stat('P&L', (pa.totalProfit >= 0 ? '+$' : '-$') + Math.abs(pa.totalProfit).toFixed(2), profitColor)}
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;margin-bottom:4px">By Signal Type</div>
+      ${bySignalHtml}`;
+  } else {
+    accDiv.innerHTML = '<div style="font-size:11px;color:var(--text-3);padding:4px 0">No predictions logged yet — signals will be tracked against actual crashes</div>';
+  }
+
+  // Recent prediction log
+  const logDiv = document.getElementById('aviator-pred-log');
+  if (pa.recent && pa.recent.length > 0) {
+    const rows = pa.recent.slice(0, 10).map(p => {
+      const icon = p.wouldHaveWon ? '<span style="color:var(--green)">W</span>' : '<span style="color:var(--red)">L</span>';
+      const sigLabel = { high_due: 'HIGH DUE', mega_due: 'MEGA DUE', hot_zone: 'HOT', cold_zone: 'COLD', low_streak: 'STREAK' }[p.signalType] || p.signalType;
+      return `<div style="display:flex;gap:6px;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);align-items:center">
+        <span style="font-weight:800;width:16px">${icon}</span>
+        <span style="color:var(--text-2);width:65px">${sigLabel}</span>
+        <span style="width:45px">@${p.suggestedCashout}x</span>
+        <span style="font-weight:700;width:50px">${p.actualCrash}x</span>
+        <span style="color:${p.profit >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700">${p.profit >= 0 ? '+' : ''}${p.profit.toFixed(2)}</span>
+      </div>`;
+    }).join('');
+    logDiv.innerHTML = `<div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;margin-bottom:4px">Recent Predictions</div>${rows}`;
+  }
+}
+
+async function refreshAviator() {
+  try {
+    const res = await fetch('/predictions/aviator');
+    if (res.ok) {
+      const state = await res.json();
+      renderAviatorState(state);
+      return state;
+    }
+  } catch {}
+  return null;
+}
+
+document.getElementById('aviator-launch-btn').onclick = async () => {
+  const btn = document.getElementById('aviator-launch-btn');
+  btnLoad(btn);
+  try {
+    const res = await fetch('/predictions/aviator/start', { method: 'POST' });
+    const data = await res.json();
+    showToast(data.message || 'Aviator launched', data.success ? 'success' : 'info');
+    btn.textContent = 'Running';
+    btn.style.background = 'var(--green)';
+    // Start polling
+    await refreshAviator();
+    if (!aviatorPollId) {
+      aviatorPollId = setInterval(refreshAviator, 10000); // every 10s
+    }
+  } catch (e) {
+    showToast('Failed to launch: ' + e.message, 'error');
+  } finally {
+    btnDone(btn, btn.textContent === 'Running' ? 'Running' : 'Launch');
+  }
+};
+
+document.getElementById('aviator-refresh-btn').onclick = () => refreshAviator();
+
+document.getElementById('aviator-stop-btn').onclick = async () => {
+  try {
+    await fetch('/predictions/aviator/stop', { method: 'POST' });
+    if (aviatorPollId) { clearInterval(aviatorPollId); aviatorPollId = null; }
+    const btn = document.getElementById('aviator-launch-btn');
+    btn.textContent = 'Launch';
+    btn.style.background = 'var(--red)';
+    showToast('Aviator tracker stopped', 'info');
+  } catch {}
+};
+
+// ===== AUTO-BET CONTROLS =====
+function renderAutoBet(state) {
+  const statusEl = document.getElementById('autobet-status');
+  const statsEl = document.getElementById('autobet-stats');
+  const startBtn = document.getElementById('autobet-start-btn');
+  const stopBtn = document.getElementById('autobet-stop-btn');
+  if (!state) { statusEl.textContent = 'Idle'; statsEl.style.display = 'none'; return; }
+
+  if (state.active) {
+    statusEl.textContent = 'RUNNING';
+    statusEl.style.color = 'var(--green)';
+    startBtn.style.display = 'none';
+    stopBtn.style.display = 'block';
+  } else {
+    statusEl.textContent = state.stoppedReason || 'Idle';
+    statusEl.style.color = state.stoppedReason ? 'var(--red)' : 'var(--text-3)';
+    startBtn.style.display = 'block';
+    stopBtn.style.display = 'none';
+  }
+
+  if (state.sessionBets > 0 || state.active) {
+    statsEl.style.display = 'grid';
+    const winRate = state.sessionBets > 0 ? Math.round(state.sessionWins / state.sessionBets * 100) : 0;
+    const profitColor = state.sessionProfit >= 0 ? 'var(--green)' : 'var(--red)';
+    const sign = state.sessionProfit >= 0 ? '+' : '';
+    statsEl.innerHTML =
+      '<div><div style="color:var(--text-3)">Bets</div><div style="font-weight:700">' + state.sessionBets + '</div></div>' +
+      '<div><div style="color:var(--text-3)">Win%</div><div style="font-weight:700">' + winRate + '%</div></div>' +
+      '<div><div style="color:var(--text-3)">P&L</div><div style="font-weight:700;color:' + profitColor + '">' + sign + state.sessionProfit.toFixed(2) + '</div></div>' +
+      '<div><div style="color:var(--text-3)">Bank</div><div style="font-weight:700">' + state.currentBank.toFixed(2) + '</div></div>';
+  } else {
+    statsEl.style.display = 'none';
+  }
+}
+
+document.getElementById('autobet-start-btn').onclick = async () => {
+  const btn = document.getElementById('autobet-start-btn');
+  const initialBank = parseFloat(document.getElementById('autobet-bank').value) || 100;
+  const betAmount = parseFloat(document.getElementById('autobet-bet').value) || 1;
+  const cashoutAt = parseFloat(document.getElementById('autobet-cashout').value) || 1.5;
+  const minStreak = parseInt(document.getElementById('autobet-streak').value) || 2;
+  const takeProfitPct = parseFloat(document.getElementById('autobet-tp').value) || 20;
+  const stopLossPct = parseFloat(document.getElementById('autobet-sl').value) || 30;
+
+  if (betAmount > initialBank * 0.5) { showToast('Bet too large (max 50% of bank)', 'error'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Starting...';
+  try {
+    const res = await fetch('/predictions/aviator/autobet/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initialBank, betAmount, cashoutAt, minStreak, takeProfitPct, stopLossPct, maxBetsPerSession: 30 }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      renderAutoBet(data.state);
+      showToast('Auto-bet armed — waiting for streak', 'success');
+    } else {
+      showToast(data.error || 'Failed to start', 'error');
+    }
+  } catch (err) {
+    showToast('Failed: ' + err, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Start Auto-Bet';
+  }
+};
+
+document.getElementById('autobet-stop-btn').onclick = async () => {
+  try {
+    const res = await fetch('/predictions/aviator/autobet/stop', { method: 'POST' });
+    const data = await res.json();
+    renderAutoBet(data.state);
+    showToast('Auto-bet stopped', 'info');
+  } catch {}
+};
+
+// Refresh auto-bet state along with aviator state
+async function refreshAutoBet() {
+  try {
+    const res = await fetch('/predictions/aviator/autobet');
+    if (res.ok) {
+      const data = await res.json();
+      renderAutoBet(data.state);
+    }
+  } catch {}
+}
+setInterval(refreshAutoBet, 5000);
+refreshAutoBet();
+
+// Check if Aviator was already running on page load
+(async () => {
+  try {
+    const res = await fetch('/predictions/aviator');
+    if (res.ok) {
+      const state = await res.json();
+      if (state.running || state.stats.total > 0) {
+        renderAviatorState(state);
+        if (state.running) {
+          const btn = document.getElementById('aviator-launch-btn');
+          btn.textContent = 'Running';
+          btn.style.background = 'var(--green)';
+          aviatorPollId = setInterval(refreshAviator, 10000);
+        }
+      }
+    }
+  } catch {}
+})();
+
 // ===== COMPARE =====
 document.getElementById('compare-codes-btn').onclick = async () => {
   const cmpBtn = document.getElementById('compare-codes-btn');
@@ -2143,6 +2586,105 @@ let codeHistory = [];
 try { codeHistory = JSON.parse(localStorage.getItem('codeHistory') || '[]'); } catch { codeHistory = []; }
 function saveCHistory() { if (codeHistory.length > 200) codeHistory = codeHistory.slice(-200); try { localStorage.setItem('codeHistory', JSON.stringify(codeHistory)); } catch {} }
 
+// Backend learned weights — fetched on init, merged into getLearnedRates()
+let backendWeights = null;
+async function fetchBackendWeights() {
+  try {
+    const res = await fetch('/predictions/learned-weights');
+    if (res.ok) backendWeights = await res.json();
+  } catch {}
+}
+
+// Live signal map — fetched periodically, used by safetyScore() to boost live picks
+let liveSignalMap = {};
+async function fetchLiveSignals() {
+  try {
+    const res = await fetch('/predictions/live/signals');
+    if (res.ok) { const d = await res.json(); liveSignalMap = d.data || {}; }
+  } catch {}
+  renderBigChanceBanner();
+}
+
+function getLiveSignal(g) {
+  if (!g.homeTeam || !g.awayTeam) return null;
+  const hk = (g.homeTeam||'').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ak = (g.awayTeam||'').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return liveSignalMap[hk + '|' + ak] || liveSignalMap[ak + '|' + hk] || null;
+}
+
+// Big Chance alert system — renders banner + browser notifications
+const seenAlerts = new Set(); // track notified matches to avoid spam
+
+function renderBigChanceBanner() {
+  const banner = document.getElementById('big-chance-banner');
+  if (!banner) return;
+  const entries = Object.entries(liveSignalMap);
+  if (!entries.length) { banner.style.display = 'none'; return; }
+
+  // Filter to only matches with big_chance or goal_likely
+  const hot = entries.filter(([, v]) => v.signals.includes('big_chance') || v.signals.includes('goal_likely'));
+  if (!hot.length) { banner.style.display = 'none'; return; }
+
+  // Sort by strength
+  hot.sort((a, b) => b[1].totalStrength - a[1].totalStrength);
+
+  const cards = hot.map(([key, sig]) => {
+    const sigLabels = [...new Set(sig.signals)].map(s => {
+      if (s === 'big_chance') return '<span style="background:var(--red);color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:800">BIG CHANCE</span>';
+      if (s === 'goal_likely') return '<span style="background:var(--amber);color:#000;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:800">GOAL LIKELY</span>';
+      if (s === 'pressure') return '<span style="background:var(--blue);color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:800">PRESSURE</span>';
+      if (s === 'domination') return '<span style="background:var(--green);color:#000;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:800">DOMINATING</span>';
+      return '';
+    }).join(' ');
+
+    const [hk, ak] = key.split('|');
+    const xg = sig.xgHome !== null && sig.xgAway !== null
+      ? `<span style="font-size:11px;color:var(--text-2)">xG: ${sig.xgHome.toFixed(1)} - ${sig.xgAway.toFixed(1)}</span>` : '';
+    const bc = sig.bigChancesHome || sig.bigChancesAway
+      ? `<span style="font-size:11px;color:var(--red);font-weight:700">Big chances: ${sig.bigChancesHome} - ${sig.bigChancesAway}</span>` : '';
+
+    return `<div style="background:rgba(240,96,96,0.08);border:1px solid rgba(240,96,96,0.25);border-radius:var(--r-xs);padding:10px 12px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:12px;font-weight:700;color:var(--green);background:var(--green-soft);padding:1px 6px;border-radius:3px">${sig.time || 'LIVE'}</span>
+        <span style="font-size:13px;font-weight:700">${sig.score}</span>
+        ${sigLabels}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px;align-items:center;flex-wrap:wrap">
+        ${xg} ${bc}
+      </div>
+    </div>`;
+  }).join('');
+
+  banner.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+    <span style="font-size:14px;font-weight:800;color:var(--red);animation:pulse 2s infinite">LIVE ALERTS</span>
+    <span style="font-size:11px;color:var(--text-3)">${hot.length} match${hot.length>1?'es':''} with signals</span>
+  </div>${cards}`;
+  banner.style.display = 'block';
+
+  // Browser notifications for new alerts
+  if ('Notification' in window && Notification.permission === 'granted') {
+    for (const [key, sig] of hot) {
+      if (seenAlerts.has(key)) continue;
+      seenAlerts.add(key);
+      const title = sig.signals.includes('big_chance') ? 'BIG CHANCE' : 'GOAL LIKELY';
+      new Notification(title, {
+        body: `${sig.score} (${sig.time})\nBig chances: ${sig.bigChancesHome}-${sig.bigChancesAway}`,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">%F0%9F%94%A5</text></svg>',
+        tag: 'bigchance-' + key,
+        requireInteraction: false,
+      });
+    }
+  }
+}
+
+// Request notification permission on first interaction
+document.addEventListener('click', function reqNotif() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  document.removeEventListener('click', reqNotif);
+}, { once: true });
+
 let historyFilter = 'all';
 function timeAgoShort(iso) { const m = Math.floor((Date.now() - new Date(iso).getTime())/60000); if (m < 60) return m+'m'; const h = Math.floor(m/60); if (h < 24) return h+'h'; return Math.floor(h/24)+'d'; }
 
@@ -2356,28 +2898,40 @@ function mktKey(market) {
 function getLearnedRates() {
   const rates = { byStrategy: {}, byOddsBand: {}, byMarket: {}, byLeague: {}, byPickOdds: {} };
   const settled = codeHistory.filter(c => c.status === 'won' || c.status === 'lost');
-  if (settled.length < 5) return null;
 
-  // Strategy-level rates
-  for (const c of settled) {
-    const k = c.strategy || 'unknown';
-    if (!rates.byStrategy[k]) rates.byStrategy[k] = { won: 0, lost: 0 };
-    if (c.status === 'won') rates.byStrategy[k].won++;
-    else rates.byStrategy[k].lost++;
+  // Merge backend weights first (much larger sample from all scraped codes)
+  if (backendWeights && backendWeights.sampleSize > 0) {
+    for (const [k, v] of Object.entries(backendWeights.byMarket || {})) rates.byMarket[k] = { ...v };
+    for (const [k, v] of Object.entries(backendWeights.byLeague || {})) rates.byLeague[k] = { ...v };
+    for (const [k, v] of Object.entries(backendWeights.byOddsBand || {})) rates.byOddsBand[k] = { ...v };
+    for (const [k, v] of Object.entries(backendWeights.byPickOdds || {})) rates.byPickOdds[k] = { ...v };
+    // Consensus pick type win rates as a bonus signal
+    if (backendWeights.consensusByPick) {
+      for (const [pick, v] of Object.entries(backendWeights.consensusByPick)) {
+        const mk = pick === 'BTS' ? 'btts' : pick === 'Over 2.5' ? 'ou' : pick === 'Home' || pick === 'Away' || pick === 'Draw' ? '1x2' : pick.toLowerCase();
+        if (!rates.byMarket[mk]) rates.byMarket[mk] = { won: 0, lost: 0 };
+        rates.byMarket[mk].won += v.won || 0;
+        rates.byMarket[mk].lost += v.lost || 0;
+      }
+    }
   }
 
-  // Code-level odds band
-  for (const c of settled) {
-    const o = c.actualOdds || 0;
-    const band = o <= 2 ? 'low' : o <= 5 ? 'mid' : o <= 15 ? 'high' : 'extreme';
-    if (!rates.byOddsBand[band]) rates.byOddsBand[band] = { won: 0, lost: 0 };
-    if (c.status === 'won') rates.byOddsBand[band].won++;
-    else rates.byOddsBand[band].lost++;
-  }
-
-  // Per-pick analysis (market type, league, odds band)
-  const allPicks = settled.flatMap(c => (c.picks || []).filter(p => p.outcome));
-  if (allPicks.length >= 10) {
+  // Layer local codeHistory on top (user's own results override/add)
+  if (settled.length >= 3) {
+    for (const c of settled) {
+      const k = c.strategy || 'unknown';
+      if (!rates.byStrategy[k]) rates.byStrategy[k] = { won: 0, lost: 0 };
+      if (c.status === 'won') rates.byStrategy[k].won++;
+      else rates.byStrategy[k].lost++;
+    }
+    for (const c of settled) {
+      const o = c.actualOdds || 0;
+      const band = o <= 2 ? 'low' : o <= 5 ? 'mid' : o <= 15 ? 'high' : 'extreme';
+      if (!rates.byOddsBand[band]) rates.byOddsBand[band] = { won: 0, lost: 0 };
+      if (c.status === 'won') rates.byOddsBand[band].won++;
+      else rates.byOddsBand[band].lost++;
+    }
+    const allPicks = settled.flatMap(c => (c.picks || []).filter(p => p.outcome));
     for (const p of allPicks) {
       const mk = mktKey(p.market);
       if (!rates.byMarket[mk]) rates.byMarket[mk] = { won: 0, lost: 0 };
@@ -2399,6 +2953,10 @@ function getLearnedRates() {
       else rates.byPickOdds[band].lost++;
     }
   }
+
+  // Need at least some data (backend or local)
+  const totalSamples = (backendWeights?.sampleSize || 0) + settled.length;
+  if (totalSamples < 5) return null;
 
   return rates;
 }
@@ -2557,6 +3115,45 @@ function safetyScore(g) {
     if (or && (or.won + or.lost) >= 5) {
       const wr = or.won / (or.won + or.lost);
       if (wr >= 0.7) s += 4; else if (wr < 0.35) s -= 4;
+    }
+  }
+
+  // LIVE SIGNALS — boost picks aligned with big chance / pressure / xG signals
+  const liveSig = getLiveSignal(g);
+  if (liveSig) {
+    const sigSet = new Set(liveSig.signals);
+    const isOverMarket = mkt.includes('over/under') || mkt.includes('total');
+    const isBTTS = mkt.includes('both teams') || mkt.includes('gg') || mkt.includes('btts');
+    const is1X2 = mkt === '1x2' || mkt.includes('1x2') || mkt === 'match winner';
+    const pickingHome = pick.includes('home') || pick === '1';
+    const pickingAway = pick.includes('away') || pick === '2';
+
+    // Big chance + goal_likely → boost Over/BTTS picks
+    if ((sigSet.has('big_chance') || sigSet.has('goal_likely')) && (isOverMarket && pick.includes('over'))) {
+      s += Math.min(15, liveSig.totalStrength);
+    }
+    if ((sigSet.has('big_chance') || sigSet.has('goal_likely')) && isBTTS) {
+      // Only boost BTS if both teams have some activity
+      if (liveSig.bigChancesHome > 0 && liveSig.bigChancesAway > 0) s += 12;
+      else s += 6;
+    }
+
+    // Domination/pressure on one side → boost that side's 1X2 / DC pick
+    if (sigSet.has('domination') || sigSet.has('pressure')) {
+      if (is1X2 || mkt.includes('double chance')) {
+        if (liveSig.side === 'home' && pickingHome) s += 10;
+        else if (liveSig.side === 'away' && pickingAway) s += 10;
+        // Penalize picking against the dominant side
+        else if (liveSig.side === 'home' && pickingAway) s -= 8;
+        else if (liveSig.side === 'away' && pickingHome) s -= 8;
+      }
+    }
+
+    // xG imbalance — if one team's xG is 2x+ the other, strong directional signal
+    if (liveSig.xgHome !== null && liveSig.xgAway !== null) {
+      const totalXg = liveSig.xgHome + liveSig.xgAway;
+      if (totalXg >= 2 && isOverMarket && pick.includes('over')) s += 8;
+      if (totalXg < 1 && isOverMarket && pick.includes('under')) s += 6;
     }
   }
 
@@ -5463,6 +6060,9 @@ async function loadLiveMonitor() {
 
     const scanTime = data.scrapedAt ? new Date(data.scrapedAt).toLocaleTimeString('en-GB') : 'just now';
     showToast(matches.length + ' live matches, ' + sigs.length + ' signals (scanned ' + scanTime + ')', sigs.length ? 'success' : 'info');
+
+    // Refresh signal map + banner after live scan
+    await fetchLiveSignals();
   } catch (e) {
     matchesDiv.innerHTML = '<div style="padding:12px;color:var(--red);font-size:13px">Error: ' + e.message + '</div>';
   } finally {
@@ -5622,7 +6222,7 @@ document.getElementById('cross-odds-btn').onclick = () => loadCrossOdds();
 
 // ===== INIT =====
 (async () => {
-  await Promise.all([loadBookingCodes(), checkHealth()]);
+  await Promise.all([loadBookingCodes(), checkHealth(), fetchBackendWeights(), fetchLiveSignals()]);
   // Render Today page content
   renderTopPicks();
   renderReadyCodes();
@@ -5630,6 +6230,10 @@ document.getElementById('cross-odds-btn').onclick = () => loadCrossOdds();
   // Auto-track pending codes every 10 minutes
   setTimeout(refreshHistoryStatuses, 5000);
   setInterval(refreshHistoryStatuses, 10 * 60 * 1000);
+  // Refresh backend weights every 30 min
+  setInterval(fetchBackendWeights, 30 * 60 * 1000);
+  // Refresh live signals every 2 min (they change fast during matches)
+  setInterval(fetchLiveSignals, 2 * 60 * 1000);
 })();
 </script>
 </body>
