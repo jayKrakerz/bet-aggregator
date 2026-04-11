@@ -9,6 +9,7 @@ import { scrapeAllTipsters, findMatchingPredictions, buildConsensus } from '../t
 import { snapshotConsensus, settleResults, getStats, getAllPicks, startAutoTracker, getSourceWeights } from '../consensus-tracker.js';
 import { getCodePerformance, getLearnedWeights } from '../code-performance-tracker.js';
 import { predictMatch, predictMatches, preloadLeagueData, getAvailableTeams } from '../stats-predictor.js';
+import { getScraperHealth, getScraperHealthSummary } from '../scraper-health.js';
 let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
 const aviatorTracker = async () => {
   if (!_aviatorModule) _aviatorModule = await import('../aviator-tracker.js');
@@ -324,6 +325,15 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     } catch {
       return { data: {} };
     }
+  });
+
+  // GET /predictions/scrapers/health — per-scraper health + aggregate summary
+  app.get('/scrapers/health', async (_request, reply) => {
+    void reply.header('Cache-Control', 'no-store');
+    return {
+      summary: getScraperHealthSummary(),
+      scrapers: getScraperHealth(),
+    };
   });
 
   // POST /predictions/discover — discover new codes by mutating known codes

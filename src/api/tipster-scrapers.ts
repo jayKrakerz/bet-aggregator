@@ -17,6 +17,7 @@
 
 import * as cheerio from 'cheerio';
 import { logger } from '../utils/logger.js';
+import { recordScraperRun } from './scraper-health.js';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -557,11 +558,18 @@ export async function scrapeAllTipsters(): Promise<TipsterPrediction[]> {
 
   const results = await Promise.allSettled(
     scraperFns.map(async ({ name, fn }) => {
+      const start = Date.now();
       try {
         const preds = await fn();
+        recordScraperRun(name, { ok: true, count: preds.length, durationMs: Date.now() - start });
         logger.info({ source: name, count: preds.length }, 'Tipster scraped');
         return preds;
       } catch (err) {
+        recordScraperRun(name, {
+          ok: false,
+          durationMs: Date.now() - start,
+          error: err instanceof Error ? err.message : String(err),
+        });
         logger.warn({ source: name, err }, 'Tipster scrape failed');
         return [] as TipsterPrediction[];
       }

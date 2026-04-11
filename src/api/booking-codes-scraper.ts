@@ -11,6 +11,7 @@ import { scrapeSocialMediaCodes } from './social-codes-scraper.js';
 import { scrapeTwitterCodes } from './twitter-codes-scraper.js';
 import { scrapeTelegramCodes } from './telegram-codes-scraper.js';
 import { scrapeMetaCodes } from './meta-codes-scraper.js';
+import { withScraperHealth } from './scraper-health.js';
 // Headless browser scraper — lazy-loaded to avoid crash when Chrome unavailable
 const headlessScraper = () => import('./headless-codes-scraper.js').then(m => m.scrapeHeadlessCodes()).catch(() => [] as BookingCode[]);
 
@@ -691,17 +692,20 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
 }
 
 async function refreshCodes(): Promise<BookingCode[]> {
+  const track = (name: string, fn: () => Promise<BookingCode[]>) =>
+    withScraperHealth(name, fn, (codes) => codes.length);
+
   const [sportPremi, paqBet, convertBet, social, codeHub, betloy, twitter, telegram, meta, headless] = await Promise.allSettled([
-    scrapeSportPremi(),
-    scrapePaqBet(),
-    scrapeConvertBetCodes(),
-    scrapeSocialMediaCodes(),
-    scrapeSportyBetCodeHub(),
-    scrapeBetloy(),
-    scrapeTwitterCodes(),
-    scrapeTelegramCodes(),
-    scrapeMetaCodes(),
-    headlessScraper(),
+    track('sportPremi', scrapeSportPremi),
+    track('paqBet', scrapePaqBet),
+    track('convertBet', scrapeConvertBetCodes),
+    track('socialMedia', scrapeSocialMediaCodes),
+    track('sportyBetCodeHub', scrapeSportyBetCodeHub),
+    track('betloy', scrapeBetloy),
+    track('twitter', scrapeTwitterCodes),
+    track('telegram', scrapeTelegramCodes),
+    track('meta', scrapeMetaCodes),
+    track('headless', headlessScraper),
   ]);
 
   const allCodes: BookingCode[] = [];
