@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { healthRoutes } from './routes/health.js';
 import { predictionsRoutes } from './routes/predictions.js';
+import { warmupCache } from './booking-codes-scraper.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function createServer() {
@@ -22,6 +23,9 @@ export async function createServer() {
   });
   await app.register(healthRoutes);
   await app.register(predictionsRoutes, { prefix: '/predictions' });
+
+  // Start scraping immediately so data is ready before the first request
+  warmupCache();
 
   return app;
 }

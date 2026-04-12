@@ -669,6 +669,7 @@ function saveDiskCache(codes: BookingCode[]) {
 }
 
 let refreshing = false;
+let refreshPromise: Promise<BookingCode[]> | null = null;
 
 export async function getAllBookingCodes(): Promise<BookingCode[]> {
   if (codesCache && Date.now() - codesCacheTime < CACHE_TTL) {
@@ -682,13 +683,45 @@ export async function getAllBookingCodes(): Promise<BookingCode[]> {
       codesCache = disk;
       codesCacheTime = Date.now() - CACHE_TTL + 60000; // expires in 1 min to trigger refresh
       // Refresh in background
-      refreshing = true;
-      refreshCodes().then(() => { refreshing = false; }).catch(() => { refreshing = false; });
+      triggerBackgroundRefresh();
       return disk;
     }
   }
 
-  return refreshCodes();
+  // If a refresh is already in flight, piggyback on it instead of starting another
+  if (refreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  return triggerRefresh();
+}
+
+function triggerBackgroundRefresh(): void {
+  if (refreshing) return;
+  triggerRefresh().catch(() => {});
+}
+
+function triggerRefresh(): Promise<BookingCode[]> {
+  refreshing = true;
+  refreshPromise = refreshCodes()
+    .finally(() => { refreshing = false; refreshPromise = null; });
+  return refreshPromise;
+}
+
+/**
+ * Start a background refresh immediately on import.
+ * This means data starts loading as soon as the server boots,
+ * not when the first HTTP request arrives.
+ */
+export function warmupCache(): void {
+  if (codesCache) return;
+  const disk = loadDiskCache();
+  if (disk) {
+    codesCache = disk;
+    codesCacheTime = Date.now() - CACHE_TTL + 60000;
+    logger.info('Warmup: serving disk cache, refreshing in background');
+  }
+  triggerBackgroundRefresh();
 }
 
 async function refreshCodes(): Promise<BookingCode[]> {

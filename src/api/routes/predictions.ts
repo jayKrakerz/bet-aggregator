@@ -10,6 +10,7 @@ import { snapshotConsensus, settleResults, getStats, getAllPicks, startAutoTrack
 import { getCodePerformance, getLearnedWeights } from '../code-performance-tracker.js';
 import { predictMatch, predictMatches, preloadLeagueData, getAvailableTeams } from '../stats-predictor.js';
 import { getScraperHealth, getScraperHealthSummary } from '../scraper-health.js';
+import { getSportsAiData, getSportsAiBotResults, findPredictionForMatch, findValueBetsForMatch, getBotPerformanceSummary } from '../sports-ai-scraper.js';
 let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
 const aviatorTracker = async () => {
   if (!_aviatorModule) _aviatorModule = await import('../aviator-tracker.js');
@@ -334,6 +335,147 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       summary: getScraperHealthSummary(),
       scrapers: getScraperHealth(),
     };
+  });
+
+  // ── Sports-AI.dev Data ───────────────────────────────────
+
+  // GET /predictions/sports-ai — all Sports-AI data (predictions + value bets; bot results excluded for speed)
+  app.get('/sports-ai', async (_request, reply) => {
+    const data = await getSportsAiData();
+    void reply.header('Cache-Control', 'public, max-age=900');
+    return {
+      predictions: { data: data.predictions, count: data.predictions.length },
+      highlights: { data: data.highlights, count: data.highlights.length },
+      valueBets: { data: data.valueBets, count: data.valueBets.length },
+      fetchedAt: data.fetchedAt,
+    };
+  });
+
+  // GET /predictions/sports-ai/predictions — AI match predictions with odds
+  app.get('/sports-ai/predictions', async (_request, reply) => {
+    const data = await getSportsAiData();
+    void reply.header('Cache-Control', 'public, max-age=900');
+    return { data: data.predictions, highlights: data.highlights, count: data.predictions.length, fetchedAt: data.fetchedAt };
+  });
+
+  // GET /predictions/sports-ai/value-bets — value bets with bookmaker comparison
+  app.get('/sports-ai/value-bets', async (_request, reply) => {
+    const data = await getSportsAiData();
+    void reply.header('Cache-Control', 'public, max-age=900');
+    return { data: data.valueBets, count: data.valueBets.length, fetchedAt: data.fetchedAt };
+  });
+
+  // GET /predictions/sports-ai/bot-results — historical bot performance (loaded on demand, cached 1hr)
+  app.get('/sports-ai/bot-results', async (_request, reply) => {
+    const results = await getSportsAiBotResults();
+    void reply.header('Cache-Control', 'public, max-age=3600');
+    return {
+      data: results,
+      summary: getBotPerformanceSummary(results),
+      count: results.length,
+    };
+  });
+
+  // GET /predictions/sports-ai/match?home=Team&away=Team — lookup AI prediction + value bets for a match
+  app.get('/sports-ai/match', async (request, reply) => {
+    const { home, away } = request.query as { home?: string; away?: string };
+    if (!home || !away) return reply.status(400).send({ error: 'Provide home and away team names' });
+
+    const [prediction, valueBets] = await Promise.all([
+      findPredictionForMatch(home, away),
+      findValueBetsForMatch(home, away),
+    ]);
+
+    return {
+      prediction,
+      valueBets,
+      found: !!prediction || valueBets.length > 0,
+    };
+  });
+
+  // POST /predictions/sports-ai/score-codes — score booking codes using AI predictions
+  app.post('/sports-ai/score-codes', async (request, reply) => {
+    const body = request.body as { codes?: Array<{ code: string; selections: Array<{ homeTeam: string; awayTeam: string; pick: string; market: string; odds: number }> }> };
+    if (!body?.codes || !Array.isArray(body.codes)) {
+      return reply.status(400).send({ error: 'Provide codes array with selections' });
+    }
+
+    const scored = await Promise.all(body.codes.slice(0, 20).map(async (code) => {
+      let aiAgreements = 0;
+      let aiDisagreements = 0;
+      let aiMatched = 0;
+      const selectionScores: Array<{ homeTeam: string; awayTeam: string; aiPrediction: string | null; aiConfidence: number | null; agrees: boolean | null }> = [];
+
+      for (const sel of code.selections) {
+        const pred = await findPredictionForMatch(sel.homeTeam, sel.awayTeam);
+        if (!pred || !pred.odds_moneyline.home) {
+          selectionScores.push({ homeTeam: sel.homeTeam, awayTeam: sel.awayTeam, aiPrediction: null, aiConfidence: null, agrees: null });
+          continue;
+        }
+
+        aiMatched++;
+        const homePct = pred.implied_home_pct;
+        const awayPct = pred.implied_away_pct;
+        const drawPct = pred.implied_draw_pct || 0;
+
+        // Determine AI's favored outcome
+        let aiFavored: string;
+        let aiConfidence: number;
+        if (homePct >= awayPct && homePct >= drawPct) {
+          aiFavored = 'home';
+          aiConfidence = homePct;
+        } else if (awayPct >= homePct && awayPct >= drawPct) {
+          aiFavored = 'away';
+          aiConfidence = awayPct;
+        } else {
+          aiFavored = 'draw';
+          aiConfidence = drawPct;
+        }
+
+        // Check if the pick aligns with AI prediction
+        const pickLower = sel.pick.toLowerCase();
+        const marketLower = sel.market.toLowerCase();
+        let agrees: boolean | null = null;
+
+        if (marketLower.includes('1x2') || marketLower.includes('match winner') || marketLower.includes('moneyline')) {
+          if (pickLower.includes('home') || pickLower === '1' || pickLower.includes(sel.homeTeam.toLowerCase().slice(0, 4))) {
+            agrees = aiFavored === 'home';
+          } else if (pickLower.includes('away') || pickLower === '2' || pickLower.includes(sel.awayTeam.toLowerCase().slice(0, 4))) {
+            agrees = aiFavored === 'away';
+          } else if (pickLower.includes('draw') || pickLower === 'x') {
+            agrees = aiFavored === 'draw';
+          }
+        }
+
+        if (agrees === true) aiAgreements++;
+        else if (agrees === false) aiDisagreements++;
+
+        selectionScores.push({
+          homeTeam: sel.homeTeam,
+          awayTeam: sel.awayTeam,
+          aiPrediction: aiFavored,
+          aiConfidence: Math.round(aiConfidence * 100) / 100,
+          agrees,
+        });
+      }
+
+      const total = code.selections.length;
+      const aiScore = aiMatched > 0
+        ? Math.round((aiAgreements / aiMatched) * 100)
+        : null;
+
+      return {
+        code: code.code,
+        aiScore,
+        aiMatched,
+        aiAgreements,
+        aiDisagreements,
+        totalSelections: total,
+        selections: selectionScores,
+      };
+    }));
+
+    return { data: scored };
   });
 
   // POST /predictions/discover — discover new codes by mutating known codes
