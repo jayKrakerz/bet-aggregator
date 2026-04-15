@@ -11,6 +11,13 @@ import { getCodePerformance, getLearnedWeights } from '../code-performance-track
 import { predictMatch, predictMatches, preloadLeagueData, getAvailableTeams } from '../stats-predictor.js';
 import { getScraperHealth, getScraperHealthSummary } from '../scraper-health.js';
 import { getSportsAiData, getSportsAiBotResults, findPredictionForMatch, findValueBetsForMatch, getBotPerformanceSummary } from '../sports-ai-scraper.js';
+import { getLivePredictions } from '../live-predictor.js';
+import { getDroppingOdds } from '../oddspedia-dropping-odds.js';
+import { getFlashLiveMatches, toSportyFormat } from '../flashscore-live.js';
+import { getSportyLiveGames } from '../sportybet-live.js';
+import { getLiveValuePicks } from '../live-value-picks.js';
+import { getPromoEdges } from '../promo-detector.js';
+import { analyzeCashout } from '../cashout-analyzer.js';
 let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
 const aviatorTracker = async () => {
   if (!_aviatorModule) _aviatorModule = await import('../aviator-tracker.js');
@@ -26,7 +33,8 @@ const crossOddsScanner = () => import('../cross-odds-scanner.js');
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
 
 // Validate a Sportybet event/market/outcome ID format
-const BETRADAR_ID = /^sr:[a-z]+:\d+$/;
+// Event IDs can be digits (real matches) OR base64-like strings (virtuals)
+const BETRADAR_ID = /^sr:[a-z]+:[A-Za-z0-9_-]{1,50}$/;
 const NUMERIC_ID = /^\d+$/;
 
 function isValidSelection(s: unknown): s is { eventId: string; marketId: string; outcomeId: string; specifier?: string; sportId: string } {
@@ -235,41 +243,67 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     return { data, matched: odds.size };
   });
 
-  // GET /predictions/games — fetch pre-match football events with odds from Sportybet
+  // GET /predictions/games — fetch events with odds from Sportybet (all sports for live)
   app.get('/games', async (request, reply) => {
     const query = request.query as { sportId?: string; timeline?: string; pageSize?: string; pageNum?: string };
-    const sportId = query.sportId || 'sr:sport:1'; // football
-    if (!BETRADAR_ID.test(sportId)) {
-      return reply.status(400).send({ error: 'Invalid sportId' });
-    }
     const isLive = query.timeline === 'live';
     const pageSize = Math.min(Math.max(parseInt(query.pageSize || '50', 10) || 50, 1), 100);
     const pageNum = Math.max(parseInt(query.pageNum || '1', 10) || 1, 1);
-    // marketId: 1=1X2, 18=Over/Under, 29=GG/NG (Both Teams to Score)
     const marketId = '1,18,29';
     const ts = Date.now();
 
     const countries = ['ng', 'gh', 'ke', 'tz', 'zm', 'cm'];
     const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-    for (const cc of countries) {
-      try {
-        const endpoint = isLive ? 'pcLiveEvents' : 'pcUpcomingEvents';
-        const url = `https://www.sportybet.com/api/${cc}/factsCenter/${endpoint}?_t=${ts}&sportId=${encodeURIComponent(sportId)}&marketId=${encodeURIComponent(marketId)}&pageSize=${pageSize}&pageNum=${pageNum}`;
-        const res = await fetch(url, {
-          headers: { 'User-Agent': ua },
-          signal: AbortSignal.timeout(10000),
-        });
-        if (!res.ok) continue;
-        const data = await res.json() as { bizCode?: number; data?: unknown };
-        if (data.bizCode === 10000 && data.data) {
-          void reply.header('Cache-Control', 'public, max-age=120');
-          return { data: data.data, country: cc, timeline: isLive ? 'live' : 'prematch' };
+
+    // For live: try all sports to find any live action
+    // For prematch: use the requested sportId (default football)
+    const sportIds = isLive && !query.sportId
+      ? ['sr:sport:1', 'sr:sport:2', 'sr:sport:3', 'sr:sport:4', 'sr:sport:5', 'sr:sport:6', 'sr:sport:21', 'sr:sport:22', 'sr:sport:23']
+      : [query.sportId || 'sr:sport:1'];
+
+    for (const sid of sportIds) {
+      if (!BETRADAR_ID.test(sid)) continue;
+      for (const cc of countries) {
+        try {
+          const group = isLive ? 'Live' : 'Prematch';
+          const url = `https://www.sportybet.com/api/${cc}/factsCenter/liveOrPrematchEvents?_t=${ts}&sportId=${encodeURIComponent(sid)}&group=${group}&marketId=${encodeURIComponent(marketId)}&pageSize=${pageSize}&pageNum=${pageNum}`;
+          const res = await fetch(url, {
+            headers: { 'User-Agent': ua },
+            signal: AbortSignal.timeout(10000),
+          });
+          if (!res.ok) continue;
+          const data = await res.json() as { bizCode?: number; data?: unknown };
+          if (data.bizCode === 10000 && data.data) {
+            // Normalize: new API returns Tournament[] directly, old returned { tournaments, totalNum }
+            let normalized = data.data;
+            if (Array.isArray(data.data)) {
+              const tournaments = data.data as Array<{ events?: unknown[] }>;
+              const totalNum = tournaments.reduce((sum: number, t) => sum + ((t.events as unknown[])?.length || 0), 0);
+              normalized = { totalNum, tournaments };
+            }
+            void reply.header('Cache-Control', 'public, max-age=120');
+            return { data: normalized, country: cc, timeline: isLive ? 'live' : 'prematch' };
+          }
+        } catch {
+          // try next country
         }
-      } catch {
-        // try next country
       }
     }
-    return reply.status(502).send({ error: 'All Sportybet endpoints failed' });
+
+    // Sportybet live API is geo-restricted — fall back to FlashScore for live data
+    if (isLive) {
+      try {
+        const flashMatches = await getFlashLiveMatches();
+        if (flashMatches.length > 0) {
+          const data = toSportyFormat(flashMatches);
+          void reply.header('Cache-Control', 'public, max-age=60');
+          return { data, country: null, timeline: 'live', source: 'flashscore' };
+        }
+      } catch { /* fall through */ }
+    }
+
+    void reply.header('Cache-Control', 'public, max-age=60');
+    return { data: { totalNum: 0, tournaments: [] }, country: null, timeline: isLive ? 'live' : 'prematch' };
   });
 
   // GET /predictions/cross-odds — compare ALL Pinnacle vs Sportybet odds (football + basketball)
@@ -476,6 +510,113 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }));
 
     return { data: scored };
+  });
+
+  // ── Live Predictor ───────────────────────────────────────
+
+  // GET /predictions/live-predict — live games with full AI analysis
+  // Optional: ?timeline=prematch&limit=10 for testing when no live games
+  app.get('/live-predict', async (request, reply) => {
+    const query = request.query as { timeline?: string; limit?: string };
+    const timeline = query.timeline === 'prematch' ? 'prematch' as const : 'live' as const;
+    const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
+
+    const result = await getLivePredictions(timeline, limit);
+    void reply.header('Cache-Control', `public, max-age=${timeline === 'live' ? 120 : 300}`);
+    return result;
+  });
+
+  // GET /predictions/cashout — analyze whether to cash out a booking code
+  // Params:
+  //   code        — booking code
+  //   stake       — bet amount (default 100)
+  //   originalOdds — acca odds when placed (optional, for post-placement analysis)
+  app.get('/cashout', async (request, reply) => {
+    const query = request.query as { code?: string; stake?: string; originalOdds?: string };
+    if (!query.code || !CODE_PATTERN.test(query.code.toUpperCase())) {
+      return reply.status(400).send({ error: 'Invalid or missing code parameter' });
+    }
+    const stake = Math.max(1, Math.min(1_000_000, parseFloat(query.stake || '100') || 100));
+    const originalOdds = query.originalOdds ? parseFloat(query.originalOdds) : undefined;
+    const result = await analyzeCashout(query.code.toUpperCase(), stake, originalOdds);
+    void reply.header('Cache-Control', 'public, max-age=30');
+    return result;
+  });
+
+  // GET /predictions/promo-edges — +EV promotional picks (1UP/2UP, low-margin markets)
+  app.get('/promo-edges', async (request, reply) => {
+    const query = request.query as { minEdge?: string; type?: string; refresh?: string };
+    const minEdge = parseFloat(query.minEdge || '0');
+    const typeFilter = query.type;
+    const forceRefresh = query.refresh === '1';
+
+    const result = await getPromoEdges(forceRefresh);
+    let edges = result.edges;
+    if (minEdge > 0) edges = edges.filter(e => e.edgePct >= minEdge);
+    if (typeFilter) edges = edges.filter(e => e.type === typeFilter);
+
+    void reply.header('Cache-Control', 'public, max-age=60');
+    return {
+      edges,
+      count: edges.length,
+      totalCount: result.count,
+      byType: result.byType,
+      scannedEvents: result.scannedEvents,
+      scrapedAt: result.scrapedAt,
+    };
+  });
+
+  // GET /predictions/live-value-picks — live outcomes with positive Kelly edge
+  // from Pinnacle sharp odds + Poisson + tipster consensus + Sports-AI
+  app.get('/live-value-picks', async (request, reply) => {
+    const query = request.query as { minEdge?: string; minConfidence?: string; refresh?: string };
+    const minEdge = parseFloat(query.minEdge || '0');
+    const minConfidence = parseInt(query.minConfidence || '0', 10);
+    const forceRefresh = query.refresh === '1';
+
+    const result = await getLiveValuePicks(forceRefresh);
+
+    let filtered = result.picks;
+    if (minEdge > 0) filtered = filtered.filter(p => p.edge >= minEdge);
+    if (minConfidence > 0) filtered = filtered.filter(p => p.confidence >= minConfidence);
+
+    void reply.header('Cache-Control', 'public, max-age=60');
+    return {
+      picks: filtered,
+      count: filtered.length,
+      totalCount: result.count,
+      highConfidence: result.highConfidence,
+      withPinnacle: result.withPinnacle,
+      scrapedAt: result.scrapedAt,
+      analysisSources: result.analysisSources,
+    };
+  });
+
+  // GET /predictions/live-games — all live games across all sports from Sportybet
+  // Optional: ?sport=Football&refresh=1
+  app.get('/live-games', async (request, reply) => {
+    const query = request.query as { sport?: string; refresh?: string };
+    const forceRefresh = query.refresh === '1';
+
+    const result = await getSportyLiveGames(forceRefresh);
+
+    // Filter by sport if requested
+    if (query.sport) {
+      const sportFilter = query.sport.toLowerCase();
+      const filtered = result.games.filter(g => g.sport.toLowerCase() === sportFilter);
+      void reply.header('Cache-Control', 'public, max-age=60');
+      return {
+        games: filtered,
+        totalCount: filtered.length,
+        allSportsCount: result.totalCount,
+        bySport: result.bySport,
+        scrapedAt: result.scrapedAt,
+        source: result.source,
+      };
+    }
+
+    void reply.header('Cache-Control', 'public, max-age=60');
+    return result;
   });
 
   // POST /predictions/discover — discover new codes by mutating known codes
@@ -891,6 +1032,24 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       return { state: getAutoBetState(), config: getAutoBetConfig() };
     } catch {
       return { state: null, config: null };
+    }
+  });
+
+  // GET /predictions/dropping-odds — Oddspedia line-movement signals.
+  // Query: sport=football|basketball|tennis|all, minDrop=10, period=1hour|6hours|1day|3days
+  app.get('/dropping-odds', async (request, reply) => {
+    const q = request.query as { sport?: string; minDrop?: string; period?: string };
+    const sport = q.sport === 'basketball' || q.sport === 'tennis' || q.sport === 'all' ? q.sport : 'football';
+    const minDropPct = q.minDrop ? Math.max(0, Math.min(100, parseFloat(q.minDrop))) : 10;
+    const period = q.period === '1hour' || q.period === '6hours' || q.period === '3days' ? q.period : '1day';
+    try {
+      const result = await getDroppingOdds({ sport, minDropPct, period });
+      return result;
+    } catch (err) {
+      return reply.status(503).send({
+        error: 'Oddspedia dropping odds unavailable',
+        detail: err instanceof Error ? err.message : String(err),
+      });
     }
   });
 };

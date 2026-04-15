@@ -19,6 +19,7 @@ import { findPredictionForMatch } from './sports-ai-scraper.js';
 import { getSourceWeights } from './consensus-tracker.js';
 import { withScraperHealth } from './scraper-health.js';
 import { predictLiveState } from './live-state-predictor.js';
+import { getDroppingOdds, findDropForMatch, type DroppingOddsResult, type DroppingOddsMatch } from './oddspedia-dropping-odds.js';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -73,6 +74,11 @@ export interface LivePrediction {
 
   // Signal
   liveEdge: string | null;
+  dropSignal: {
+    topDropPct: number;
+    sides: Array<{ side: string; dropPct: number; currentOdds: number; peakOdds: number }>;
+    supportsBestPick: boolean;
+  } | null;
 }
 
 export interface LivePredictResult {
@@ -318,6 +324,7 @@ async function analyzeMatch(
   pinnacleMap: Map<string, PinnacleOdds>,
   weights: Map<string, number>,
   timeline: 'live' | 'prematch',
+  droppingOdds: DroppingOddsResult | null,
 ): Promise<LivePrediction> {
   // Run analysis sources in parallel
   const [poissonResult, sportsAiResult] = await Promise.allSettled([
@@ -532,7 +539,41 @@ async function analyzeMatch(
   const agreeing = sourceBestPicks.filter(p => p === bestPick).length;
   if (agreeing >= 3) confidence += 20;
   else if (agreeing >= 2) confidence += 10;
-  confidence = Math.min(100, confidence);
+
+  // Dropping-odds confirmation: if Oddspedia shows sharp money on the
+  // same side as our bestPick, that's an independent market-move signal
+  // and worth a confidence bump. If it points the other way, dock it.
+  let dropMatch: DroppingOddsMatch | null = null;
+  let dropSignalOut: LivePrediction['dropSignal'] = null;
+  if (droppingOdds) {
+    dropMatch = findDropForMatch(droppingOdds, ev.home, ev.away);
+    if (dropMatch) {
+      const sides = dropMatch.signals.map(s => ({
+        side: s.sideLabel,
+        dropPct: s.dropPct,
+        currentOdds: s.currentOdds,
+        peakOdds: s.peakOdds,
+      }));
+      const top = dropMatch.signals.reduce((a, b) => (a.dropPct >= b.dropPct ? a : b));
+      const topSide = top.side; // 'home' | 'draw' | 'away' | 'over' | ...
+      const bestPickKey = bestPick.toLowerCase();
+      const supports =
+        (topSide === 'home' && bestPickKey === 'home') ||
+        (topSide === 'draw' && bestPickKey === 'draw') ||
+        (topSide === 'away' && bestPickKey === 'away') ||
+        (topSide === 'over' && bestPickKey.startsWith('over')) ||
+        (topSide === 'under' && bestPickKey.startsWith('under')) ||
+        (topSide === 'btts_yes' && bestPickKey === 'btts');
+      if (supports && top.dropPct >= 15) confidence += 10;
+      else if (!supports && top.dropPct >= 25) confidence -= 10;
+      dropSignalOut = {
+        topDropPct: dropMatch.topDropPct,
+        sides,
+        supportsBestPick: supports,
+      };
+    }
+  }
+  confidence = Math.max(0, Math.min(100, confidence));
 
   // Live edge: only fire when we have an anchor (pinnacle or live-state)
   // and the edge clears 5%. Below that we're inside Pinnacle's own vig
@@ -579,6 +620,7 @@ async function analyzeMatch(
       sourceCount,
     },
     liveEdge,
+    dropSignal: dropSignalOut,
   };
 }
 
@@ -620,8 +662,10 @@ async function runPredictions(timeline: 'live' | 'prematch', limit: number): Pro
     };
   }
 
-  // 2. Pre-fetch shared data sources in parallel
-  const [tipsterResult, pinnacleResult, weightsResult] = await Promise.allSettled([
+  // 2. Pre-fetch shared data sources in parallel.
+  // Dropping odds is best-effort: failures (e.g. no Chrome on host) must
+  // not break the predictor, just skip the bonus signal.
+  const [tipsterResult, pinnacleResult, weightsResult, droppingResult] = await Promise.allSettled([
     scrapeAllTipsters(),
     batchPinnacleOdds(events.map(ev => ({
       homeTeam: ev.home,
@@ -630,18 +674,23 @@ async function runPredictions(timeline: 'live' | 'prematch', limit: number): Pro
       eventId: ev.eventId,
     }))),
     Promise.resolve(getSourceWeights()),
+    getDroppingOdds({ sport: 'all', minDropPct: 10 }),
   ]);
 
   const tipsterPredictions = tipsterResult.status === 'fulfilled' ? tipsterResult.value : [];
   const pinnacleMap = pinnacleResult.status === 'fulfilled' ? pinnacleResult.value : new Map<string, PinnacleOdds>();
   const weights = weightsResult.status === 'fulfilled' ? weightsResult.value : new Map<string, number>();
+  const droppingOdds = droppingResult.status === 'fulfilled' ? droppingResult.value : null;
+  if (droppingResult.status === 'rejected') {
+    logger.warn({ err: droppingResult.reason }, 'Oddspedia dropping odds unavailable');
+  }
 
   // 3. Analyze each match (parallel, batches of 10)
   const predictions: LivePrediction[] = [];
   for (let i = 0; i < events.length; i += 10) {
     const batch = events.slice(i, i + 10);
     const results = await Promise.allSettled(
-      batch.map(ev => analyzeMatch(ev, tipsterPredictions, pinnacleMap, weights, timeline)),
+      batch.map(ev => analyzeMatch(ev, tipsterPredictions, pinnacleMap, weights, timeline, droppingOdds)),
     );
     for (const r of results) {
       if (r.status === 'fulfilled') predictions.push(r.value);
@@ -662,6 +711,7 @@ async function runPredictions(timeline: 'live' | 'prematch', limit: number): Pro
   if (pinnacleMap.size > 0) activeSources.push('pinnacle');
   activeSources.push('poisson', 'sportsAi');
   if (timeline === 'live') activeSources.push('liveState');
+  if (droppingOdds && droppingOdds.matches.length > 0) activeSources.push('oddspedia-drop');
 
   logger.info({
     matches: predictions.length,
