@@ -874,6 +874,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
           <button class="chip" data-mf="correct score" style="padding:4px 10px;font-size:11px">CS</button>
           <button class="chip" data-mf="draw no bet" style="padding:4px 10px;font-size:11px">DNB</button>
           <button class="chip" data-mf="corner" style="padding:4px 10px;font-size:11px">Corners</button>
+          <button class="chip" data-mf="live" style="padding:4px 10px;font-size:11px;color:var(--green);border-color:rgba(52,212,114,0.3)">Live Games</button>
         </span>
       </div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:6px">
@@ -891,6 +892,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
           <button class="chip" data-mi="halftime" style="padding:4px 10px;font-size:11px">HT</button>
           <button class="chip" data-mi="correct score" style="padding:4px 10px;font-size:11px">CS</button>
           <button class="chip" data-mi="team ou" style="padding:4px 10px;font-size:11px">Team O/U</button>
+          <button class="chip" data-mi="live" style="padding:4px 10px;font-size:11px;color:var(--green);border-color:rgba(52,212,114,0.3)">Live Games</button>
         </span>
       </div>
     </div>
@@ -1369,6 +1371,34 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
+  <!-- Promo Edges -->
+  <div class="card" style="border-color:rgba(247,183,49,0.2);cursor:pointer" onclick="switchPage('promos')">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--amber-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M20 12v4H6a2 2 0 0 0-2 2c0 1.1.9 2 2 2h12v-4"/><path d="M15 12H4"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Promo Edges</div>
+        <div style="font-size:12px;color:var(--text-3)">1UP/2UP value, low-margin markets, +EV picks</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
+  <!-- Live Games -->
+  <div class="card" style="border-color:rgba(52,212,114,0.15);cursor:pointer" onclick="switchPage('livegames')">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--green-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Live Games</div>
+        <div style="font-size:12px;color:var(--text-3)">All live games with odds, betslip &amp; auto-generator</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
   <!-- Insights -->
   <div class="card" onclick="switchPage('tools')" style="cursor:pointer">
     <div style="display:flex;align-items:center;gap:10px">
@@ -1413,6 +1443,181 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   </div>
 
 
+</div>
+
+<!-- ===== PAGE: PROMO EDGES ===== -->
+<div class="page" id="page-promos">
+  <div style="margin-bottom:16px">
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:4px">Promo Edges</h2>
+    <div style="font-size:12px;color:var(--text-3)">+EV picks from Sportybet's promotional markets — 1UP/2UP insurance, low-margin pricing, state-model value</div>
+  </div>
+
+  <!-- Summary stats -->
+  <div class="hero" id="promo-hero">
+    <div class="hero-stat"><div class="hero-num" id="promo-total" style="color:var(--green)">--</div><div class="hero-label">Edges</div></div>
+    <div class="hero-stat"><div class="hero-num" id="promo-1up" style="color:var(--blue)">--</div><div class="hero-label">1UP/2UP</div></div>
+    <div class="hero-stat"><div class="hero-num" id="promo-margin" style="color:var(--amber)">--</div><div class="hero-label">Low Margin</div></div>
+    <div class="hero-stat"><div class="hero-num" id="promo-scanned" style="color:var(--purple)">--</div><div class="hero-label">Scanned</div></div>
+  </div>
+
+  <!-- Filter + refresh -->
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <div style="display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:3px" id="promo-type-tabs">
+      <button class="chip active" data-ptype="all" style="padding:5px 12px;font-size:11px">All</button>
+      <button class="chip" data-ptype="1up-vs-1x2" style="padding:5px 12px;font-size:11px">1UP</button>
+      <button class="chip" data-ptype="2up-vs-1x2" style="padding:5px 12px;font-size:11px">2UP</button>
+      <button class="chip" data-ptype="overround" style="padding:5px 12px;font-size:11px">Low Margin</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="promo-refresh-btn" style="gap:4px;display:inline-flex;align-items:center">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      Scan
+    </button>
+  </div>
+
+  <!-- Cashout Analyzer -->
+  <div class="card" style="border-color:rgba(176,124,255,0.2);margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div class="card-icon" style="background:var(--purple-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Cashout Analyzer</div>
+        <div style="font-size:11px;color:var(--text-3)">Should you take the cashout or let it ride? Model-based decision.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input type="text" id="cashout-code-input" placeholder="Code (e.g. PU4PZL)" maxlength="8" class="input-sm" style="flex:2;text-transform:uppercase;font-family:monospace;letter-spacing:1px" />
+      <input type="number" id="cashout-stake-input" placeholder="Stake" value="100" min="1" class="input-sm" style="flex:1" />
+      <input type="number" id="cashout-odds-input" placeholder="Odds (optional)" min="1" step="0.01" class="input-sm" style="flex:1" />
+      <button id="cashout-analyze-btn" class="btn btn-blue btn-sm" style="flex-shrink:0;background:var(--purple);box-shadow:0 2px 8px rgba(176,124,255,0.3)">Analyze</button>
+    </div>
+    <div style="font-size:10px;color:var(--text-3);margin-bottom:6px">Leave odds blank for pre-placement check. Enter original acca odds for cashout decision on placed bet.</div>
+    <div id="cashout-result"></div>
+  </div>
+
+  <!-- Promo explainer -->
+  <details style="margin-bottom:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:10px 12px">
+    <summary style="font-size:12px;font-weight:700;cursor:pointer;color:var(--text-2)">How each edge type works</summary>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-2);line-height:1.6">
+      <p><b style="color:var(--blue)">1UP</b> — bet settles as a win if your team leads by 1 goal at ANY point during the match. Strictly more winning scenarios than 1X2.</p>
+      <p><b style="color:var(--green)">2UP</b> — same, but needs a 2-goal lead at some point. Harder to trigger but pays well.</p>
+      <p><b style="color:var(--amber)">Low Margin</b> — when Sportybet's margin on a market is below 6% (vs typical 8%). Promotional pricing that gives back expected value.</p>
+      <p style="margin-top:8px;padding:6px;background:var(--red-soft);border-radius:4px;color:var(--red)"><b>Important:</b> "+EV" means positive expected value over many bets. Single bets can still lose. Bankroll management matters.</p>
+    </div>
+  </details>
+
+  <div id="promo-slip-result"></div>
+
+  <!-- Edges list -->
+  <div id="promo-list">
+    <div class="empty">Tap <b>Scan</b> to find promo edges...</div>
+  </div>
+
+  <!-- Floating betslip -->
+  <div class="slip-float" id="promo-slip-bar">
+    <div class="slip-top">
+      <span class="slip-picks" id="promo-slip-count">0 picks</span>
+      <span class="slip-odds-val" id="promo-slip-odds">0.00</span>
+    </div>
+    <div class="slip-details" id="promo-slip-details"></div>
+    <div class="slip-actions">
+      <button class="btn btn-ghost btn-sm" onclick="clearPromoSlip()">Clear All</button>
+      <button class="btn btn-green btn-sm" onclick="createPromoCode()" style="font-weight:800">Get Code</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: LIVE GAMES ===== -->
+<div class="page" id="page-livegames">
+  <!-- Hero stats -->
+  <div class="games-hero" id="lg-hero">
+    <div class="games-hero-stat">
+      <div class="games-hero-num" id="lg-total" style="color:var(--green)">--</div>
+      <div class="games-hero-label">Live</div>
+    </div>
+    <div class="games-hero-stat">
+      <div class="games-hero-num" id="lg-sports" style="color:var(--blue)">--</div>
+      <div class="games-hero-label">Sports</div>
+    </div>
+    <div class="games-hero-stat">
+      <div class="games-hero-num" id="lg-leagues" style="color:var(--amber)">--</div>
+      <div class="games-hero-label">Leagues</div>
+    </div>
+    <div class="games-hero-stat">
+      <div class="games-hero-num" id="lg-picks" style="color:var(--purple)">0</div>
+      <div class="games-hero-label">Picks</div>
+    </div>
+  </div>
+
+  <!-- Sport filter pills -->
+  <div style="display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;-webkit-overflow-scrolling:touch" id="lg-sport-tabs">
+    <button class="chip active" data-lgsport="all" style="flex-shrink:0">All</button>
+  </div>
+
+  <!-- Controls row -->
+  <div class="games-controls">
+    <div class="games-search-wrap" style="flex:1">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="lg-search" class="games-search" placeholder="Search team or league...">
+    </div>
+    <button class="btn btn-ghost btn-sm" id="lg-refresh-btn" style="flex-shrink:0;gap:4px;display:inline-flex;align-items:center">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      Refresh
+    </button>
+  </div>
+
+  <!-- Auto-generate controls -->
+  <div class="card" style="margin-bottom:12px;border-color:rgba(52,212,114,0.15)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div class="card-icon" style="background:var(--green-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Live Generator</div>
+        <div style="font-size:12px;color:var(--text-3)">Auto-pick from live games &amp; generate booking code</div>
+      </div>
+    </div>
+    <div class="gen-pills" id="lg-gen-btns" style="margin-bottom:10px">
+      <button type="button" class="gen-pill gen-pill-safe" data-lgt="2">x2</button>
+      <button type="button" class="gen-pill gen-pill-safe" data-lgt="3">x3</button>
+      <button type="button" class="gen-pill gen-pill-mid" data-lgt="5">x5</button>
+      <button type="button" class="gen-pill gen-pill-mid" data-lgt="10">x10</button>
+      <button type="button" class="gen-pill gen-pill-risky" data-lgt="20">x20</button>
+      <button type="button" class="gen-pill gen-pill-risky" data-lgt="50">x50</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input type="number" id="lg-custom-odds" placeholder="Custom odds" min="1.5" max="500" step="0.5" class="input-sm" style="flex:2;min-width:0" />
+      <select id="lg-max-games" class="input-sm" style="flex:1;min-width:0;cursor:pointer">
+        <option value="0">Auto</option>
+        <option value="3">3 games</option>
+        <option value="5">5 games</option>
+        <option value="8">8 games</option>
+        <option value="10">10 games</option>
+      </select>
+      <button id="lg-custom-go" class="btn btn-green" style="flex-shrink:0">Go</button>
+    </div>
+    <div id="lg-gen-results" style="margin-top:10px"></div>
+  </div>
+
+  <div id="lg-slip-result"></div>
+
+  <!-- Live games list -->
+  <div id="lg-list">
+    <div class="empty">Tap Refresh to load live games...</div>
+  </div>
+
+  <!-- Floating betslip -->
+  <div class="slip-float" id="lg-slip-bar">
+    <div class="slip-top">
+      <span class="slip-picks" id="lg-slip-count">0 picks</span>
+      <span class="slip-odds-val" id="lg-slip-odds">0.00</span>
+    </div>
+    <div class="slip-details" id="lg-slip-details"></div>
+    <div class="slip-actions">
+      <button class="btn btn-ghost btn-sm" onclick="clearLgSlip()">Clear All</button>
+      <button class="btn btn-green btn-sm" onclick="createLgCode()" style="font-weight:800">Get Booking Code</button>
+    </div>
+  </div>
 </div>
 
 </main>
@@ -1540,7 +1745,7 @@ function switchPage(name) {
   if (page) page.classList.add('active');
 
   // Highlight nav for main 4 tabs; sub-pages (generate, tools, history, arb, vfl) highlight "more"
-  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', live:'more' };
+  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', live:'more', livegames:'more', promos:'more' };
   const navTarget = navMap[name] || name;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === navTarget));
   document.querySelectorAll('#desktop-tabs .chip').forEach(b => {
@@ -1554,6 +1759,8 @@ function switchPage(name) {
   }
   if (name === 'history') { renderHistory(); refreshHistoryStatuses(); }
   if (name === 'arb' && !arbLoaded) loadArbitrage();
+  if (name === 'livegames' && !lgLoaded) loadLiveGames();
+  if (name === 'promos' && !promoLoaded) loadPromoEdges();
   if (name === 'more') {
     loadScraperHealth();
     startScraperHealthPoll();
@@ -1622,6 +1829,9 @@ function buildSelectionsHTML(selections, expanded) {
     const selData = canSelect ? `data-sel='${JSON.stringify({eventId:s.eventId,marketId:s.marketId,outcomeId:s.outcomeId,specifier:s.specifier||'',sportId:s.sportId}).replace(/'/g,"&#39;")}'` : '';
     return `<div class="sel-row" ${selData}>
       ${canSelect ? `<input type="checkbox" class="sel-check" style="flex-shrink:0;width:14px;height:14px;cursor:pointer;accent-color:var(--blue)" />` : `<span style="flex-shrink:0;width:14px;text-align:center">${icon}</span>`}
+      ${s._isLive ? `<span style="font-size:8px;font-weight:800;color:var(--green);background:var(--green-soft);padding:1px 5px;border-radius:3px;flex-shrink:0">LIVE${s._score ? ' ' + s._score : ''}${s._minute ? ' ' + s._minute : ''}</span>` : ''}
+      ${s._edge ? `<span style="font-size:8px;font-weight:700;color:var(--blue);background:var(--blue-soft);padding:1px 5px;border-radius:3px;flex-shrink:0">+${s._edge}% edge</span>` : ''}
+      ${s._modelProb ? `<span style="font-size:8px;font-weight:600;color:var(--amber);background:var(--amber-soft);padding:1px 5px;border-radius:3px;flex-shrink:0">${Math.round(s._modelProb)}% model</span>` : ''}
       <span class="sel-col-match" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${esc(s.homeTeam)} vs ${esc(s.awayTeam)}</span>
       <span class="sel-col-league" style="color:var(--text-3);font-size:9px;flex-shrink:0">${esc(league)}</span>
       <span class="sel-col-market" style="color:var(--blue);font-size:10px;flex-shrink:0;min-width:50px">${esc(s.market)}</span>
@@ -1696,6 +1906,7 @@ async function loadBookingCodes() {
       recordConsensus(c.selections, c.code);
       addToGamePool(c.selections);
     }
+    finalizeGamePool();
 
     const conPicks = gamePool.filter(g => getConsensus(g) >= 2).length;
     document.getElementById('stat-consensus').textContent = conPicks;
@@ -2783,6 +2994,7 @@ document.getElementById('history-clear-btn').onclick = () => { if (confirm('Clea
 
 // ===== GAME POOL & CONSENSUS =====
 let gamePool = [];
+const gamePoolKeys = new Set();
 const consensusMap = new Map();
 let totalCodesLoaded = 0;
 
@@ -2888,20 +3100,46 @@ function addToGamePool(selections) {
     // Filter gimmick markets
     if (isGimmickMarket(s.market)) continue;
     const key = s.eventId+':'+s.marketId+':'+s.outcomeId;
-    if (gamePool.some(g => g._key === key)) continue;
+    if (gamePoolKeys.has(key)) continue;
     let matchDate = s.matchDate || null;
     if (!matchDate && s.estimateStartTime) { const d = new Date(s.estimateStartTime); matchDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
     recordOdds(s);
     gamePool.push({...s, _key:key, matchDate});
+    gamePoolKeys.add(key);
   }
   saveOddsHistory();
-  gamePool.sort((a,b) => safetyScore(b) - safetyScore(a));
+}
+
+// Call after a batch of addToGamePool() — computes safety once per game,
+// sorts by the cached value, and refreshes pool-count UI.
+function finalizeGamePool() {
+  for (const g of gamePool) g._safety = safetyScore(g);
+  gamePool.sort((a,b) => b._safety - a._safety);
   const now = new Date();
   const todayStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
   const todayCount = gamePool.filter(g => !g.matchDate || g.matchDate === todayStr).length;
-  document.getElementById('pool-count').textContent = gamePool.length > 0 ? todayCount+' today / '+gamePool.length+' total' : 'load codes first';
-  document.getElementById('stat-games').textContent = todayCount;
-  document.getElementById('today-stat-games').textContent = todayCount;
+  const poolEl = document.getElementById('pool-count');
+  if (poolEl) poolEl.textContent = gamePool.length > 0 ? todayCount+' today / '+gamePool.length+' total' : 'load codes first';
+  const statGames = document.getElementById('stat-games');
+  if (statGames) statGames.textContent = todayCount;
+  const todayStatGames = document.getElementById('today-stat-games');
+  if (todayStatGames) todayStatGames.textContent = todayCount;
+}
+
+function updatePoolCount() {
+  const now = new Date();
+  const todayStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  const todayCount = gamePool.filter(g => !g.matchDate || g.matchDate === todayStr).length;
+  const liveCount = includedMarkets.has('live') ? liveGamesPool.length : 0;
+  const total = gamePool.length + liveCount;
+  const el = document.getElementById('pool-count');
+  if (liveCount > 0) {
+    el.textContent = todayCount + ' today + ' + liveCount + ' live';
+    el.style.color = 'var(--green)';
+  } else {
+    el.textContent = total > 0 ? todayCount + ' today / ' + total + ' total' : 'load codes first';
+    el.style.color = '';
+  }
 }
 
 // ===== LEARNED WIN RATES =====
@@ -3036,13 +3274,16 @@ function safetyScore(g) {
   const pick = (g.pick||'').toLowerCase();
 
   // HARD EXCLUDE — games starting in <20 min or already live
-  if (g.estimateStartTime) {
-    const minsUntil = (g.estimateStartTime - Date.now()) / 60000;
-    if (minsUntil < 20) return 0;
+  // UNLESS this is a live game explicitly pulled in via the "Live Games" include filter
+  if (!g._isLive) {
+    if (g.estimateStartTime) {
+      const minsUntil = (g.estimateStartTime - Date.now()) / 60000;
+      if (minsUntil < 20) return 0;
+    }
+    // FIX 3: Also exclude by match status
+    const status = (g.matchStatus || '').toLowerCase();
+    if (status === 'live' || status === '1h' || status === '2h' || status === 'ht' || status === 'ended') return 0;
   }
-  // FIX 3: Also exclude by match status
-  const status = (g.matchStatus || '').toLowerCase();
-  if (status === 'live' || status === '1h' || status === '2h' || status === 'ht' || status === 'ended') return 0;
 
   // MARKET TYPE
   if (mkt.includes('over/under')||mkt.includes('total')) {
@@ -3368,9 +3609,17 @@ function estimateProb(g) {
   const mkt = (g.market || '').toLowerCase();
   const pick = (g.pick || '').toLowerCase();
 
-  // FIX 3: Exclude live/ended games
-  const status = (g.matchStatus || '').toLowerCase();
-  if (status === 'live' || status === '1h' || status === '2h' || status === 'ht' || status === 'ended') return 0;
+  // Live games come from the state-model which already computed a probability.
+  // Use it directly — it knows the current score & time remaining.
+  if (g._isLive && typeof g._modelProb === 'number' && g._modelProb > 0) {
+    return Math.min(0.98, Math.max(0.02, g._modelProb / 100));
+  }
+
+  // FIX 3: Exclude live/ended games (unless explicitly included via Live Games filter)
+  if (!g._isLive) {
+    const status = (g.matchStatus || '').toLowerCase();
+    if (status === 'live' || status === '1h' || status === '2h' || status === 'ht' || status === 'ended') return 0;
+  }
 
   // FIX 10: Per-market margin stripping (Sportybet margins vary by market)
   let margin = 0.94; // default 6%
@@ -3582,23 +3831,88 @@ document.querySelectorAll('#market-filter-chips .chip').forEach(b => {
     } else {
       excludedMarkets.add(mf);
       b.classList.add('active');
+      // If excluding live, also remove from include
+      if (mf === 'live' && includedMarkets.has('live')) {
+        includedMarkets.delete('live');
+        document.querySelector('#market-include-chips [data-mi="live"]')?.classList.remove('active');
+      }
     }
   };
 });
 
 // Include-only market filter
 document.querySelectorAll('#market-include-chips .chip').forEach(b => {
-  b.onclick = () => {
+  b.onclick = async () => {
     const mi = b.dataset.mi;
     if (includedMarkets.has(mi)) {
       includedMarkets.delete(mi);
       b.classList.remove('active');
+      if (mi === 'live') updatePoolCount();
     } else {
       includedMarkets.add(mi);
       b.classList.add('active');
+      // When "Live Games" is toggled on, run the state-model and load value picks
+      if (mi === 'live') {
+        // Auto-remove from exclude if also there (conflict)
+        if (excludedMarkets.has('live')) {
+          excludedMarkets.delete('live');
+          document.querySelector('#market-filter-chips [data-mf="live"]')?.classList.remove('active');
+        }
+        b.textContent = 'Analyzing live...';
+        const livePool = await fetchLiveGamesForPool();
+        b.textContent = 'Live Value (' + livePool.length + ')';
+        showToast(livePool.length + ' value picks found (' + liveGamesPoolStats.highConfidence + ' high-conf)', 'success');
+        updatePoolCount();
+      }
     }
   };
 });
+
+// Live games pool injection — uses state-model value picks (REAL live prediction)
+let liveGamesPoolLoaded = false;
+let liveGamesPool = [];
+let liveGamesPoolStats = { total: 0, highConfidence: 0 };
+
+async function fetchLiveGamesForPool() {
+  if (liveGamesPoolLoaded && liveGamesPool.length) return liveGamesPool;
+  try {
+    // Use the value-picks endpoint which runs the state-aware model
+    // Only returns outcomes with positive Kelly edge vs Sportybet's odds
+    const res = await fetch('/predictions/live-value-picks?minEdge=2');
+    if (!res.ok) return [];
+    const json = await res.json();
+    const valuePicks = json.picks || [];
+    liveGamesPool = [];
+    for (const p of valuePicks) {
+      const key = p.eventId + ':' + p.marketId + ':' + p.outcomeId;
+      liveGamesPool.push({
+        eventId: p.eventId, marketId: p.marketId, outcomeId: p.outcomeId,
+        specifier: p.specifier || '', sportId: p.sportId,
+        odds: p.odds,
+        homeTeam: p.home, awayTeam: p.away,
+        market: p.market, pick: p.pick,
+        league: p.league,
+        matchStatus: p.matchStatus || 'Live',
+        matchDate: new Date().toISOString().slice(0, 10),
+        isWinning: null, _key: key, _isLive: true,
+        // State-model annotations
+        _edge: p.edge,
+        _confidence: p.confidence,
+        _modelProb: p.probability,
+        _score: p.score,
+        _minute: p.minute,
+        _fragility: p.fragility,
+        _flipRisk: p.flipRisk,
+      });
+    }
+    liveGamesPoolLoaded = true;
+    liveGamesPoolStats = { total: json.totalCount || valuePicks.length, highConfidence: json.highConfidence || 0 };
+    return liveGamesPool;
+  } catch (e) {
+    console.error('Failed to fetch live games for pool:', e);
+    return [];
+  }
+}
 
 // Source tabs (Scraped / Discovered)
 document.querySelectorAll('#source-tabs .chip').forEach(btn => {
@@ -3674,6 +3988,7 @@ async function runDiscovery() {
       recordConsensus(c.selections, c.code);
       addToGamePool(c.selections);
     }
+    finalizeGamePool();
 
     // Update badge
     document.getElementById('discovered-badge').textContent = '(' + discoveredCodes.length + ')';
@@ -3740,6 +4055,7 @@ async function runDiscoverySilent() {
       recordConsensus(c.selections, c.code);
       addToGamePool(c.selections);
     }
+    finalizeGamePool();
     document.getElementById('discovered-badge').textContent = '(' + discoveredCodes.length + ')';
   } catch {}
   discoveryRunning = false;
@@ -3767,17 +4083,38 @@ document.querySelectorAll('#gen-tabs .chip').forEach(btn => {
   };
 });
 
-function getEligibleGames(targetOdds) {
+async function getEligibleGames(targetOdds) {
   const today = new Date();
   const maxDays = selectedDaysRange > 0 ? selectedDaysRange : (targetOdds >= 20 ? 3 : targetOdds >= 10 ? 2 : 1);
   const dates = new Set();
   for (let d=0;d<maxDays;d++) { const dt = new Date(today); dt.setDate(dt.getDate()+d); dates.add(dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')); }
-  let pool = gamePool.filter(g => !g.matchDate || dates.has(g.matchDate));
+
+  // If "live" is in include-only, use ONLY live games (prematch excluded entirely)
+  // If "live" is mixed with specific market includes, use only LIVE games that match those markets
+  const wantLiveOnly = includedMarkets.has('live');
+  const excludeLive = excludedMarkets.has('live');
+
+  let pool;
+  if (wantLiveOnly) {
+    // Live games exclusively — the user explicitly opted in
+    pool = await fetchLiveGamesForPool();
+    pool = [...pool];
+  } else if (!excludeLive) {
+    // Default: prematch only (original behavior)
+    pool = gamePool.filter(g => !g.matchDate || dates.has(g.matchDate));
+  } else {
+    // Exclude live explicitly
+    pool = gamePool.filter(g => (!g.matchDate || dates.has(g.matchDate)) && !g._isLive);
+  }
+
   // Include-only filter (if any chips selected, ONLY those markets pass)
-  if (includedMarkets.size > 0) {
+  // "live" is handled above, so skip it in the market matching
+  const marketIncludes = new Set([...includedMarkets].filter(x => x !== 'live'));
+  if (marketIncludes.size > 0) {
     pool = pool.filter(g => {
+      if (g._isLive && includedMarkets.has('live')) return true; // live games already included
       const m = (g.market||'').toLowerCase();
-      for (const mi of includedMarkets) {
+      for (const mi of marketIncludes) {
         if (mi==='1x2' && (m==='1x2'||m==='match winner'||(m.includes('1x2')&&!m.includes('from')&&!m.includes('1up')&&!m.includes('2up')))) return true;
         if (mi==='over/under' && (m==='over/under'||(m.includes('over/under')&&!m.includes('team')&&!m.includes('1st')&&!m.includes('2nd')&&!m.includes('early')&&!m.includes('corner')))) return true;
         if (mi==='gg' && (m.includes('both teams')||m.includes('btts')||m==='gg/ng')) return true;
@@ -3795,10 +4132,11 @@ function getEligibleGames(targetOdds) {
     });
   }
   // Exclude filter (applies after include)
-  if (excludedMarkets.size > 0) {
+  const marketExcludes = new Set([...excludedMarkets].filter(x => x !== 'live'));
+  if (marketExcludes.size > 0) {
     pool = pool.filter(g => {
       const m = (g.market||'').toLowerCase();
-      for (const mf of excludedMarkets) {
+      for (const mf of marketExcludes) {
         if (mf==='gg' && (m.includes('both teams')||m.includes('btts')||m.includes('gg'))) return false;
         if (mf==='over/under' && (m.includes('over/under')||m.includes('total')||m.includes('over ')||m.includes('under '))) return false;
         if (mf==='1x2' && (m==='1x2'||m.includes('1x2')||m==='match winner')) return false;
@@ -3843,9 +4181,86 @@ function getConstraints(targetOdds) {
   return c;
 }
 
-function pickDiversifiedSets(targetOdds) {
-  if (!gamePool.length) return [];
-  const available = getEligibleGames(targetOdds);
+// Live-games-only picking: no consensus/enrichment data, so use pure odds-based algorithm
+function pickLiveOnlySets(pool, targetOdds) {
+  if (!pool.length) return [];
+
+  const maxLegs = selectedGamesCount > 0 ? selectedGamesCount :
+    targetOdds <= 2 ? 2 : targetOdds <= 3 ? 3 : targetOdds <= 5 ? 4 :
+    targetOdds <= 10 ? 5 : targetOdds <= 20 ? 6 : targetOdds <= 50 ? 8 : 10;
+
+  function pickStrategy(strategy) {
+    const idealPerLeg = Math.pow(targetOdds, 1 / maxLegs);
+    let minOdds, maxOdds;
+    if (strategy === 'safe') {
+      minOdds = Math.max(1.12, idealPerLeg * 0.7);
+      maxOdds = Math.min(4.0, idealPerLeg * 2.0);
+    } else if (strategy === 'value') {
+      minOdds = Math.max(1.20, idealPerLeg * 0.8);
+      maxOdds = Math.min(6.0, idealPerLeg * 2.5);
+    } else { // high-risk
+      minOdds = Math.max(1.30, idealPerLeg * 0.9);
+      maxOdds = Math.min(10.0, idealPerLeg * 3.5);
+    }
+
+    const candidates = pool
+      .filter(p => p.odds >= minOdds && p.odds <= maxOdds)
+      .sort((a, b) => Math.abs(a.odds - idealPerLeg) - Math.abs(b.odds - idealPerLeg));
+
+    // Split into tiers and shuffle within tier for variety
+    const tier1 = candidates.filter(p => Math.abs(p.odds - idealPerLeg) < idealPerLeg * 0.3);
+    for (let i = tier1.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tier1[i], tier1[j]] = [tier1[j], tier1[i]];
+    }
+    const tier2 = candidates.filter(p => Math.abs(p.odds - idealPerLeg) >= idealPerLeg * 0.3);
+    const src = [...tier1, ...tier2];
+
+    const picks = []; const usedEvents = new Set(); let currentOdds = 1;
+    for (const p of src) {
+      if (picks.length >= maxLegs || currentOdds >= targetOdds) break;
+      if (usedEvents.has(p.eventId)) continue;
+      const remaining = maxLegs - picks.length - 1;
+      if (remaining > 0 && currentOdds * p.odds > targetOdds * 1.3) continue;
+      picks.push(p);
+      usedEvents.add(p.eventId);
+      currentOdds *= p.odds;
+    }
+    // If we undershot, add more picks from higher-odds pool
+    if (currentOdds < targetOdds * 0.85 && picks.length < maxLegs + 2) {
+      const remaining = pool.filter(p => !usedEvents.has(p.eventId) && p.odds >= 1.15 && p.odds <= maxOdds * 1.5).sort((a, b) => b.odds - a.odds);
+      for (const p of remaining) {
+        if (currentOdds >= targetOdds || picks.length >= maxLegs + 2) break;
+        if (usedEvents.has(p.eventId)) continue;
+        picks.push(p);
+        usedEvents.add(p.eventId);
+        currentOdds *= p.odds;
+      }
+    }
+    return { picks, odds: currentOdds };
+  }
+
+  const sets = [];
+  const safe = pickStrategy('safe');
+  if (safe.picks.length && safe.odds >= targetOdds * 0.6) { safe.picks._strategy = 'safe'; sets.push(safe.picks); }
+  const value = pickStrategy('value');
+  if (value.picks.length && value.odds >= targetOdds * 0.6) { value.picks._strategy = 'value'; sets.push(value.picks); }
+  const risk = pickStrategy('high-risk');
+  if (risk.picks.length && risk.odds >= targetOdds * 0.6) { risk.picks._strategy = 'high-risk'; sets.push(risk.picks); }
+
+  return sets;
+}
+
+async function pickDiversifiedSets(targetOdds) {
+  const wantsLive = includedMarkets.has('live');
+  if (!gamePool.length && !wantsLive) return [];
+  const available = await getEligibleGames(targetOdds);
+
+  // LIVE-ONLY MODE: use smart odds-based picking (no consensus/enrichment data available)
+  const liveOnlyMode = wantsLive && available.length > 0 && available.every(g => g._isLive);
+  if (liveOnlyMode) {
+    return pickLiveOnlySets(available, targetOdds);
+  }
   // Score each game with BOTH safety (for display) and calibrated probability (for selection)
   const scored = available.map(g => ({
     ...g,
@@ -3884,12 +4299,20 @@ function pickDiversifiedSets(targetOdds) {
    */
   function pickSet(pool, sortMode, minSafety) {
     const safetyCutoff = minSafety || 0;
-    const eligible = pool.filter(g =>
-      g.odds >= C.minOdds &&
-      g.odds <= C.maxOdds &&
-      g._prob > 0.01 &&
-      g._safety >= safetyCutoff
-    );
+    // Live games get a relaxed max odds cap since their odds fluctuate more during the match
+    const liveMaxOdds = Math.max(C.maxOdds * 2, 8);
+    const eligible = pool.filter(g => {
+      if (g._isLive) {
+        // Live games: bypass safety cutoff, relax max odds, keep min odds sane
+        return g.odds >= Math.max(1.05, C.minOdds * 0.9)
+          && g.odds <= liveMaxOdds
+          && g._prob > 0.01;
+      }
+      return g.odds >= C.minOdds
+        && g.odds <= C.maxOdds
+        && g._prob > 0.01
+        && g._safety >= safetyCutoff;
+    });
 
     // Ideal odds per pick: what each pick should contribute to reach target
     const idealOdds = Math.pow(targetOdds, 1 / Math.max(3, C.maxLegs * 0.75));
@@ -4049,7 +4472,7 @@ async function fetchEnrichment() {
 
   // Send top 25 candidates (by current safety score) for enrichment
   const top = [...gamePool]
-    .sort((a, b) => safetyScore(b) - safetyScore(a))
+    .sort((a, b) => (b._safety ?? 0) - (a._safety ?? 0))
     .slice(0, 25)
     .map(g => ({ homeTeam: g.homeTeam, awayTeam: g.awayTeam, matchDate: g.matchDate, eventId: g.eventId }));
 
@@ -4064,8 +4487,8 @@ async function fetchEnrichment() {
       enrichmentData = json.data;
       // Generate stat-based picks from enrichment data
       generateStatPicks();
-      // Re-sort the game pool now that we have enrichment data
-      gamePool.sort((a, b) => safetyScore(b) - safetyScore(a));
+      // Re-score and re-sort the pool now that enrichment is available
+      finalizeGamePool();
     }
   } catch {}
 }
@@ -4170,6 +4593,7 @@ function generateStatPicks() {
         _statConfidence: statPick.confidence,
       };
       gamePool.push(synth);
+      gamePoolKeys.add(key);
 
       // Record consensus from stats engine
       currentCodeSource = 'Stats Engine';
@@ -4203,7 +4627,7 @@ async function fetchPinnacleOdds() {
 
   // Send top 25 candidates for Pinnacle price comparison
   const top = [...gamePool]
-    .sort((a, b) => safetyScore(b) - safetyScore(a))
+    .sort((a, b) => (b._safety ?? 0) - (a._safety ?? 0))
     .slice(0, 25)
     .map(g => ({ homeTeam: g.homeTeam, awayTeam: g.awayTeam, league: g.league || '', eventId: g.eventId }));
 
@@ -4216,8 +4640,8 @@ async function fetchPinnacleOdds() {
     const json = await res.json();
     if (json.data) {
       pinnacleData = json.data;
-      // Re-sort pool with Pinnacle value signal
-      gamePool.sort((a, b) => safetyScore(b) - safetyScore(a));
+      // Re-score and re-sort with Pinnacle value signal
+      finalizeGamePool();
     }
   } catch {}
 }
@@ -4296,15 +4720,24 @@ async function generateSafeCode(targetOdds, btn) {
   const resultsDiv = document.getElementById('auto-gen-results');
   btnLoad(btn);
 
+  // Clear stale errors from previous attempts
+  [...resultsDiv.children].forEach(c => {
+    if (c.textContent && c.textContent.includes('Failed to generate')) c.remove();
+  });
+
   // Auto-discover codes if not done yet — WAIT for it so pool is full before picking
-  if (!discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) {
+  // Skip discovery when using live games only (discovery scrapes prematch code hubs)
+  const wantsLiveOnly = includedMarkets.has('live');
+  if (!wantsLiveOnly && !discoveredCodes.length && allBookingCodes.length > 0 && !discoveryRunning) {
     await runDiscoverySilent();
   }
-  // Fetch enrichment + news data
-  await Promise.all([fetchEnrichment(), fetchTeamNews(), fetchPinnacleOdds()]);
+  // Fetch enrichment + news data (skip for live-only since these are prematch-focused)
+  if (!wantsLiveOnly) {
+    await Promise.all([fetchEnrichment(), fetchTeamNews(), fetchPinnacleOdds()]);
+  }
 
   const poolBefore = gamePool.length;
-  const sets = pickDiversifiedSets(targetOdds);
+  const sets = await pickDiversifiedSets(targetOdds);
   if (!sets.length) {
     btnDone(btn);
     resultsDiv.innerHTML = '<div style="padding:12px;color:var(--amber);font-size:13px">Not enough games in the pool. Load more codes or try a lower target.</div>';
@@ -4423,7 +4856,25 @@ async function generateSafeCode(targetOdds, btn) {
     wrapper.scrollIntoView({behavior:'smooth',block:'start'});
     showToast(successCodes.length+' codes generated!', 'success');
   } else {
-    resultsDiv.innerHTML = '<div style="padding:10px;color:var(--red);font-size:12px">Failed to generate.</div>' + resultsDiv.innerHTML;
+    // Collect reason for each failed code
+    const errors = results
+      .map(r => {
+        if (r.status !== 'fulfilled') return String(r.reason || 'network error');
+        const d = r.value?.data;
+        if (!d) return 'no response';
+        if (d.bizCode === 10000 && d.data?.shareCode) return null; // success
+        // Sportybet returns error info like "message", "innerMsg", "unavailableOutcomes"
+        const parts = [];
+        if (d.message && d.message !== 'Success') parts.push(d.message);
+        if (d.innerMsg && d.innerMsg !== d.message) parts.push(d.innerMsg);
+        if (d.data?.unavailableOutcomes?.length) parts.push(d.data.unavailableOutcomes.length + ' stale odds');
+        if (d.bizCode && d.bizCode !== 10000 && !parts.length) parts.push('code ' + d.bizCode);
+        return parts.length ? parts.join(' — ') : ('bizCode=' + d.bizCode);
+      })
+      .filter(e => e !== null);
+    const uniqueErrors = [...new Set(errors)].slice(0, 3);
+    const errMsg = uniqueErrors.length ? ' — ' + uniqueErrors.join(' | ') : '';
+    resultsDiv.innerHTML = '<div style="padding:10px;color:var(--red);font-size:12px;background:var(--red-soft);border-radius:var(--r-xs);margin-bottom:10px">Failed to generate' + esc(errMsg) + '<br><span style="font-size:10px;color:var(--text-3)">Live odds may have changed during submission. Try again.</span></div>' + resultsDiv.innerHTML;
   }
 
   loading.remove();
@@ -4655,6 +5106,7 @@ document.getElementById('load-code-btn').onclick = async () => {
     const statusText = pending>0?pending+' pending':lost>0?'Lost ('+lost+' failed)':'All Won!';
     rd.innerHTML = `<div style="border:1px solid rgba(34,197,94,0.25);border-radius:var(--r-sm);background:var(--green-soft);padding:14px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:20px;font-weight:800;font-family:monospace;letter-spacing:2px;color:var(--green)">${esc(code)}</span><span style="font-size:9px;color:var(--green);font-weight:700">${I.check(9,'var(--green)')} VALID</span><span style="font-size:11px;color:${statusCol};font-weight:700">${statusText}</span></div><div style="display:flex;gap:12px;font-size:12px;color:var(--text-3);margin-bottom:8px"><span><b style="color:var(--text)">${selections.length}</b> games</span><span>Total: <b style="color:var(--amber)">${totalOdds.toLocaleString(undefined,{maximumFractionDigits:2})}</b></span></div>${buildSelectionsHTML(selections, selections.length<=20)}</div>`;
     addToGamePool(selections);
+    finalizeGamePool();
   } catch { rd.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px">Connection error</div>'; }
   btnDone(loadBtn);
 };
@@ -6344,6 +6796,810 @@ async function loadCrossOdds() {
 }
 
 document.getElementById('cross-odds-btn').onclick = () => loadCrossOdds();
+
+// ===== CASHOUT ANALYZER =====
+async function analyzeCashoutCode() {
+  const code = (document.getElementById('cashout-code-input').value || '').toUpperCase().trim();
+  const stake = parseFloat(document.getElementById('cashout-stake-input').value) || 100;
+  const originalOdds = parseFloat(document.getElementById('cashout-odds-input').value) || 0;
+  const resultEl = document.getElementById('cashout-result');
+
+  if (!code || !/^[A-Z0-9]{4,8}$/.test(code)) {
+    resultEl.innerHTML = '<div style="padding:8px;color:var(--red);font-size:12px">Enter a valid booking code (4-8 alphanumeric chars)</div>';
+    return;
+  }
+
+  resultEl.innerHTML = '<div style="padding:12px;text-align:center"><div class="spinner" style="width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 6px"></div><span style="font-size:12px;color:var(--text-3)">Analyzing ' + code + '...</span></div>';
+
+  try {
+    let url = `/predictions/cashout?code=${encodeURIComponent(code)}&stake=${stake}`;
+    if (originalOdds > 1) url += `&originalOdds=${originalOdds}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error');
+    const d = await res.json();
+
+    if (!d.valid) {
+      resultEl.innerHTML = `<div style="padding:10px;color:var(--red);font-size:12px;background:var(--red-soft);border-radius:var(--r-xs)">${esc(d.explanation || 'Invalid code')}</div>`;
+      return;
+    }
+
+    // Recommendation badge colors
+    const recMeta = {
+      HOLD:          { color: 'var(--green)', bg: 'var(--green-soft)', label: 'HOLD — Don\'t cash out', icon: '✋' },
+      TAKE_CASHOUT:  { color: 'var(--amber)', bg: 'var(--amber-soft)', label: 'TAKE THE CASHOUT', icon: '💰' },
+      DEAD_BET:     { color: 'var(--red)', bg: 'var(--red-soft)', label: 'DEAD BET', icon: '💀' },
+      ALREADY_WON:  { color: 'var(--green)', bg: 'var(--green-soft)', label: 'ALREADY WON', icon: '🏆' },
+      CLOSE_CALL:   { color: 'var(--text-2)', bg: 'rgba(255,255,255,0.04)', label: 'CLOSE CALL', icon: '⚖️' },
+    };
+    const m = recMeta[d.recommendation] || recMeta.CLOSE_CALL;
+
+    let html = '';
+
+    // Recommendation banner
+    html += `<div style="padding:14px;background:${m.bg};border:1px solid ${m.color};border-radius:var(--r-xs);margin-bottom:10px">`;
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">`;
+    html += `<span style="font-size:20px">${m.icon}</span>`;
+    html += `<span style="font-size:14px;font-weight:800;color:${m.color}">${m.label}</span>`;
+    html += `<span style="margin-left:auto;font-size:10px;color:var(--text-3)">conf ${d.confidence}</span>`;
+    html += `</div>`;
+    html += `<div style="font-size:12px;color:var(--text-2);line-height:1.5">${esc(d.explanation)}</div>`;
+    html += `</div>`;
+
+    // Numbers grid
+    html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">`;
+    html += `<div style="padding:8px;background:var(--bg);border-radius:var(--r-xs);text-align:center">`;
+    html += `<div style="font-size:10px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Potential Win</div>`;
+    html += `<div style="font-size:15px;font-weight:800;color:var(--amber);margin-top:3px">${d.potentialWin.toFixed(0)}</div>`;
+    html += `<div style="font-size:9px;color:var(--text-3)">@${d.totalOriginalOdds.toFixed(2)}</div>`;
+    html += `</div>`;
+    html += `<div style="padding:8px;background:var(--bg);border-radius:var(--r-xs);text-align:center">`;
+    html += `<div style="font-size:10px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Cashout Now</div>`;
+    html += `<div style="font-size:15px;font-weight:800;color:var(--text);margin-top:3px">${d.simulatedCashout.toFixed(0)}</div>`;
+    html += `<div style="font-size:9px;color:var(--text-3)">Market view</div>`;
+    html += `</div>`;
+    html += `<div style="padding:8px;background:var(--bg);border-radius:var(--r-xs);text-align:center">`;
+    html += `<div style="font-size:10px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">True Value</div>`;
+    html += `<div style="font-size:15px;font-weight:800;color:var(--green);margin-top:3px">${d.trueExpectedValue.toFixed(0)}</div>`;
+    html += `<div style="font-size:9px;color:var(--text-3)">Model view</div>`;
+    html += `</div>`;
+    html += `</div>`;
+
+    // Legs breakdown
+    html += `<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Legs (${d.totalLegs})</div>`;
+    for (const l of d.legs) {
+      const statusColor = l.status === 'won' ? 'var(--green)' : l.status === 'lost' ? 'var(--red)' : 'var(--blue)';
+      const statusBg = l.status === 'won' ? 'var(--green-soft)' : l.status === 'lost' ? 'var(--red-soft)' : 'var(--blue-soft)';
+      const statusLabel = l.status === 'won' ? 'WON' : l.status === 'lost' ? 'LOST' : 'PENDING';
+      html += `<div style="padding:8px 10px;background:var(--bg);border-radius:var(--r-xs);margin-bottom:4px;font-size:11px">`;
+      html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">`;
+      html += `<span style="font-size:9px;font-weight:800;color:${statusColor};background:${statusBg};padding:2px 5px;border-radius:3px">${statusLabel}</span>`;
+      if (l.isLive && l.score) html += `<span style="font-size:9px;font-weight:700;color:var(--green)">LIVE ${esc(l.score)}${l.minute ? ' ' + esc(l.minute) : ''}</span>`;
+      html += `<span style="font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.homeTeam)} vs ${esc(l.awayTeam)}</span>`;
+      html += `</div>`;
+      html += `<div style="display:flex;align-items:center;gap:8px;color:var(--text-3);font-size:10px">`;
+      html += `<span style="color:var(--blue)">${esc(l.marketDesc)} - ${esc(l.pick)}</span>`;
+      html += `<span style="margin-left:auto">orig@${l.originalOdds.toFixed(2)}`;
+      if (l.currentOdds && Math.abs(l.currentOdds - l.originalOdds) > 0.01) html += ` → now@${l.currentOdds.toFixed(2)}`;
+      html += `</span>`;
+      if (l.modelProb !== null && l.status === 'pending') {
+        const prob = Math.round(l.modelProb * 100);
+        const probCol = prob >= 80 ? 'var(--green)' : prob >= 50 ? 'var(--blue)' : 'var(--amber)';
+        html += `<span style="color:${probCol};font-weight:700">${prob}% model</span>`;
+      }
+      html += `</div>`;
+      html += `</div>`;
+    }
+
+    resultEl.innerHTML = html;
+  } catch (e) {
+    console.error(e);
+    resultEl.innerHTML = '<div style="padding:10px;color:var(--red);font-size:12px">Failed to analyze. Check code and try again.</div>';
+  }
+}
+document.getElementById('cashout-analyze-btn').onclick = analyzeCashoutCode;
+document.getElementById('cashout-code-input').addEventListener('keydown', e => { if (e.key === 'Enter') analyzeCashoutCode(); });
+
+// ===== PROMO EDGES =====
+let promoData = [];
+let promoLoaded = false;
+let promoTypeFilter = 'all';
+const promoSlip = new Map();
+
+document.getElementById('promo-refresh-btn').onclick = () => loadPromoEdges(true);
+document.getElementById('promo-type-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('[data-ptype]');
+  if (!btn) return;
+  document.querySelectorAll('#promo-type-tabs .chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  promoTypeFilter = btn.dataset.ptype;
+  renderPromoEdges();
+});
+
+async function loadPromoEdges(forceRefresh) {
+  const listEl = document.getElementById('promo-list');
+  listEl.innerHTML = '<div class="empty"><div class="spinner" style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 10px"></div>Scanning for promo edges...</div>';
+
+  try {
+    const url = '/predictions/promo-edges' + (forceRefresh ? '?refresh=1' : '');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error');
+    const json = await res.json();
+    promoData = json.edges || [];
+    promoLoaded = true;
+    document.getElementById('promo-total').textContent = promoData.length;
+    document.getElementById('promo-scanned').textContent = json.scannedEvents || 0;
+    const byType = json.byType || {};
+    document.getElementById('promo-1up').textContent = (byType['1up-vs-1x2'] || 0) + (byType['2up-vs-1x2'] || 0);
+    document.getElementById('promo-margin').textContent = byType['overround'] || 0;
+    renderPromoEdges();
+  } catch (e) {
+    console.error('Promo edges load error:', e);
+    listEl.innerHTML = '<div class="empty" style="color:var(--red)">Failed to scan. Try again.</div>';
+  }
+}
+
+function renderPromoEdges() {
+  const listEl = document.getElementById('promo-list');
+  let filtered = promoData;
+  if (promoTypeFilter !== 'all') filtered = filtered.filter(e => e.type === promoTypeFilter);
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="empty" style="padding:24px">No edges found for this filter.<br><span style="font-size:11px;color:var(--text-3)">Try different type or tap <b>Scan</b> to refresh.</span></div>';
+    return;
+  }
+
+  const typeMeta = {
+    '1up-vs-1x2': { color: 'var(--blue)', bg: 'var(--blue-soft)', label: '1UP' },
+    '2up-vs-1x2': { color: 'var(--green)', bg: 'var(--green-soft)', label: '2UP' },
+    'overround':  { color: 'var(--amber)', bg: 'var(--amber-soft)', label: 'LOW MARGIN' },
+    'state-model': { color: 'var(--purple)', bg: 'var(--purple-soft)', label: 'MODEL' },
+  };
+
+  let html = '';
+  for (const e of filtered) {
+    const meta = typeMeta[e.type] || typeMeta['state-model'];
+    const mt = e.minute || e.matchStatus || '';
+    const key = e.eventId + ':' + e.marketId + ':' + e.outcomeId;
+    const selected = promoSlip.has(key);
+    const edgeColor = e.edgePct >= 15 ? 'var(--green)' : e.edgePct >= 5 ? 'var(--blue)' : 'var(--amber)';
+
+    html += `<div class="card" style="border-color:${meta.color};margin-bottom:10px;padding:12px">`;
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">`;
+    html += `<span style="font-size:9px;font-weight:800;color:${meta.color};background:${meta.bg};padding:2px 6px;border-radius:3px;letter-spacing:0.5px">${meta.label}</span>`;
+    if (e._isLive) html += `<span style="font-size:9px;font-weight:800;color:var(--green);background:var(--green-soft);padding:2px 6px;border-radius:3px">LIVE ${esc(e.score)} ${esc(mt)}</span>`;
+    html += `<span style="font-size:11px;color:var(--text-3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.league)}</span>`;
+    html += `<span style="font-weight:800;color:${edgeColor};font-size:13px">+${e.edgePct}% edge</span>`;
+    html += `</div>`;
+
+    html += `<div style="font-size:14px;font-weight:700;margin-bottom:6px">${esc(e.home)} <span style="color:var(--text-3)">vs</span> ${esc(e.away)}</div>`;
+
+    // Pick + odds + model/book comparison
+    html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">`;
+    html += `<span style="font-size:13px;font-weight:700;color:${meta.color}">${esc(e.pickLabel)}</span>`;
+    html += `<span style="font-size:14px;font-weight:800;color:var(--amber)">@${e.odds}</span>`;
+    html += `<span style="font-size:11px;color:var(--text-3)">${esc(e.marketLabel)}</span>`;
+    html += `</div>`;
+
+    // Probability bars
+    html += `<div style="display:flex;gap:12px;margin-bottom:8px;font-size:11px">`;
+    html += `<span><span style="color:var(--text-3)">Model:</span> <b style="color:var(--green)">${e.probability}%</b></span>`;
+    html += `<span><span style="color:var(--text-3)">Implied:</span> <b style="color:var(--text-2)">${e.impliedPct}%</b></span>`;
+    html += `<span><span style="color:var(--text-3)">Fair odds:</span> <b style="color:var(--blue)">@${e.fairOdds}</b></span>`;
+    html += `<span><span style="color:var(--text-3)">Conf:</span> <b>${e.confidence}</b></span>`;
+    html += `</div>`;
+
+    html += `<div style="font-size:11px;color:var(--text-2);padding:8px;background:var(--bg);border-radius:4px;line-height:1.5;margin-bottom:8px">${esc(e.explanation)}</div>`;
+
+    html += `<button class="btn btn-sm ${selected ? 'btn-red' : 'btn-green'}" data-key="${esc(key)}" onclick="togglePromoPick(this)" style="width:100%;padding:8px">${selected ? 'Remove' : 'Add to Slip'}</button>`;
+    html += `</div>`;
+  }
+
+  listEl.innerHTML = html;
+}
+
+function togglePromoPick(btn) {
+  const key = btn.dataset.key;
+  const edge = promoData.find(e => (e.eventId + ':' + e.marketId + ':' + e.outcomeId) === key);
+  if (!edge) return;
+  if (promoSlip.has(key)) {
+    promoSlip.delete(key);
+    btn.classList.remove('btn-red'); btn.classList.add('btn-green');
+    btn.textContent = 'Add to Slip';
+  } else {
+    promoSlip.set(key, edge);
+    btn.classList.remove('btn-green'); btn.classList.add('btn-red');
+    btn.textContent = 'Remove';
+  }
+  updatePromoSlip();
+}
+
+function updatePromoSlip() {
+  const bar = document.getElementById('promo-slip-bar');
+  const countEl = document.getElementById('promo-slip-count');
+  const oddsEl = document.getElementById('promo-slip-odds');
+  const detailsEl = document.getElementById('promo-slip-details');
+  if (!promoSlip.size) { bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  let total = 1;
+  let detailHTML = '';
+  for (const [, e] of promoSlip) {
+    total *= e.odds;
+    detailHTML += `<div style="font-size:11px;padding:3px 0;display:flex;justify-content:space-between"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.home)} v ${esc(e.away)} — ${esc(e.pickLabel)}</span><span style="color:var(--amber);font-weight:700;margin-left:8px">@${e.odds}</span></div>`;
+  }
+  countEl.textContent = promoSlip.size + ' pick' + (promoSlip.size !== 1 ? 's' : '');
+  oddsEl.textContent = total.toFixed(2);
+  detailsEl.innerHTML = detailHTML;
+}
+
+function clearPromoSlip() {
+  promoSlip.clear();
+  updatePromoSlip();
+  renderPromoEdges();
+}
+
+async function createPromoCode() {
+  if (!promoSlip.size) return;
+  const resultEl = document.getElementById('promo-slip-result');
+  resultEl.innerHTML = '<div class="slip-result" style="text-align:center"><div class="spinner" style="width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 8px"></div>Creating booking code...</div>';
+  const selections = [...promoSlip.values()].map(e => ({
+    eventId: e.eventId, marketId: e.marketId, outcomeId: e.outcomeId,
+    specifier: e.specifier || '', sportId: e.sportId,
+  }));
+  try {
+    const res = await fetch('/predictions/create-code', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections }),
+    });
+    const data = await res.json();
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      let totalOdds = 1;
+      for (const e of promoSlip.values()) totalOdds *= e.odds;
+      resultEl.innerHTML = `<div class="slip-result">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+          <span class="code-val">${esc(code)}</span>
+          <button onclick="navigator.clipboard.writeText('${esc(code)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',1500)})" class="code-copy" style="padding:6px 16px">Copy Code</button>
+        </div>
+        <div style="font-size:13px;color:var(--text-2);display:flex;gap:12px">
+          <span>${promoSlip.size} picks</span>
+          <span style="color:var(--amber);font-weight:700">Odds: ${totalOdds.toFixed(2)}</span>
+        </div>
+      </div>`;
+      showToast('Promo code: ' + code, 'success');
+      const hist = JSON.parse(localStorage.getItem('ja_history') || '[]');
+      hist.unshift({ code, odds: totalOdds.toFixed(2), picks: promoSlip.size, source: 'Promo Edges', date: new Date().toISOString(), status: 'pending' });
+      localStorage.setItem('ja_history', JSON.stringify(hist.slice(0, 200)));
+    } else {
+      resultEl.innerHTML = `<div class="slip-result" style="border-color:rgba(240,96,96,0.25);color:var(--red)">Failed: ${esc(data.message || 'Unknown')}</div>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="slip-result" style="border-color:rgba(240,96,96,0.25);color:var(--red)">Network error</div>`;
+  }
+}
+
+// ===== LIVE GAMES =====
+let lgData = [];
+let lgLoaded = false;
+let lgSportFilter = 'all';
+const lgSlip = new Map();
+const lgCollapsed = new Set();
+let lgAutoRefresh = null;
+
+document.getElementById('lg-refresh-btn').onclick = () => loadLiveGames(true);
+document.getElementById('lg-search').addEventListener('input', () => { if (lgLoaded) renderLiveGames(); });
+
+// Sport filter tabs
+document.getElementById('lg-sport-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('[data-lgsport]');
+  if (!btn) return;
+  document.querySelectorAll('#lg-sport-tabs .chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  lgSportFilter = btn.dataset.lgsport;
+  renderLiveGames();
+});
+
+async function loadLiveGames(forceRefresh) {
+  const listEl = document.getElementById('lg-list');
+  if (!forceRefresh && lgLoaded && lgData.length) { renderLiveGames(); return; }
+  listEl.innerHTML = '<div class="empty"><div class="spinner" style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 10px"></div>Loading live games...</div>';
+
+  try {
+    const url = '/predictions/live-games' + (forceRefresh ? '?refresh=1' : '');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error');
+    const json = await res.json();
+    lgData = json.games || [];
+    lgLoaded = true;
+    buildSportTabs(json.bySport || {});
+    renderLiveGames();
+    // Auto-refresh every 60s
+    if (!lgAutoRefresh) {
+      lgAutoRefresh = setInterval(() => { if (currentPage === 'livegames') loadLiveGames(true); }, 60000);
+    }
+  } catch (e) {
+    console.error('Live games error:', e);
+    listEl.innerHTML = '<div class="empty" style="color:var(--red)">Failed to load live games. Tap Refresh to retry.</div>';
+  }
+}
+
+function buildSportTabs(bySport) {
+  const container = document.getElementById('lg-sport-tabs');
+  let html = '<button class="chip active" data-lgsport="all" style="flex-shrink:0">All</button>';
+  const sportIcons = {
+    'Football': '\u26BD', 'Basketball': '\uD83C\uDFC0', 'Tennis': '\uD83C\uDFBE',
+    'Ice Hockey': '\uD83C\uDFD2', 'Cricket': '\uD83C\uDFCF', 'Volleyball': '\uD83C\uDFD0',
+    'Baseball': '\u26BE', 'Handball': '\uD83E\uDD3E', 'Darts': '\uD83C\uDFAF',
+    'Table Tennis': '\uD83C\uDFD3', 'eSports': '\uD83C\uDFAE', 'Badminton': '\uD83C\uDFF8',
+    'American Football': '\uD83C\uDFC8',
+  };
+  for (const [sport, count] of Object.entries(bySport).sort((a,b) => b[1] - a[1])) {
+    const icon = sportIcons[sport] || '\u26BD';
+    html += `<button class="chip" data-lgsport="${esc(sport)}" style="flex-shrink:0">${icon} ${esc(sport)} <span style="font-size:10px;opacity:0.7">${count}</span></button>`;
+  }
+  container.innerHTML = html;
+  // Re-activate current filter
+  const active = container.querySelector(`[data-lgsport="${lgSportFilter}"]`);
+  if (active) active.classList.add('active');
+  else { lgSportFilter = 'all'; container.querySelector('[data-lgsport="all"]').classList.add('active'); }
+}
+
+function renderLiveGames() {
+  const listEl = document.getElementById('lg-list');
+  const search = (document.getElementById('lg-search').value || '').toLowerCase().trim();
+
+  let filtered = lgData;
+  if (lgSportFilter !== 'all') filtered = filtered.filter(g => g.sport === lgSportFilter);
+  if (search) filtered = filtered.filter(g =>
+    g.homeTeamName.toLowerCase().includes(search) ||
+    g.awayTeamName.toLowerCase().includes(search) ||
+    g.league.toLowerCase().includes(search)
+  );
+
+  // Update hero
+  const leagues = new Set(lgData.map(g => g.country + ' - ' + g.league));
+  const sports = new Set(lgData.map(g => g.sport));
+  document.getElementById('lg-total').textContent = lgData.length;
+  document.getElementById('lg-sports').textContent = sports.size;
+  document.getElementById('lg-leagues').textContent = leagues.size;
+  document.getElementById('lg-picks').textContent = lgSlip.size;
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<div class="empty">No live games' + (search ? ' matching "' + esc(search) + '"' : '') + '</div>';
+    return;
+  }
+
+  // Group by country - league
+  const groups = new Map();
+  for (const g of filtered) {
+    const key = g.country + ' - ' + g.league;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(g);
+  }
+
+  let html = '';
+  for (const [league, events] of groups) {
+    const collapsed = lgCollapsed.has(league);
+    const flag = getCountryFlag(league);
+
+    html += `<div class="league-section${collapsed ? ' collapsed' : ''}">`;
+    html += `<div class="league-hdr" onclick="toggleLgLeague(this)">`;
+    html += `<span class="flag">${flag}</span>`;
+    html += `<span class="name">${esc(league)}</span>`;
+    html += `<span class="count">${events.length}</span>`;
+    html += `<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+    html += `</div>`;
+    html += `<div class="league-body">`;
+
+    // Column headers
+    html += `<div class="odds-header">`;
+    html += `<div class="odds-header-spacer"></div>`;
+    html += `<div class="odds-header-group"><span class="odds-header-label">1</span><span class="odds-header-label">X</span><span class="odds-header-label">2</span></div>`;
+    html += `<div class="odds-header-sep"></div>`;
+    html += `<div class="odds-header-group"><span class="odds-header-label">OV</span><span class="odds-header-label">UN</span></div>`;
+    html += `<div class="odds-header-sep"></div>`;
+    html += `<div class="odds-header-group"><span class="odds-header-label">GG</span><span class="odds-header-label">NG</span></div>`;
+    html += `</div>`;
+
+    for (const g of events) {
+      const scores = (g.score || '0:0').split(':');
+      const statusLabel = g.matchStatus || 'Live';
+      const minute = g.minute || '';
+
+      html += `<div class="gm" data-eid="${esc(g.eventId)}">`;
+      html += `<div class="gm-info">`;
+
+      // Live badge + minute
+      html += `<div class="gm-time-col">`;
+      html += `<div class="gm-live-badge">LIVE</div>`;
+      if (minute) html += `<div style="font-size:11px;color:var(--green);font-weight:800;text-align:center">${esc(minute)}</div>`;
+      else html += `<div style="font-size:10px;color:var(--text-3);font-weight:600;text-align:center">${esc(statusLabel)}</div>`;
+      html += `</div>`;
+
+      // Teams
+      html += `<div class="gm-teams">`;
+      html += `<div class="gm-team">${esc(g.homeTeamName)}</div>`;
+      html += `<div class="gm-team">${esc(g.awayTeamName)}</div>`;
+      html += `</div>`;
+
+      // Score + status
+      html += `<div class="gm-score">`;
+      html += `<div class="gm-score-val">${scores[0] || '0'}</div>`;
+      html += `<div class="gm-score-val">${scores[1] || '0'}</div>`;
+      html += `<div style="font-size:9px;color:var(--text-3);font-weight:600;grid-column:span 2;text-align:center">${esc(statusLabel)}</div>`;
+      html += `</div>`;
+      html += `</div>`;
+
+      // Odds grid
+      html += `<div class="gm-odds">`;
+      const mkts = g.markets || [];
+      const m1x2 = mkts.find(m => m.id === '1');
+      const mOU = mkts.find(m => m.id === '18' && (m.specifier || '').includes('total=2.5'));
+      const mGG = mkts.find(m => m.id === '29');
+
+      html += renderLgOddsGroup(g, m1x2, ['1','2','3'], ['Home','Draw','Away']);
+      html += `<div class="gm-odds-sep"></div>`;
+      html += renderLgOddsGroup(g, mOU, ['12','13'], ['Over','Under']);
+      html += `<div class="gm-odds-sep"></div>`;
+      html += renderLgOddsGroup(g, mGG, ['74','76'], ['Yes','No']);
+      html += `</div>`;
+      html += `</div>`;
+
+      // Extra markets
+      const extraMkts = mkts.filter(m => m !== m1x2 && m !== mOU && m !== mGG && m.outcomes && m.outcomes.length > 0);
+      if (extraMkts.length > 0) {
+        html += `<div class="gm-more"><button class="gm-more-btn" onclick="toggleLgExtra(this,'${esc(g.eventId)}')">+${g.totalMarkets > 3 ? g.totalMarkets - 3 : extraMkts.length} markets</button></div>`;
+        html += `<div class="gm-expand" id="lg-extra-${esc(g.eventId)}">`;
+        for (const m of extraMkts.slice(0, 20)) {
+          html += `<div class="gm-expand-mkt">`;
+          html += `<div class="gm-expand-title">${esc(m.desc || m.name)}${m.specifier ? ' (' + esc(m.specifier) + ')' : ''}</div>`;
+          html += `<div class="gm-expand-odds">`;
+          for (const o of m.outcomes) {
+            if (!o.odds || parseFloat(o.odds) <= 1 || o.isActive === 0) continue;
+            const odds = parseFloat(o.odds);
+            const key = `${g.eventId}:${m.id}:${o.id}`;
+            const sel = lgSlip.has(key);
+            html += `<button class="ob${sel ? ' sel' : ''}" data-key="${esc(key)}" data-eid="${esc(g.eventId)}" data-mid="${esc(m.id)}" data-oid="${esc(o.id)}" data-spec="${esc(m.specifier || '')}" data-sid="${esc(g.sportId)}" data-odds="${odds}" data-label="${esc(g.homeTeamName)} vs ${esc(g.awayTeamName)}: ${esc(m.desc || m.name)} - ${esc(o.desc)}" onclick="toggleLgPick(this)"><span class="ob-lbl">${esc(o.desc)}</span> ${odds.toFixed(2)}</button>`;
+          }
+          html += `</div></div>`;
+        }
+        html += `</div>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+
+  html += `<div style="text-align:center;padding:12px;font-size:11px;color:var(--text-3)">${filtered.length} live games</div>`;
+  listEl.innerHTML = html;
+}
+
+function renderLgOddsGroup(game, market, outcomeIds, labels) {
+  let html = '<div class="odds-header-group">';
+  if (!market || !market.outcomes || !market.outcomes.length) {
+    for (let i = 0; i < outcomeIds.length; i++) html += '<button class="ob locked">-</button>';
+    return html + '</div>';
+  }
+  const validOdds = market.outcomes.filter(o => parseFloat(o.odds) > 1).map(o => parseFloat(o.odds));
+  const lowestOdds = validOdds.length ? Math.min(...validOdds) : 0;
+
+  for (let i = 0; i < outcomeIds.length; i++) {
+    const o = market.outcomes.find(x => x.id === outcomeIds[i]) || market.outcomes[i];
+    if (!o || !o.odds || parseFloat(o.odds) <= 1 || o.isActive === 0) {
+      html += '<button class="ob locked">-</button>';
+      continue;
+    }
+    const odds = parseFloat(o.odds);
+    const key = `${game.eventId}:${market.id}:${o.id}`;
+    const sel = lgSlip.has(key);
+    const isFav = odds === lowestOdds && odds < 2.5;
+    html += `<button class="ob${sel ? ' sel' : ''}${isFav ? ' fav' : ''}" data-key="${esc(key)}" data-eid="${esc(game.eventId)}" data-mid="${esc(market.id)}" data-oid="${esc(o.id)}" data-spec="${esc(market.specifier || '')}" data-sid="${esc(game.sportId)}" data-odds="${odds}" data-label="${esc(game.homeTeamName)} vs ${esc(game.awayTeamName)}: ${esc(market.desc || market.name)} - ${esc(o.desc)}" onclick="toggleLgPick(this)">${odds.toFixed(2)}</button>`;
+  }
+  return html + '</div>';
+}
+
+function toggleLgLeague(hdr) {
+  const section = hdr.parentElement;
+  const league = hdr.querySelector('.name').textContent;
+  section.classList.toggle('collapsed');
+  if (section.classList.contains('collapsed')) lgCollapsed.add(league);
+  else lgCollapsed.delete(league);
+}
+
+function toggleLgExtra(btn, eventId) {
+  const el = document.getElementById('lg-extra-' + eventId);
+  if (!el) return;
+  const showing = el.style.display === 'block';
+  el.style.display = showing ? 'none' : 'block';
+  btn.textContent = showing ? btn.textContent.replace('Hide', '+') : 'Hide markets';
+}
+
+function toggleLgPick(btn) {
+  const key = btn.dataset.key;
+  if (lgSlip.has(key)) {
+    lgSlip.delete(key);
+    btn.classList.remove('sel');
+  } else {
+    lgSlip.set(key, {
+      eventId: btn.dataset.eid, marketId: btn.dataset.mid,
+      outcomeId: btn.dataset.oid, specifier: btn.dataset.spec,
+      sportId: btn.dataset.sid, odds: parseFloat(btn.dataset.odds),
+      label: btn.dataset.label,
+    });
+    btn.classList.add('sel');
+  }
+  updateLgSlip();
+}
+
+function updateLgSlip() {
+  const bar = document.getElementById('lg-slip-bar');
+  const countEl = document.getElementById('lg-slip-count');
+  const oddsEl = document.getElementById('lg-slip-odds');
+  const detailsEl = document.getElementById('lg-slip-details');
+  document.getElementById('lg-picks').textContent = lgSlip.size;
+
+  if (!lgSlip.size) {
+    bar.classList.remove('show');
+    return;
+  }
+  bar.classList.add('show');
+  let total = 1;
+  let detailHTML = '';
+  for (const [, v] of lgSlip) {
+    total *= v.odds;
+    const game = lgData.find(g => g.eventId === v.eventId);
+    const timeInfo = game ? (game.minute || game.matchStatus || '') : '';
+    const scoreInfo = game ? (game.score || '') : '';
+    detailHTML += `<div style="font-size:11px;padding:3px 0;display:flex;align-items:center;gap:6px">`;
+    if (scoreInfo) detailHTML += `<span style="color:var(--green);font-weight:700;flex-shrink:0">${esc(scoreInfo)}</span>`;
+    if (timeInfo) detailHTML += `<span style="color:var(--green);font-size:10px;opacity:0.8;flex-shrink:0">${esc(timeInfo)}</span>`;
+    detailHTML += `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(v.label)}</span><span style="color:var(--amber);font-weight:700;margin-left:8px;flex-shrink:0">@${v.odds.toFixed(2)}</span></div>`;
+  }
+  countEl.textContent = lgSlip.size + ' pick' + (lgSlip.size !== 1 ? 's' : '');
+  oddsEl.textContent = total.toFixed(2);
+  detailsEl.innerHTML = detailHTML;
+}
+
+function clearLgSlip() {
+  lgSlip.clear();
+  updateLgSlip();
+  renderLiveGames();
+}
+
+async function createLgCode() {
+  if (!lgSlip.size) return;
+  const resultEl = document.getElementById('lg-slip-result');
+  resultEl.innerHTML = '<div class="slip-result" style="text-align:center"><div class="spinner" style="width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 8px"></div>Creating booking code...</div>';
+
+  const selections = [...lgSlip.values()].map(v => ({
+    eventId: v.eventId, marketId: v.marketId,
+    outcomeId: v.outcomeId, specifier: v.specifier, sportId: v.sportId,
+  }));
+
+  try {
+    const res = await fetch('/predictions/create-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections }),
+    });
+    const data = await res.json();
+    if (data.bizCode === 10000 && data.data?.shareCode) {
+      const code = data.data.shareCode;
+      let totalOdds = 1;
+      for (const v of lgSlip.values()) totalOdds *= v.odds;
+      resultEl.innerHTML = `<div class="slip-result">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+          <span class="code-val">${esc(code)}</span>
+          <button onclick="navigator.clipboard.writeText('${esc(code)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',1500)})" class="code-copy" style="padding:6px 16px">Copy Code</button>
+        </div>
+        <div style="font-size:13px;color:var(--text-2);display:flex;gap:12px">
+          <span>${lgSlip.size} picks</span>
+          <span style="color:var(--amber);font-weight:700">Odds: ${totalOdds.toFixed(2)}</span>
+        </div>
+      </div>`;
+      showToast('Booking code: ' + code, 'success');
+      // Save to history
+      const hist = JSON.parse(localStorage.getItem('ja_history') || '[]');
+      hist.unshift({ code, odds: totalOdds.toFixed(2), picks: lgSlip.size, source: 'Live Games', date: new Date().toISOString(), status: 'pending' });
+      localStorage.setItem('ja_history', JSON.stringify(hist.slice(0, 200)));
+    } else {
+      resultEl.innerHTML = `<div class="slip-result" style="border-color:rgba(240,96,96,0.25);color:var(--red)">Failed: ${esc(data.message || 'Unknown error')}</div>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="slip-result" style="border-color:rgba(240,96,96,0.25);color:var(--red)">Network error</div>`;
+  }
+}
+
+// Auto-generate from live games
+function lgAutoGenerate(targetOdds, btn) {
+  if (btn) btnLoad(btn);
+  const resultsEl = document.getElementById('lg-gen-results');
+
+  // Build pool of pickable outcomes from live games
+  const pool = [];
+  for (const g of lgData) {
+    for (const m of (g.markets || [])) {
+      for (const o of (m.outcomes || [])) {
+        const odds = parseFloat(o.odds);
+        if (odds <= 1.05 || odds > 15 || o.isActive === 0) continue;
+        pool.push({
+          eventId: g.eventId, marketId: m.id, outcomeId: o.id,
+          specifier: m.specifier || '', sportId: g.sportId,
+          odds, desc: o.desc || '', marketDesc: m.desc || m.name || '',
+          home: g.homeTeamName, away: g.awayTeamName,
+          score: g.score, minute: g.minute, matchStatus: g.matchStatus,
+          league: g.country + ' - ' + g.league,
+        });
+      }
+    }
+  }
+
+  if (pool.length < 2) {
+    if (btn) btnDone(btn);
+    resultsEl.innerHTML = '<div style="padding:8px;color:var(--amber);font-size:12px">Not enough live games with odds. Try again when more games are live.</div>';
+    return;
+  }
+
+  const maxGamesInput = parseInt(document.getElementById('lg-max-games').value) || 0;
+
+  // Calculate ideal per-leg odds to reach target in N legs
+  // e.g. x5 in 4 legs = ~1.50 per leg, x10 in 5 legs = ~1.58 per leg
+  function pickSet(target, strategy) {
+    const maxGames = maxGamesInput || (target <= 2 ? 2 : target <= 3 ? 3 : target <= 5 ? 4 : target <= 10 ? 5 : target <= 20 ? 6 : target <= 50 ? 8 : 10);
+    const idealPerLeg = Math.pow(target, 1 / maxGames); // e.g. 5^(1/4) = 1.495
+
+    // Define odds range per strategy around the ideal
+    let minOdds, maxOdds;
+    if (strategy === 'safe') {
+      minOdds = Math.max(1.15, idealPerLeg * 0.7);
+      maxOdds = Math.min(4.0, idealPerLeg * 2.0);
+    } else {
+      minOdds = Math.max(1.25, idealPerLeg * 0.8);
+      maxOdds = Math.min(8.0, idealPerLeg * 3.0);
+    }
+
+    // Filter pool to strategy range, one pick per event, prefer odds closest to ideal
+    const candidates = pool
+      .filter(p => p.odds >= minOdds && p.odds <= maxOdds)
+      .sort((a, b) => Math.abs(a.odds - idealPerLeg) - Math.abs(b.odds - idealPerLeg));
+
+    // Shuffle top candidates for variety (keep odds-proximity bias by only shuffling within tiers)
+    const tier1 = candidates.filter(p => Math.abs(p.odds - idealPerLeg) < idealPerLeg * 0.3);
+    for (let i = tier1.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tier1[i], tier1[j]] = [tier1[j], tier1[i]];
+    }
+    const tier2 = candidates.filter(p => Math.abs(p.odds - idealPerLeg) >= idealPerLeg * 0.3);
+    for (let i = tier2.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tier2[i], tier2[j]] = [tier2[j], tier2[i]];
+    }
+    const src = [...tier1, ...tier2];
+
+    const picks = [];
+    const usedEvents = new Set();
+    let currentOdds = 1;
+
+    for (const p of src) {
+      if (picks.length >= maxGames) break;
+      if (currentOdds >= target) break;
+      if (usedEvents.has(p.eventId)) continue;
+
+      const remaining = maxGames - picks.length - 1;
+      const newOdds = currentOdds * p.odds;
+
+      // Don't overshoot too much if we still have legs left
+      if (remaining > 0 && newOdds > target * 1.3) continue;
+
+      picks.push(p);
+      usedEvents.add(p.eventId);
+      currentOdds = newOdds;
+    }
+
+    // If we're short of target and have room, try adding more picks
+    if (currentOdds < target * 0.8 && picks.length < maxGames + 2) {
+      const remaining = pool.filter(p =>
+        !usedEvents.has(p.eventId) && p.odds >= 1.2 && p.odds <= maxOdds * 1.5
+      ).sort((a, b) => b.odds - a.odds); // highest odds first to reach target
+      for (const p of remaining) {
+        if (currentOdds >= target) break;
+        if (picks.length >= maxGames + 2) break;
+        if (usedEvents.has(p.eventId)) continue;
+        picks.push(p);
+        usedEvents.add(p.eventId);
+        currentOdds *= p.odds;
+      }
+    }
+
+    return { picks, odds: currentOdds };
+  }
+
+  // Generate 2 strategies: safe + value
+  const strategies = [];
+  const safe = pickSet(targetOdds, 'safe');
+  if (safe.picks.length >= 1 && safe.odds >= targetOdds * 0.6) strategies.push({ ...safe, name: 'Safe' });
+  const value = pickSet(targetOdds, 'value');
+  if (value.picks.length >= 1 && value.odds >= targetOdds * 0.6) strategies.push({ ...value, name: 'Value' });
+
+  if (!strategies.length) {
+    if (btn) btnDone(btn);
+    resultsEl.innerHTML = '<div style="padding:8px;color:var(--amber);font-size:12px">Could not build a slip reaching x' + targetOdds + ' from live games. Try a lower target.</div>';
+    return;
+  }
+
+  // Submit each set as a booking code
+  resultsEl.innerHTML = '<div style="text-align:center;padding:8px"><div class="spinner" style="width:22px;height:22px;border:2.5px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 6px"></div><div style="font-size:12px;color:var(--text-2)">Generating ' + strategies.length + ' live codes...</div></div>';
+
+  Promise.allSettled(strategies.map(async (strat) => {
+    const sels = strat.picks.map(p => ({
+      eventId: p.eventId, marketId: p.marketId,
+      outcomeId: p.outcomeId, specifier: p.specifier, sportId: p.sportId,
+    }));
+    const res = await fetch('/predictions/create-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections: sels }),
+    });
+    const data = await res.json();
+    return { strat, data };
+  })).then(results => {
+    let html = '';
+    let successCount = 0;
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      const { strat, data } = r.value;
+      const code = data.bizCode === 10000 && data.data?.shareCode ? data.data.shareCode : null;
+      if (!code) continue;
+      successCount++;
+      const sc = strat.name === 'Safe'
+        ? { border: 'rgba(34,197,94,0.25)', bg: 'var(--green-soft)', text: 'var(--green)' }
+        : { border: 'rgba(78,148,255,0.25)', bg: 'var(--blue-soft)', text: 'var(--blue)' };
+
+      html += `<div style="border:1px solid ${sc.border};border-radius:var(--r-sm);background:${sc.bg};padding:12px;margin-bottom:8px">`;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">`;
+      html += `<span style="font-size:10px;font-weight:800;color:${sc.text};border:1px solid ${sc.border};padding:2px 8px;border-radius:4px">${strat.name.toUpperCase()}</span>`;
+      html += `<span style="font-size:18px;font-weight:800;color:${sc.text};letter-spacing:2px">${esc(code)}</span>`;
+      html += `<button onclick="navigator.clipboard.writeText('${esc(code)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" class="btn btn-ghost btn-sm" style="margin-left:auto;padding:5px 12px;font-size:12px">Copy</button>`;
+      html += `</div>`;
+      html += `<div style="display:flex;gap:8px;margin-bottom:8px;font-size:12px;flex-wrap:wrap">`;
+      html += `<span style="font-weight:800;color:var(--amber)">@${strat.odds.toFixed(2)}</span>`;
+      html += `<span style="color:var(--text-3)">${strat.picks.length} games</span>`;
+      html += `</div>`;
+      // Show picks
+      html += `<div style="border:1px solid ${sc.border};border-radius:var(--r-xs);overflow:hidden">`;
+      for (const p of strat.picks) {
+        const timeLabel = p.minute || p.matchStatus || '';
+        html += `<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px">`;
+        html += `<span style="color:var(--green);font-weight:700;flex-shrink:0;min-width:32px;text-align:center">${esc(p.score || '0:0')}</span>`;
+        if (timeLabel) html += `<span style="color:var(--green);font-size:10px;font-weight:600;flex-shrink:0;opacity:0.8">${esc(timeLabel)}</span>`;
+        html += `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.home)} v ${esc(p.away)}</span>`;
+        html += `<span style="color:var(--text-2);flex-shrink:0">${esc(p.marketDesc)} - ${esc(p.desc)}</span>`;
+        html += `<span style="color:var(--amber);font-weight:700;flex-shrink:0">@${p.odds.toFixed(2)}</span>`;
+        html += `</div>`;
+      }
+      html += `</div></div>`;
+
+      // Save to history
+      const hist = JSON.parse(localStorage.getItem('ja_history') || '[]');
+      hist.unshift({ code, odds: strat.odds.toFixed(2), picks: strat.picks.length, source: 'Live Gen (' + strat.name + ')', date: new Date().toISOString(), status: 'pending' });
+      localStorage.setItem('ja_history', JSON.stringify(hist.slice(0, 200)));
+    }
+    if (successCount) {
+      resultsEl.innerHTML = html;
+      showToast(successCount + ' live code' + (successCount > 1 ? 's' : '') + ' generated!', 'success');
+    } else {
+      resultsEl.innerHTML = '<div style="padding:8px;color:var(--red);font-size:12px">Failed to generate codes. The live games may have ended.</div>';
+    }
+    if (btn) btnDone(btn);
+  });
+}
+
+// Wire up generate buttons
+document.querySelectorAll('#lg-gen-btns button').forEach(b => {
+  b.onclick = () => lgAutoGenerate(parseInt(b.dataset.lgt), b);
+});
+document.getElementById('lg-custom-go').onclick = () => {
+  const odds = parseFloat(document.getElementById('lg-custom-odds').value);
+  if (!odds || odds < 1.5) { showToast('Enter odds >= 1.5', 'error'); return; }
+  lgAutoGenerate(odds, document.getElementById('lg-custom-go'));
+};
 
 // ===== INIT =====
 (async () => {
