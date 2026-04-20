@@ -43,6 +43,21 @@ export interface LiveStateProbs {
   homeOver15Pct: number;
   awayOver05Pct: number;
   awayOver15Pct: number;
+  // Asian Handicap half-lines (clean win/lose, no push).
+  // "ahHome05" = AH -0.5 home = home wins. "ahHome15" = home wins by ≥ 2. etc.
+  ahHome05Pct: number;
+  ahHome15Pct: number;
+  ahHome25Pct: number;
+  ahAway05Pct: number;
+  ahAway15Pct: number;
+  ahAway25Pct: number;
+  // Next Goal market (live). All three sum to 100.
+  //   home: remaining home rate claims the first additional goal
+  //   away: remaining away rate claims it
+  //   none: no more goals in remaining time
+  nextGoalHomePct: number;
+  nextGoalAwayPct: number;
+  nextGoalNonePct: number;
   valid: boolean;       // false if we can't parse state
   reason: string;       // which branch computed the probs
 }
@@ -111,6 +126,8 @@ function predictFootball(score: [number, number], minute: number): LiveStateProb
   // Probability home scores N more goals from now
   // Sum home prob + away prob for win/draw/loss paths
   let pHomeWin = 0, pDraw = 0, pAwayWin = 0;
+  // Goal-difference distribution at FT (finalH - finalA). Keyed by diff.
+  const diffDist = new Map<number, number>();
   const MAX_GOALS = 8;
 
   for (let hMore = 0; hMore <= MAX_GOALS; hMore++) {
@@ -121,12 +138,22 @@ function predictFootball(score: [number, number], minute: number): LiveStateProb
       if (pA < 1e-9) break;
       const finalH = h + hMore;
       const finalA = a + aMore;
+      const diff = finalH - finalA;
       const p = pH * pA;
+      diffDist.set(diff, (diffDist.get(diff) ?? 0) + p);
       if (finalH > finalA) pHomeWin += p;
       else if (finalH === finalA) pDraw += p;
       else pAwayWin += p;
     }
   }
+
+  // Asian handicap probabilities — P(goal diff ≥ k) for home, P(≤ -k) for away.
+  const pHomeBy = (k: number): number => {
+    let s = 0; for (const [d, p] of diffDist) if (d >= k) s += p; return s;
+  };
+  const pAwayBy = (k: number): number => {
+    let s = 0; for (const [d, p] of diffDist) if (d <= -k) s += p; return s;
+  };
 
   // Normalize (should already sum to ~1 but be safe)
   const total = pHomeWin + pDraw + pAwayWin;
@@ -179,6 +206,14 @@ function predictFootball(score: [number, number], minute: number): LiveStateProb
     return 1 - poissonCdf(T - a - 1, awayRateRemaining);
   };
 
+  // Next goal — competing Poissons over the remaining time.
+  //   P(at least one more goal) = 1 - e^-λ_total
+  //   Given a goal happens, home's share = λ_H / λ_total
+  const pAnyMore = totalRemaining > 0 ? 1 - Math.exp(-totalRemaining) : 0;
+  const pNextHome = totalRemaining > 0 ? pAnyMore * (homeRateRemaining / totalRemaining) : 0;
+  const pNextAway = totalRemaining > 0 ? pAnyMore * (awayRateRemaining / totalRemaining) : 0;
+  const pNextNone = 1 - pAnyMore;
+
   return {
     homeWinPct: Math.round(pHomeWin * 1000) / 10,
     drawPct: Math.round(pDraw * 1000) / 10,
@@ -194,6 +229,15 @@ function predictFootball(score: [number, number], minute: number): LiveStateProb
     homeOver15Pct: Math.round(pHomeOver(2) * 1000) / 10,
     awayOver05Pct: Math.round(pAwayOver(1) * 1000) / 10,
     awayOver15Pct: Math.round(pAwayOver(2) * 1000) / 10,
+    ahHome05Pct: Math.round(pHomeBy(1) * 1000) / 10,
+    ahHome15Pct: Math.round(pHomeBy(2) * 1000) / 10,
+    ahHome25Pct: Math.round(pHomeBy(3) * 1000) / 10,
+    ahAway05Pct: Math.round(pAwayBy(1) * 1000) / 10,
+    ahAway15Pct: Math.round(pAwayBy(2) * 1000) / 10,
+    ahAway25Pct: Math.round(pAwayBy(3) * 1000) / 10,
+    nextGoalHomePct: Math.round(pNextHome * 1000) / 10,
+    nextGoalAwayPct: Math.round(pNextAway * 1000) / 10,
+    nextGoalNonePct: Math.round(pNextNone * 1000) / 10,
     valid: true,
     reason: `Football state model: ${h}-${a} at ${minute}', λ_remaining=${totalRate.toFixed(2)}`,
   };
@@ -222,6 +266,13 @@ function predictBasketball(score: [number, number], minute: number, totalMinutes
     bttsYesPct: 99, bttsNoPct: 1,
     oddTotalPct: 50, evenTotalPct: 50, // N/A for basketball — use neutral
     homeOver05Pct: 100, homeOver15Pct: 100, awayOver05Pct: 100, awayOver15Pct: 100,
+    ahHome05Pct: Math.round(pHome * 1000) / 10,
+    ahHome15Pct: Math.round(Math.max(0, pHome - 0.1) * 1000) / 10,
+    ahHome25Pct: Math.round(Math.max(0, pHome - 0.2) * 1000) / 10,
+    ahAway05Pct: Math.round((1 - pHome) * 1000) / 10,
+    ahAway15Pct: Math.round(Math.max(0, (1 - pHome) - 0.1) * 1000) / 10,
+    ahAway25Pct: Math.round(Math.max(0, (1 - pHome) - 0.2) * 1000) / 10,
+    nextGoalHomePct: 0, nextGoalAwayPct: 0, nextGoalNonePct: 100, // N/A for basketball
     valid: true,
     reason: `Basketball state model: ${h}-${a} diff=${diff} with ${remaining.toFixed(1)}min left`,
   };
@@ -236,6 +287,9 @@ export function predictLiveState(input: LiveStateInput): LiveStateProbs {
     bttsYesPct: 50, bttsNoPct: 50,
     oddTotalPct: 50, evenTotalPct: 50,
     homeOver05Pct: 50, homeOver15Pct: 50, awayOver05Pct: 50, awayOver15Pct: 50,
+    ahHome05Pct: 50, ahHome15Pct: 50, ahHome25Pct: 50,
+    ahAway05Pct: 50, ahAway15Pct: 50, ahAway25Pct: 50,
+    nextGoalHomePct: 33, nextGoalAwayPct: 33, nextGoalNonePct: 34,
     valid: false, reason: 'could not parse state',
   };
 

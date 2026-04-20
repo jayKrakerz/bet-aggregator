@@ -141,6 +141,21 @@ const OUTCOME_MAP: Record<string, OutcomeMapping> = {
   awayUnder05: { marketId: '20', outcomeId: '13', specifier: 'total=0.5', market: 'Away Total', pickLabel: (_, a) => a + ' Under 0.5' },
   awayOver15: { marketId: '20', outcomeId: '12', specifier: 'total=1.5', market: 'Away Total', pickLabel: (_, a) => a + ' Over 1.5' },
   awayUnder15: { marketId: '20', outcomeId: '13', specifier: 'total=1.5', market: 'Away Total', pickLabel: (_, a) => a + ' Under 1.5' },
+  // Asian handicap half-lines (Betradar market 16, outcomes 1714=home, 1715=away, specifier hcp=±X.5)
+  ahHome05: { marketId: '16', outcomeId: '1714', specifier: 'hcp=-0.5', market: 'AH -0.5', pickLabel: (h) => h + ' -0.5' },
+  ahHome15: { marketId: '16', outcomeId: '1714', specifier: 'hcp=-1.5', market: 'AH -1.5', pickLabel: (h) => h + ' -1.5' },
+  ahHome25: { marketId: '16', outcomeId: '1714', specifier: 'hcp=-2.5', market: 'AH -2.5', pickLabel: (h) => h + ' -2.5' },
+  ahHomePlus05: { marketId: '16', outcomeId: '1714', specifier: 'hcp=0.5', market: 'AH +0.5', pickLabel: (h) => h + ' +0.5' },
+  ahHomePlus15: { marketId: '16', outcomeId: '1714', specifier: 'hcp=1.5', market: 'AH +1.5', pickLabel: (h) => h + ' +1.5' },
+  ahAway05: { marketId: '16', outcomeId: '1715', specifier: 'hcp=0.5', market: 'AH +0.5', pickLabel: (_, a) => a + ' +0.5' },
+  ahAway15: { marketId: '16', outcomeId: '1715', specifier: 'hcp=1.5', market: 'AH +1.5', pickLabel: (_, a) => a + ' +1.5' },
+  ahAway25: { marketId: '16', outcomeId: '1715', specifier: 'hcp=2.5', market: 'AH +2.5', pickLabel: (_, a) => a + ' +2.5' },
+  ahAwayMinus05: { marketId: '16', outcomeId: '1715', specifier: 'hcp=-0.5', market: 'AH -0.5', pickLabel: (_, a) => a + ' -0.5' },
+  ahAwayMinus15: { marketId: '16', outcomeId: '1715', specifier: 'hcp=-1.5', market: 'AH -1.5', pickLabel: (_, a) => a + ' -1.5' },
+  // Next Goal (live; Betradar market 7, outcomes 6=home, 7=none, 8=away)
+  nextGoalHome: { marketId: '7', outcomeId: '6', specifier: '', market: 'Next Goal', pickLabel: (h) => h + ' next' },
+  nextGoalNone: { marketId: '7', outcomeId: '7', specifier: '', market: 'Next Goal', pickLabel: () => 'No more goals' },
+  nextGoalAway: { marketId: '7', outcomeId: '8', specifier: '', market: 'Next Goal', pickLabel: (_, a) => a + ' next' },
 };
 
 /**
@@ -331,6 +346,21 @@ export async function getLiveValuePicks(forceRefresh = false): Promise<LiveValue
       { key: 'awayUnder05', probPct: 100 - modelProbs.awayOver05Pct },
       { key: 'awayOver15', probPct: modelProbs.awayOver15Pct },
       { key: 'awayUnder15', probPct: 100 - modelProbs.awayOver15Pct },
+      // Asian handicap half-lines
+      { key: 'ahHome05', probPct: modelProbs.ahHome05Pct },
+      { key: 'ahHome15', probPct: modelProbs.ahHome15Pct },
+      { key: 'ahHome25', probPct: modelProbs.ahHome25Pct },
+      { key: 'ahHomePlus05', probPct: 100 - modelProbs.ahAway05Pct },
+      { key: 'ahHomePlus15', probPct: 100 - modelProbs.ahAway15Pct },
+      { key: 'ahAway05', probPct: 100 - modelProbs.ahHome05Pct },
+      { key: 'ahAway15', probPct: 100 - modelProbs.ahHome15Pct },
+      { key: 'ahAway25', probPct: 100 - modelProbs.ahHome25Pct },
+      { key: 'ahAwayMinus05', probPct: modelProbs.ahAway05Pct },
+      { key: 'ahAwayMinus15', probPct: modelProbs.ahAway15Pct },
+      // Next goal (live — meaningful only when the match is in-play)
+      { key: 'nextGoalHome', probPct: modelProbs.nextGoalHomePct },
+      { key: 'nextGoalAway', probPct: modelProbs.nextGoalAwayPct },
+      { key: 'nextGoalNone', probPct: modelProbs.nextGoalNonePct },
     ];
 
     for (const { key, probPct } of outcomeChecks) {
