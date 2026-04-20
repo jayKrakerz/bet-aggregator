@@ -23,6 +23,7 @@ import { logger } from '../utils/logger.js';
 import { getSportyLiveGames } from './sportybet-live.js';
 import { predictLiveState, kellyEdge } from './live-state-predictor.js';
 import { broadcastPicks } from './telegram-broadcaster.js';
+import { predictElo } from './elo-predictor.js';
 
 /**
  * Market-shrinkage blending (adapted from soccer-bet-bot's odds-based Bayesian blend).
@@ -295,6 +296,23 @@ export async function getLiveValuePicks(forceRefresh = false): Promise<LiveValue
       matchStatus: g.matchStatus,
     });
     if (!modelProbs.valid) continue;
+
+    // ELO blend: when both teams have enough history, we have a strong
+    // independent prior on the pre-match 1X2 split. Blend it into the
+    // Poisson state model's 1X2 probs, weighted by how early in the match
+    // we are — early = more ELO, late = pure state (score dominates).
+    if (g.sport === 'Football' && g.homeTeamName && g.awayTeamName) {
+      const elo = predictElo(g.homeTeamName, g.awayTeamName);
+      if (elo.confident) {
+        const minuteNumE = parseInt((g.minute || '').replace(/[^\d]/g, ''), 10) || 0;
+        const clamped = Math.max(0, Math.min(90, minuteNumE));
+        const eloWeight = Math.max(0, 0.4 - 0.4 * (clamped / 90)); // 0.4 @ kickoff → 0 @ 90'
+        const stateWeight = 1 - eloWeight;
+        modelProbs.homeWinPct = stateWeight * modelProbs.homeWinPct + eloWeight * elo.homeWinPct;
+        modelProbs.drawPct = stateWeight * modelProbs.drawPct + eloWeight * elo.drawPct;
+        modelProbs.awayWinPct = stateWeight * modelProbs.awayWinPct + eloWeight * elo.awayWinPct;
+      }
+    }
 
     // Confidence based on how far into the match we are (later = more signal)
     // and whether we have a real sport-specific model

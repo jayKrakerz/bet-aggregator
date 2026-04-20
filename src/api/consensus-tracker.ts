@@ -16,6 +16,7 @@ import {
   type ConsensusPrediction,
 } from './tipster-scrapers.js';
 import { findPinnacleOdds, type PinnacleOdds } from './pinnacle-odds.js';
+import { updateFromResult as eloUpdate } from './elo-predictor.js';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -444,6 +445,9 @@ export async function settleResults(): Promise<{ settled: number; pending: numbe
     pick.result = evaluatePick(pick.pick, score.homeGoals, score.awayGoals);
     pick.settledAt = new Date().toISOString();
     settled++;
+
+    // Feed the settled result into the ELO rating system.
+    eloUpdate(pick.homeTeam, pick.awayTeam, score.homeGoals, score.awayGoals);
 
     // Close-odds capture (best-effort, non-blocking) — only if not already set
     if (!pick.closingOdds) {

@@ -20,6 +20,7 @@ import { getLiveValuePicks } from '../live-value-picks.js';
 import { getLateLockPicks } from '../late-lock-scanner.js';
 import { getPromoEdges } from '../promo-detector.js';
 import { analyzeCashout } from '../cashout-analyzer.js';
+import { predictElo, bootstrapEloFromEspn, getEloStats } from '../elo-predictor.js';
 let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
 const aviatorTracker = async () => {
   if (!_aviatorModule) _aviatorModule = await import('../aviator-tracker.js');
@@ -67,6 +68,31 @@ function requireUnlock(request: { headers: Record<string, string | string[] | un
 }
 
 export const predictionsRoutes: FastifyPluginAsync = async (app) => {
+
+  // GET /predictions/elo?home=<team>&away=<team> — ELO 1X2 prediction
+  app.get('/elo', async (request, reply) => {
+    const q = request.query as { home?: string; away?: string };
+    if (!q.home || !q.away) return reply.status(400).send({ error: 'home and away required' });
+    void reply.header('Cache-Control', 'public, max-age=60');
+    return predictElo(q.home, q.away);
+  });
+
+  // GET /predictions/elo/stats — system health + top-10 ranked teams
+  app.get('/elo/stats', async (_request, reply) => {
+    void reply.header('Cache-Control', 'public, max-age=120');
+    return getEloStats();
+  });
+
+  // POST /predictions/elo/bootstrap — seed ratings from ~180 days of ESPN history.
+  // Idempotent: no-op once bootstrappedAt is set.
+  app.post('/elo/bootstrap', async (_request, reply) => {
+    try {
+      const result = await bootstrapEloFromEspn();
+      return result;
+    } catch (err) {
+      return reply.status(500).send({ error: (err as Error).message });
+    }
+  });
 
   // GET /predictions/config — public monetization + affiliate config for frontend
   app.get('/config', async (_request, reply) => {
@@ -832,6 +858,10 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
 
   // Start background auto-tracker on first load
   startAutoTracker();
+
+  // Kick off ELO bootstrap in the background. Idempotent (no-op if already
+  // seeded). Non-blocking so server startup isn't delayed.
+  void bootstrapEloFromEspn().catch(err => app.log.warn({ err }, 'ELO bootstrap failed'));
 
   // GET /predictions/consensus-results — performance stats
   app.get('/consensus-results', async () => {
