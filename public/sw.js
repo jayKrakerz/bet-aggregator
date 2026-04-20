@@ -1,4 +1,4 @@
-const CACHE = 'jawinzone-v3';
+const CACHE = 'jawinzone-v4';
 const PRECACHE = ['/manifest.json', '/icons/icon-192.svg', '/icons/icon-512.svg'];
 
 self.addEventListener('install', e => {

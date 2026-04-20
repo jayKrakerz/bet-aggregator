@@ -1833,14 +1833,9 @@ window.APP_CONFIG = { sportyAffilTag: null, buyMeACoffeeUrl: null, adsenseClient
   }
 })();
 
-// ===== SPORTYBET DEEP LINK + AFFILIATE =====
-function sportyShareUrl(code) {
-  const tag = (window.APP_CONFIG && window.APP_CONFIG.sportyAffilTag) || '';
-  const base = 'https://www.sportybet.com/ng/m/sport/share/' + encodeURIComponent(code);
-  return tag ? base + '?btag=' + encodeURIComponent(tag) : base;
-}
+// ===== SPORTYBET CODE COPY =====
 // Copy the booking code to clipboard. User opens Sportybet themselves.
-// (Affiliate-tagged deep-link is NOT opened — user preference: copy-only.)
+// (No redirect, no window.open — user preference: copy-only.)
 function sportyOpen(code, btn) {
   try { navigator.clipboard.writeText(code); } catch {}
   if (btn) {
