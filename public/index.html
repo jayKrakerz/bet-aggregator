@@ -1839,16 +1839,16 @@ function sportyShareUrl(code) {
   const base = 'https://www.sportybet.com/ng/m/sport/share/' + encodeURIComponent(code);
   return tag ? base + '?btag=' + encodeURIComponent(tag) : base;
 }
-// Copy to clipboard AND open Sportybet deep link — tracked via affiliate tag when
-// configured. Returns false so inline onclick handlers don't navigate the parent page.
+// Copy the booking code to clipboard. User opens Sportybet themselves.
+// (Affiliate-tagged deep-link is NOT opened — user preference: copy-only.)
 function sportyOpen(code, btn) {
   try { navigator.clipboard.writeText(code); } catch {}
   if (btn) {
     const orig = btn.textContent;
-    btn.textContent = 'Opening...';
+    btn.textContent = 'Copied!';
     setTimeout(() => { btn.textContent = orig; }, 1500);
   }
-  window.open(sportyShareUrl(code), '_blank', 'noopener');
+  showToast('Code ' + code + ' copied — paste in Sportybet', 'success');
   return false;
 }
 
@@ -1877,9 +1877,11 @@ async function playPick(btn, eventId, marketId, outcomeId, specifier, sportId) {
     const code = data && data.data && data.data.shareCode;
     if (!code) throw new Error((data && data.message) || 'create-code failed');
     window.__pickPlayCache.set(key, code);
-    btn.innerHTML = orig;
     btn.disabled = false;
-    sportyOpen(code, btn);
+    btn.innerHTML = 'Copy ' + code;
+    try { navigator.clipboard.writeText(code); } catch {}
+    showToast('Code ' + code + ' copied — paste in Sportybet', 'success');
+    setTimeout(() => { btn.innerHTML = orig; }, 2500);
   } catch (err) {
     btn.innerHTML = orig;
     btn.disabled = false;
