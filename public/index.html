@@ -692,6 +692,9 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 <!-- ===== PAGE: CODES ===== -->
 <div class="page" id="page-codes">
 
+  <!-- AdSense slot (mounted only if ADSENSE_CLIENT_ID is set) -->
+  <div id="ad-slot-codes" style="margin-bottom:12px;min-height:0"></div>
+
   <!-- Onboarding (first visit) -->
   <div class="onboard" id="onboard" style="display:none">
     <button class="onboard-close" id="onboard-close" aria-label="Dismiss">&times;</button>
@@ -1385,6 +1388,20 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
+  <!-- Sharp Signals (late-locks + steam moves + live edge) -->
+  <div class="card" style="border-color:rgba(176,124,255,0.2);cursor:pointer" onclick="switchPage('sharp')">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--purple-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Sharp Signals <span style="font-size:10px;background:var(--purple-soft);color:var(--purple);padding:1px 6px;border-radius:3px;margin-left:4px">PRO</span></div>
+        <div style="font-size:12px;color:var(--text-3)">Late-locks, steam moves, live Kelly edge, cross-book lag</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
   <!-- Live Games -->
   <div class="card" style="border-color:rgba(52,212,114,0.15);cursor:pointer" onclick="switchPage('livegames')">
     <div style="display:flex;align-items:center;gap:10px">
@@ -1426,6 +1443,37 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
     </div>
   </div>
+
+  <!-- Unlock Key (for premium endpoints) -->
+  <div class="card" style="border-color:rgba(176,124,255,0.15);margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div class="card-icon" style="background:var(--purple-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700">Unlock Key</div>
+        <div style="font-size:11px;color:var(--text-3)">Unlocks Sharp Signals (late-locks, steam, live-edge)</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <input id="unlock-input" class="input-sm" placeholder="Paste your key" style="flex:1;font-family:monospace" />
+      <button id="unlock-save-btn" class="btn btn-blue btn-sm">Save</button>
+    </div>
+    <div id="unlock-status" style="font-size:11px;color:var(--text-3);margin-top:6px"></div>
+  </div>
+
+  <!-- Tip Jar (hidden unless configured) -->
+  <a id="tip-jar-link" href="#" target="_blank" rel="noopener" style="display:none;text-decoration:none">
+    <div class="card" style="border-color:rgba(247,183,49,0.3);cursor:pointer">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="card-icon" style="background:var(--amber-soft)">☕</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:var(--amber)">Support the project</div>
+          <div style="font-size:11px;color:var(--text-3)">Tip jar — keeps scrapers running</div>
+        </div>
+      </div>
+    </div>
+  </a>
 
   <!-- Scraper Health -->
   <div class="card" id="scraper-health-card" style="border-color:rgba(52,212,114,0.15);cursor:pointer">
@@ -1524,6 +1572,41 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <button class="btn btn-ghost btn-sm" onclick="clearPromoSlip()">Clear All</button>
       <button class="btn btn-green btn-sm" onclick="createPromoCode()" style="font-weight:800">Get Code</button>
     </div>
+  </div>
+</div>
+
+<!-- ===== PAGE: SHARP SIGNALS ===== -->
+<div class="page" id="page-sharp">
+  <div style="margin-bottom:14px">
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:4px">Sharp Signals</h2>
+    <div style="font-size:12px;color:var(--text-3)">Late-locks, steam moves, live Kelly edge, cross-book lag — +EV from sharp market disagreement</div>
+  </div>
+
+  <!-- Bankroll (shared with Kelly stake rendering) -->
+  <div class="card" style="padding:10px 12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="font-size:12px;color:var(--text-3);font-weight:600">Bankroll (GH₵)</div>
+      <input id="bankroll-input" type="number" min="100" step="100" class="input-sm" style="flex:1;max-width:140px" />
+      <div style="font-size:10px;color:var(--text-3)">Kelly/unit stake uses this</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:3px;margin-bottom:12px;overflow-x:auto" id="sharp-tabs">
+    <button class="chip active" data-stab="late" style="padding:5px 12px;font-size:11px;flex-shrink:0">Late Locks</button>
+    <button class="chip" data-stab="live" style="padding:5px 12px;font-size:11px;flex-shrink:0">Live Value</button>
+    <button class="chip" data-stab="steam" style="padding:5px 12px;font-size:11px;flex-shrink:0">Steam Moves</button>
+    <button class="chip" data-stab="predict" style="padding:5px 12px;font-size:11px;flex-shrink:0">Live Predict</button>
+    <button class="chip" data-stab="lag" style="padding:5px 12px;font-size:11px;flex-shrink:0">Odds Lag</button>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button id="sharp-refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
+    <div id="sharp-status" style="font-size:11px;color:var(--text-3);align-self:center"></div>
+  </div>
+
+  <div id="sharp-content">
+    <div class="empty" style="padding:28px;font-size:13px">Loading…</div>
   </div>
 </div>
 
@@ -1709,9 +1792,99 @@ function fmtMatchTime(s) {
   return dayStr;
 }
 
-async function api(path) {
-  const res = await fetch(API + path);
+async function api(path, opts) {
+  const headers = { ...(opts && opts.headers) };
+  const unlock = localStorage.getItem('unlockKey');
+  if (unlock) headers['X-Unlock-Key'] = unlock;
+  const res = await fetch(API + path, { ...(opts || {}), headers });
+  if (res.status === 402) {
+    window.__paywallHit = true;
+    showToast('Premium — unlock key required', 'error');
+  }
   return res.json();
+}
+
+// ===== APP CONFIG (affiliate tag, tip jar, telegram status) =====
+window.APP_CONFIG = { sportyAffilTag: null, buyMeACoffeeUrl: null, adsenseClientId: null, telegramEnabled: false, paywallEnabled: false };
+(async () => {
+  try {
+    const c = await fetch('/predictions/config').then(r => r.json());
+    if (c && typeof c === 'object') window.APP_CONFIG = c;
+  } catch {}
+  // Mount AdSense / tip jar slots once config is in
+  if (window.APP_CONFIG.adsenseClientId && !document.getElementById('adsense-loader')) {
+    const s = document.createElement('script');
+    s.id = 'adsense-loader';
+    s.async = true;
+    s.crossOrigin = 'anonymous';
+    s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(window.APP_CONFIG.adsenseClientId);
+    document.head.appendChild(s);
+  }
+  const tip = document.getElementById('tip-jar-link');
+  if (tip && window.APP_CONFIG.buyMeACoffeeUrl) {
+    tip.href = window.APP_CONFIG.buyMeACoffeeUrl;
+    tip.style.display = '';
+  }
+  // AdSense slot on Codes page
+  const adSlot = document.getElementById('ad-slot-codes');
+  if (adSlot && window.APP_CONFIG.adsenseClientId) {
+    adSlot.innerHTML = '<ins class="adsbygoogle" style="display:block;min-height:90px" data-ad-client="' + window.APP_CONFIG.adsenseClientId + '" data-ad-format="auto" data-full-width-responsive="true"></ins>';
+    try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch {}
+  }
+})();
+
+// ===== SPORTYBET DEEP LINK + AFFILIATE =====
+function sportyShareUrl(code) {
+  const tag = (window.APP_CONFIG && window.APP_CONFIG.sportyAffilTag) || '';
+  const base = 'https://www.sportybet.com/ng/m/sport/share/' + encodeURIComponent(code);
+  return tag ? base + '?btag=' + encodeURIComponent(tag) : base;
+}
+// Copy to clipboard AND open Sportybet deep link — tracked via affiliate tag when
+// configured. Returns false so inline onclick handlers don't navigate the parent page.
+function sportyOpen(code, btn) {
+  try { navigator.clipboard.writeText(code); } catch {}
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = 'Opening...';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  }
+  window.open(sportyShareUrl(code), '_blank', 'noopener');
+  return false;
+}
+
+// ===== ONE-CLICK PLAY FOR SINGLE PICKS =====
+// Converts a single pick (from Sharp Signals, Live Value, Late Locks, etc.) into
+// a Sportybet booking code via /create-code, then opens the deep-link (with
+// affiliate tag if configured). One click: signal → playable code → sporty tab.
+window.__pickPlayCache = window.__pickPlayCache || new Map();
+async function playPick(btn, eventId, marketId, outcomeId, specifier, sportId) {
+  const key = [eventId, marketId, outcomeId, specifier || '', sportId].join('|');
+  const cached = window.__pickPlayCache.get(key);
+  if (cached) return sportyOpen(cached, btn);
+  if (!btn) return;
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Creating…';
+  try {
+    const res = await fetch('/predictions/create-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        selections: [{ eventId, marketId, outcomeId, specifier: specifier || '', sportId: sportId || 'sr:sport:1' }],
+      }),
+    });
+    const data = await res.json();
+    const code = data && data.data && data.data.shareCode;
+    if (!code) throw new Error((data && data.message) || 'create-code failed');
+    window.__pickPlayCache.set(key, code);
+    btn.innerHTML = orig;
+    btn.disabled = false;
+    sportyOpen(code, btn);
+  } catch (err) {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+    showToast('Could not create code — market may be locked', 'error');
+  }
 }
 
 function btnLoad(btn) {
@@ -1745,7 +1918,7 @@ function switchPage(name) {
   if (page) page.classList.add('active');
 
   // Highlight nav for main 4 tabs; sub-pages (generate, tools, history, arb, vfl) highlight "more"
-  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', live:'more', livegames:'more', promos:'more' };
+  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', live:'more', livegames:'more', promos:'more', sharp:'more' };
   const navTarget = navMap[name] || name;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === navTarget));
   document.querySelectorAll('#desktop-tabs .chip').forEach(b => {
@@ -1761,6 +1934,7 @@ function switchPage(name) {
   if (name === 'arb' && !arbLoaded) loadArbitrage();
   if (name === 'livegames' && !lgLoaded) loadLiveGames();
   if (name === 'promos' && !promoLoaded) loadPromoEdges();
+  if (name === 'sharp') loadSharp(sharpTab);
   if (name === 'more') {
     loadScraperHealth();
     startScraperHealthPoll();
@@ -1788,8 +1962,9 @@ function openDrawer(code, codeData) {
   const body = document.getElementById('drawer-body');
   body.innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button onclick="navigator.clipboard.writeText('${esc(code)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',1500)})" class="btn btn-green" style="flex:1;font-size:14px">Copy Code</button>
-      <button onclick="document.getElementById('tracker-input').value='${esc(code)}';closeDrawer();switchPage('tools');document.getElementById('tracker-start-btn').click()" class="btn btn-ghost" style="flex:1;font-size:12px">Track Live</button>
+      <button onclick="sportyOpen('${esc(code)}', this)" class="btn btn-green" style="flex:1;font-size:14px">Play on Sportybet</button>
+      <button onclick="navigator.clipboard.writeText('${esc(code)}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1500)})" class="btn btn-ghost" style="flex:0 0 auto;font-size:13px">Copy</button>
+      <button onclick="document.getElementById('tracker-input').value='${esc(code)}';closeDrawer();switchPage('tools');document.getElementById('tracker-start-btn').click()" class="btn btn-ghost" style="flex:0 0 auto;font-size:12px">Track</button>
     </div>
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text-3);margin-bottom:8px;letter-spacing:.5px">Selections</div>
     ${buildSelectionsHTML(codeData.selections, true)}
@@ -2805,7 +2980,7 @@ document.getElementById('odds-movers-gen-btn').onclick = async () => {
       const code = data.data.shareCode;
       codeHistory.push({code,strategy:'movers',targetOdds:null,actualOdds:Math.round(totalOdds*100)/100,gamesCount:sels.length,createdAt:new Date().toISOString(),status:'pending',wonCount:0,lostCount:0,pendingCount:sels.length,lastChecked:null,picks:sels.map(s=>({homeTeam:'',awayTeam:'',league:'',market:'',pick:'',odds:0,eventId:s.eventId,outcome:null}))});
       saveCHistory();
-      rd.innerHTML = `<div style="border:2px solid rgba(34,197,94,0.4);border-radius:var(--r-sm);background:var(--green-soft);padding:16px;text-align:center"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">MOVERS CODE</div><div class="gen-code-val" style="color:var(--green);margin-bottom:8px">${esc(code)}</div><button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',2000)})" class="btn btn-green">Copy Code</button><div style="font-size:11px;color:var(--text-3);margin-top:8px">${sels.length} games &bull; ${Math.round(totalOdds*100)/100} total odds</div></div>`;
+      rd.innerHTML = `<div style="border:2px solid rgba(34,197,94,0.4);border-radius:var(--r-sm);background:var(--green-soft);padding:16px;text-align:center"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">MOVERS CODE</div><div class="gen-code-val" style="color:var(--green);margin-bottom:8px">${esc(code)}</div><div style="display:flex;gap:6px;justify-content:center"><button onclick="sportyOpen('${code}', this)" class="btn btn-green">Play on Sportybet</button><button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)})" class="btn btn-ghost">Copy</button></div><div style="font-size:11px;color:var(--text-3);margin-top:8px">${sels.length} games &bull; ${Math.round(totalOdds*100)/100} total odds</div></div>`;
     } else {
       rd.innerHTML = `<div style="padding:12px;border:1px solid rgba(239,68,68,0.2);border-radius:var(--r-sm);background:var(--red-soft)"><span style="color:var(--red);font-weight:700;font-size:12px">Failed: ${esc(data.message||'Unknown error')}</span><div style="font-size:11px;color:var(--text-3);margin-top:6px">Try selecting different picks.</div></div>`;
     }
@@ -5065,7 +5240,7 @@ document.getElementById('gen-code-btn').onclick = async () => {
       const code = data.data.shareCode;
       codeHistory.push({code,strategy:'manual',targetOdds:null,actualOdds:Math.round(manualOdds*100)/100,gamesCount:sels.length,createdAt:new Date().toISOString(),status:'pending',wonCount:0,lostCount:0,pendingCount:sels.length,lastChecked:null,picks:sels.map(s=>({homeTeam:'',awayTeam:'',league:'',market:'',pick:'',odds:0,eventId:s.eventId,outcome:null}))});
       saveCHistory();
-      rd.innerHTML = `<div style="border:2px solid rgba(34,197,94,0.4);border-radius:var(--r-sm);background:var(--green-soft);padding:16px;text-align:center"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">YOUR CODE</div><div class="gen-code-val" style="color:var(--green);margin-bottom:8px">${esc(code)}</div><button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',2000)})" class="btn btn-green">Copy Code</button><div style="font-size:11px;color:var(--text-3);margin-top:8px">${sels.length} games</div></div>`;
+      rd.innerHTML = `<div style="border:2px solid rgba(34,197,94,0.4);border-radius:var(--r-sm);background:var(--green-soft);padding:16px;text-align:center"><div style="font-size:10px;color:var(--text-3);margin-bottom:4px">YOUR CODE</div><div class="gen-code-val" style="color:var(--green);margin-bottom:8px">${esc(code)}</div><div style="display:flex;gap:6px;justify-content:center"><button onclick="sportyOpen('${code}', this)" class="btn btn-green">Play on Sportybet</button><button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)})" class="btn btn-ghost">Copy</button></div><div style="font-size:11px;color:var(--text-3);margin-top:8px">${sels.length} games</div></div>`;
     } else rd.innerHTML = `<div style="padding:12px;border:1px solid rgba(239,68,68,0.2);border-radius:var(--r-sm);background:var(--red-soft)"><span style="color:var(--red);font-weight:700;font-size:12px">Failed: ${esc(data.message||'Unknown error')}</span><div style="font-size:11px;color:var(--text-3);margin-top:6px">Sportybet may have rejected this combination. Try selecting different games or fewer selections.</div><button onclick="document.getElementById('gen-code-btn').click()" class="btn btn-ghost btn-sm" style="margin-top:8px">Retry</button></div>`;
   } catch { rd.innerHTML = '<div style="padding:12px;color:var(--red);font-size:12px">Connection error</div>'; }
   btnDone(genBtn);
@@ -5377,7 +5552,7 @@ document.getElementById('rv-generate').onclick = async () => {
             <span style="font-weight:700;color:${estWinPct >= 60 ? 'var(--green)' : 'var(--amber)'}">~${estWinPct}% win</span>
             <span style="color:var(--text-2)">Safety: ${avgSafety}</span>
           </div>
-          <button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy Code',2000)})" class="btn btn-green" style="margin-bottom:8px">Copy Code</button>
+          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:8px"><button onclick="sportyOpen('${code}', this)" class="btn btn-green">Play on Sportybet</button><button onclick="navigator.clipboard.writeText('${code}').then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)})" class="btn btn-ghost">Copy</button></div>
           <div style="font-size:11px;color:var(--text-3)">
             ${picked.map(g => {
               const con = getConsensus(g);
@@ -6071,6 +6246,7 @@ function renderValueCard(vb) {
       <div style="text-align:right">
         <div style="font-size:20px;font-weight:900;color:var(--amber)">+${vb.edgePct}%</div>
         <div style="font-size:10px;font-weight:600;color:var(--text-3)">EV</div>
+        <div style="margin-top:2px">${kellyBadge(vb.modelProb || 100 / (vb.pinnacleOdds || 1), vb.sportyOdds || vb.odds)}</div>
       </div>
     </div>
 
@@ -6899,6 +7075,235 @@ async function analyzeCashoutCode() {
 document.getElementById('cashout-analyze-btn').onclick = analyzeCashoutCode;
 document.getElementById('cashout-code-input').addEventListener('keydown', e => { if (e.key === 'Enter') analyzeCashoutCode(); });
 
+// ===== BANKROLL + KELLY HELPERS =====
+function getBankroll() {
+  const raw = parseFloat(localStorage.getItem('bankroll') || '0');
+  return raw > 0 ? raw : 1000;
+}
+function setBankroll(v) {
+  if (v > 0) localStorage.setItem('bankroll', String(v));
+}
+// Kelly fraction of bankroll for a single bet. kelly = (p*(odds-1) - (1-p)) / (odds-1)
+// We apply a conservative 0.25 fraction multiplier — full Kelly is too volatile in practice.
+function kellyFraction(probPct, odds) {
+  if (!odds || odds <= 1 || !probPct || probPct <= 0) return 0;
+  const p = probPct / 100;
+  const b = odds - 1;
+  const k = (p * b - (1 - p)) / b;
+  if (k <= 0) return 0;
+  return Math.min(0.1, k * 0.25); // cap at 10% bankroll, 0.25 Kelly
+}
+function kellyStake(probPct, odds) {
+  return Math.max(1, Math.round(getBankroll() * kellyFraction(probPct, odds)));
+}
+function kellyBadge(probPct, odds) {
+  const frac = kellyFraction(probPct, odds);
+  if (frac <= 0) return '';
+  const stake = kellyStake(probPct, odds);
+  return '<span style="font-size:10px;background:var(--purple-soft);color:var(--purple);padding:1px 6px;border-radius:3px;font-weight:700" title="Quarter-Kelly stake for this edge">K: ' + (frac * 100).toFixed(1) + '% · ₵' + stake + '</span>';
+}
+
+const bankrollEl = document.getElementById('bankroll-input');
+if (bankrollEl) {
+  bankrollEl.value = getBankroll();
+  bankrollEl.addEventListener('change', () => {
+    const v = parseFloat(bankrollEl.value);
+    if (v > 0) { setBankroll(v); if (currentPage === 'sharp') loadSharp(sharpTab); }
+  });
+}
+
+// Unlock key persistence
+const unlockInput = document.getElementById('unlock-input');
+const unlockStatus = document.getElementById('unlock-status');
+const unlockSaveBtn = document.getElementById('unlock-save-btn');
+function refreshUnlockStatus() {
+  const k = localStorage.getItem('unlockKey');
+  if (!unlockStatus) return;
+  if (k) unlockStatus.innerHTML = '<span style="color:var(--green)">&#10003; Key set — Sharp Signals unlocked</span>';
+  else unlockStatus.textContent = 'No key — Sharp Signals may be locked (depends on server config)';
+}
+if (unlockInput) {
+  unlockInput.value = localStorage.getItem('unlockKey') || '';
+  refreshUnlockStatus();
+}
+if (unlockSaveBtn) unlockSaveBtn.onclick = () => {
+  const v = (unlockInput.value || '').trim();
+  if (v) localStorage.setItem('unlockKey', v); else localStorage.removeItem('unlockKey');
+  refreshUnlockStatus();
+  showToast(v ? 'Unlock key saved' : 'Unlock key cleared', 'success');
+};
+
+// ===== SHARP SIGNALS =====
+let sharpTab = 'late';
+const sharpSeen = new Set(); // dedupe PWA notifications
+const sharpBtn = document.getElementById('sharp-refresh-btn');
+const sharpTabsEl = document.getElementById('sharp-tabs');
+if (sharpBtn) sharpBtn.onclick = () => loadSharp(sharpTab, true);
+if (sharpTabsEl) sharpTabsEl.addEventListener('click', e => {
+  const b = e.target.closest('[data-stab]');
+  if (!b) return;
+  sharpTab = b.dataset.stab;
+  document.querySelectorAll('#sharp-tabs .chip').forEach(c => c.classList.toggle('active', c === b));
+  loadSharp(sharpTab);
+});
+
+async function loadSharp(tab, forceRefresh) {
+  const content = document.getElementById('sharp-content');
+  const status = document.getElementById('sharp-status');
+  if (!content) return;
+  content.innerHTML = '<div class="empty" style="padding:24px;font-size:13px"><div class="spinner" style="width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 10px"></div>Loading…</div>';
+  if (status) status.textContent = '';
+  try {
+    if (tab === 'late') {
+      const data = await api('/predictions/late-locks' + (forceRefresh ? '?refresh=1' : ''));
+      if (data && data.error === 'premium') { content.innerHTML = renderPaywall(); return; }
+      content.innerHTML = renderLateLocks(data);
+      firePushForPicks('late-lock', data && data.picks);
+      if (status) status.textContent = (data.count||0) + ' picks · ' + (data.lateMatches||0) + ' late matches';
+    } else if (tab === 'live') {
+      const data = await api('/predictions/live-value-picks?minEdge=2');
+      content.innerHTML = renderLiveValue(data);
+      firePushForPicks('live-value', data && data.picks);
+      if (status) status.textContent = (data.count||0) + ' picks';
+    } else if (tab === 'steam') {
+      const data = await api('/predictions/dropping-odds?minDrop=10');
+      if (data && data.error === 'premium') { content.innerHTML = renderPaywall(); return; }
+      content.innerHTML = renderDropping(data);
+      if (status) status.textContent = (data && data.matches ? data.matches.length : 0) + ' movers';
+    } else if (tab === 'predict') {
+      const data = await api('/predictions/live-predict?timeline=live&limit=40');
+      if (data && data.error === 'premium') { content.innerHTML = renderPaywall(); return; }
+      content.innerHTML = renderLivePredict(data);
+      if (status) status.textContent = (data && data.predictions ? data.predictions.length : 0) + ' matches';
+    } else if (tab === 'lag') {
+      const data = await api('/predictions/odds-lag');
+      content.innerHTML = renderOddsLag(data);
+      if (status) status.textContent = (data && data.lags ? data.lags.length : 0) + ' lagged lines';
+    }
+  } catch (err) {
+    console.error(err);
+    content.innerHTML = '<div class="empty" style="color:var(--red)">Failed to load. Retry in a moment.</div>';
+  }
+}
+
+function renderPaywall() {
+  return '<div class="card" style="border-color:rgba(176,124,255,0.3);padding:20px;text-align:center">' +
+    '<div style="font-size:14px;font-weight:700;margin-bottom:6px">🔒 Premium — Sharp Signals</div>' +
+    '<div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Enter your unlock key on the <b>More</b> page to access late-locks, steam moves, and live-predict.</div>' +
+    '<button class="btn btn-blue btn-sm" onclick="switchPage(\'more\')">Go to More → Unlock Key</button></div>';
+}
+
+function renderLateLocks(data) {
+  const picks = (data && data.picks) || [];
+  if (!picks.length) return '<div class="empty" style="padding:20px">No late-lock picks right now. Scanner runs on 85\'+ matches only.</div>';
+  return picks.slice(0, 40).map(p => `
+    <div class="card" style="margin-bottom:8px;padding:10px 12px;border-color:rgba(176,124,255,0.2)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-size:13px;font-weight:700">${esc(p.home)} vs ${esc(p.away)}</div>
+        <div style="font-size:12px;color:var(--green);font-weight:800">+${(p.evPct||0).toFixed(1)}%</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">${esc(p.league||'')} · <span style="color:var(--red)">${esc(p.score||'')} ${esc(p.minute||'')}'</span></div>
+      <div style="font-size:12px;margin-bottom:6px"><b>${esc(p.market||'')}</b> @ <span style="color:var(--amber);font-weight:700">${(p.odds||0).toFixed(2)}</span></div>
+      <div style="display:flex;gap:8px;font-size:10px;color:var(--text-3);margin-bottom:8px">
+        <span>Model ${(p.modelProbPct||0).toFixed(1)}%</span>
+        <span>Implied ${(p.impliedPct||0).toFixed(1)}%</span>
+        ${kellyBadge(p.modelProbPct, p.odds)}
+      </div>
+      <button class="btn btn-green btn-sm" style="width:100%" onclick="playPick(this,'${esc(p.eventId||'')}','${esc(p.marketId||'')}','${esc(p.outcomeId||'')}','${esc(p.specifier||'')}','${esc(p.sportId||'sr:sport:1')}')">Play on Sportybet</button>
+    </div>`).join('');
+}
+
+function renderLiveValue(data) {
+  const picks = (data && data.picks) || [];
+  if (!picks.length) return '<div class="empty" style="padding:20px">No live value picks above the edge threshold right now.</div>';
+  return picks.slice(0, 40).map(p => `
+    <div class="card" style="margin-bottom:8px;padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-size:13px;font-weight:700">${esc(p.home)} vs ${esc(p.away)}</div>
+        <div style="font-size:12px;color:var(--green);font-weight:800">+${(p.edge||0).toFixed(1)}%</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">${esc(p.league||'')} · ${esc(p.score||'')} ${esc(p.minute||'')}'</div>
+      <div style="font-size:12px;margin-bottom:6px"><b>${esc(p.market||'')}</b>: ${esc(p.pick||'')} @ <span style="color:var(--amber);font-weight:700">${(p.odds||0).toFixed(2)}</span></div>
+      <div style="display:flex;gap:8px;font-size:10px;color:var(--text-3);margin-bottom:8px">
+        <span>Conf ${(p.confidence||0)|0}</span>
+        <span>Prob ${(p.probability||0).toFixed(1)}%</span>
+        ${kellyBadge(p.probability, p.odds)}
+      </div>
+      <button class="btn btn-green btn-sm" style="width:100%" onclick="playPick(this,'${esc(p.eventId||'')}','${esc(p.marketId||'')}','${esc(p.outcomeId||'')}','${esc(p.specifier||'')}','${esc(p.sportId||'sr:sport:1')}')">Play on Sportybet</button>
+    </div>`).join('');
+}
+
+function renderDropping(data) {
+  const m = (data && data.matches) || [];
+  if (!m.length) return '<div class="empty" style="padding:20px">No steam moves hitting the drop threshold.</div>';
+  return m.slice(0, 40).map(x => `
+    <div class="card" style="margin-bottom:8px;padding:10px 12px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">${esc(x.home || x.homeTeam || '')} vs ${esc(x.away || x.awayTeam || '')}</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">${esc(x.league||'')} · ${esc(x.kickoff || x.startTime || '')}</div>
+      <div style="font-size:12px;color:var(--red);font-weight:700">▼ ${(x.dropPct || x.drop || 0).toFixed(1)}% on ${esc(x.pick || x.outcome || 'line')}</div>
+    </div>`).join('');
+}
+
+function renderLivePredict(data) {
+  const preds = (data && data.predictions) || [];
+  if (!preds.length) return '<div class="empty" style="padding:20px">No live predictions available.</div>';
+  return preds.slice(0, 40).map(p => {
+    const bestKey = p.bestPick || (p.kellyEdge ? Object.keys(p.kellyEdge).reduce((a,b) => p.kellyEdge[a] > p.kellyEdge[b] ? a : b, 'home') : '');
+    const bestEdge = bestKey && p.kellyEdge ? (p.kellyEdge[bestKey] || 0) : 0;
+    return `<div class="card" style="margin-bottom:8px;padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-size:13px;font-weight:700">${esc(p.homeTeam||'')} vs ${esc(p.awayTeam||'')}</div>
+        <div style="font-size:12px;color:${bestEdge > 0 ? 'var(--green)' : 'var(--text-3)'};font-weight:800">${bestEdge > 0 ? '+' : ''}${bestEdge.toFixed(1)}%</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">${esc(p.league||'')} · ${esc(p.score||'')} ${esc(p.minute||'')}'</div>
+      <div style="font-size:11px">Best: <b>${esc(bestKey)}</b></div>
+    </div>`;
+  }).join('');
+}
+
+function renderOddsLag(data) {
+  const lags = (data && data.lags) || [];
+  if (!lags.length) return '<div class="empty" style="padding:20px">No lagged lines right now.</div>';
+  return lags.slice(0, 40).map(x => `
+    <div class="card" style="margin-bottom:8px;padding:10px 12px">
+      <div style="font-size:13px;font-weight:700">${esc(x.home||x.homeTeam||'')} vs ${esc(x.away||x.awayTeam||'')}</div>
+      <div style="font-size:12px;color:var(--amber);margin-top:4px">${esc(x.market||'')} — lag ${(x.lagPct || x.diff || 0).toFixed(1)}%</div>
+    </div>`).join('');
+}
+
+// PWA push notification for new sharp picks
+function firePushForPicks(source, picks) {
+  if (!picks || !picks.length) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  for (const p of picks) {
+    const key = source + ':' + (p.eventId||'') + ':' + (p.marketId||'') + ':' + (p.outcomeId||'') + ':' + (p.specifier||'');
+    if (sharpSeen.has(key)) continue;
+    const ev = p.evPct !== undefined ? p.evPct : p.edge;
+    if (!ev || ev < 5) continue; // only 5%+ edges
+    sharpSeen.add(key);
+    try {
+      new Notification((source === 'late-lock' ? '🔒 Late Lock' : '⚡ Live Value') + ' +' + ev.toFixed(1) + '% EV', {
+        body: (p.home||'') + ' vs ' + (p.away||'') + ' — ' + (p.market||'') + ' @ ' + (p.odds||0).toFixed(2),
+        icon: '/icons/icon-192.png',
+        tag: key,
+      });
+    } catch {}
+  }
+}
+// Ask permission once when user opens Sharp Signals for the first time
+let pushPrompted = false;
+(function wrapSwitchForPushPrompt() {
+  const orig = window.switchPage;
+  window.switchPage = function (name) {
+    const ret = orig.apply(this, arguments);
+    if (name === 'sharp' && !pushPrompted && 'Notification' in window && Notification.permission === 'default') {
+      pushPrompted = true;
+      setTimeout(() => Notification.requestPermission().catch(() => {}), 500);
+    }
+    return ret;
+  };
+})();
+
 // ===== PROMO EDGES =====
 let promoData = [];
 let promoLoaded = false;
@@ -6968,6 +7373,7 @@ function renderPromoEdges() {
     if (e._isLive) html += `<span style="font-size:9px;font-weight:800;color:var(--green);background:var(--green-soft);padding:2px 6px;border-radius:3px">LIVE ${esc(e.score)} ${esc(mt)}</span>`;
     html += `<span style="font-size:11px;color:var(--text-3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.league)}</span>`;
     html += `<span style="font-weight:800;color:${edgeColor};font-size:13px">+${e.edgePct}% edge</span>`;
+    html += kellyBadge(e.modelPct || e.probability || 100 - (100 / (e.odds || 1)), e.odds);
     html += `</div>`;
 
     html += `<div style="font-size:14px;font-weight:700;margin-bottom:6px">${esc(e.home)} <span style="color:var(--text-3)">vs</span> ${esc(e.away)}</div>`;

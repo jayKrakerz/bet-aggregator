@@ -15,6 +15,7 @@ import {
   findMatchingPredictions,
   type ConsensusPrediction,
 } from './tipster-scrapers.js';
+import { findPinnacleOdds, type PinnacleOdds } from './pinnacle-odds.js';
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -33,6 +34,12 @@ export interface TrackedPick {
   awayGoals: number | null;
   settledAt: string | null;
   snapshotAt: string;
+  // CLV tracking — Pinnacle fair decimal odds for the chosen pick, captured at
+  // snapshot time (our "take") and at settle time (the "close"). CLV% per pick
+  // is (snapshot / close - 1) * 100 — positive means our pick was taken at a
+  // price the sharp market later agreed was cheap.
+  snapshotOdds?: number | null;
+  closingOdds?: number | null;
 }
 
 export interface TrackerStats {
@@ -47,6 +54,7 @@ export interface TrackerStats {
   bySource: Record<string, { total: number; won: number; lost: number; winRate: number; weight: number }>;
   streak: { current: number; type: 'W' | 'L' | null };
   recentResults: TrackedPick[];
+  clv: { samples: number; avgPct: number; positivePct: number };
 }
 
 // Bayesian shrinkage prior: every source starts at 50% with 10 pseudo-bets.
@@ -270,6 +278,58 @@ export function getSourceWeights(): Map<string, number> {
   return weights;
 }
 
+/**
+ * Map a consensus pick label (e.g. "Home", "Over 2.5", "BTS") to Pinnacle's
+ * fair decimal odds (margin-stripped via 1/implied-prob). Returns null when
+ * we can't match the match or the specific market. Best-effort — missing CLV
+ * data is fine and common, but hits give us ground truth on pick quality.
+ */
+function stripVigTwoWay(over: number, under: number): { over: number; under: number } | null {
+  if (over <= 1 || under <= 1) return null;
+  const inv = 1 / over + 1 / under;
+  if (inv <= 0) return null;
+  return { over: inv / (1 / over), under: inv / (1 / under) };
+}
+function stripVigThreeWay(h: number, d: number, a: number): { h: number; d: number; a: number } | null {
+  if (h <= 1 || d <= 1 || a <= 1) return null;
+  const inv = 1 / h + 1 / d + 1 / a;
+  if (inv <= 0) return null;
+  return { h: inv / (1 / h), d: inv / (1 / d), a: inv / (1 / a) };
+}
+
+function fairOddsForPick(odds: PinnacleOdds, pick: string): number | null {
+  const p = pick.toLowerCase().trim();
+  if (odds.moneyline) {
+    const fair = stripVigThreeWay(odds.moneyline.home, odds.moneyline.draw, odds.moneyline.away);
+    if (fair) {
+      if (p === 'home' || p === '1') return fair.h;
+      if (p === 'draw' || p === 'x') return fair.d;
+      if (p === 'away' || p === '2') return fair.a;
+      if (p === '1x' || p === 'home or draw') return 1 / (1 / fair.h + 1 / fair.d);
+      if (p === 'x2' || p === 'draw or away') return 1 / (1 / fair.d + 1 / fair.a);
+      if (p === '12' || p === 'home or away') return 1 / (1 / fair.h + 1 / fair.a);
+    }
+  }
+  // Over/Under X.X
+  const m = p.match(/^(over|under)\s+(\d+\.?\d*)$/);
+  if (m && odds.totals) {
+    const side = m[1] as 'over' | 'under';
+    const line = parseFloat(m[2]!);
+    const row = odds.totals.find(t => Math.abs(t.line - line) < 0.01);
+    if (row) {
+      const fair = stripVigTwoWay(row.over, row.under);
+      if (fair) return side === 'over' ? fair.over : fair.under;
+    }
+  }
+  return null;
+}
+
+async function fetchFairOddsForPick(home: string, away: string, pick: string, league = ''): Promise<number | null> {
+  const pin = await findPinnacleOdds(home, away, league);
+  if (!pin) return null;
+  return fairOddsForPick(pin, pick);
+}
+
 function pickId(home: string, away: string, date: string, pick: string): string {
   // Normalize date to YYYY-MM-DD
   const d = date.includes('-') && date.length === 10 ? date : (() => {
@@ -329,7 +389,14 @@ export async function snapshotConsensus(minSources = 2, minPct = 50): Promise<Tr
       awayGoals: null,
       settledAt: null,
       snapshotAt: new Date().toISOString(),
+      snapshotOdds: null,
+      closingOdds: null,
     };
+
+    // CLV capture (best-effort, non-blocking): fetch Pinnacle fair odds at snapshot
+    fetchFairOddsForPick(home, away, consensus.bestPick).then(o => {
+      if (o && o > 1) pick.snapshotOdds = Math.round(o * 1000) / 1000;
+    }).catch(() => { /* swallow — CLV is best-effort */ });
 
     picks.push(pick);
     added.push(pick);
@@ -377,6 +444,16 @@ export async function settleResults(): Promise<{ settled: number; pending: numbe
     pick.result = evaluatePick(pick.pick, score.homeGoals, score.awayGoals);
     pick.settledAt = new Date().toISOString();
     settled++;
+
+    // Close-odds capture (best-effort, non-blocking) — only if not already set
+    if (!pick.closingOdds) {
+      fetchFairOddsForPick(pick.homeTeam, pick.awayTeam, pick.pick).then(o => {
+        if (o && o > 1) {
+          pick.closingOdds = Math.round(o * 1000) / 1000;
+          saveState();
+        }
+      }).catch(() => { /* swallow */ });
+    }
 
     // Credit / blame every source that contributed to this pick
     for (const src of pick.sources) {
@@ -445,6 +522,25 @@ export function getStats(): TrackerStats {
   // Recent results (last 20)
   const recentResults = settledByTime.slice(0, 20);
 
+  // CLV — Pinnacle-fair-odds delta between snapshot and close.
+  // Positive CLV across many picks is the only statistical proof of edge.
+  let clvSum = 0;
+  let clvSamples = 0;
+  let clvPositive = 0;
+  for (const p of picks) {
+    if (p.snapshotOdds && p.closingOdds && p.snapshotOdds > 1 && p.closingOdds > 1) {
+      const clvPct = (p.snapshotOdds / p.closingOdds - 1) * 100;
+      clvSum += clvPct;
+      clvSamples++;
+      if (clvPct > 0) clvPositive++;
+    }
+  }
+  const clv = {
+    samples: clvSamples,
+    avgPct: clvSamples > 0 ? Math.round((clvSum / clvSamples) * 100) / 100 : 0,
+    positivePct: clvSamples > 0 ? Math.round((clvPositive / clvSamples) * 1000) / 10 : 0,
+  };
+
   // Per-source performance + Bayesian-shrunk weight (used by buildConsensus)
   const bySource: TrackerStats['bySource'] = {};
   for (const [source, stat] of sourceStats) {
@@ -469,6 +565,7 @@ export function getStats(): TrackerStats {
     bySource,
     streak: { current: streakCount, type: streakType },
     recentResults,
+    clv,
   };
 }
 

@@ -18,6 +18,7 @@
 
 import { logger } from '../utils/logger.js';
 import { getSportyLiveGames, type LiveGame, type LiveMarket } from './sportybet-live.js';
+import { broadcastPicks } from './telegram-broadcaster.js';
 
 const BASELINE_GOALS_PER_MATCH = 2.7;
 const STOPPAGE_MIN = 3;
@@ -282,6 +283,23 @@ export async function getLateLockPicks(forceRefresh = false): Promise<LateLockRe
 
   cache = result;
   cacheTime = Date.now();
+
+  broadcastPicks(picks.map(p => ({
+    eventId: p.eventId,
+    marketId: p.marketId,
+    outcomeId: p.outcomeId,
+    specifier: p.specifier,
+    home: p.home,
+    away: p.away,
+    league: p.league,
+    market: p.market,
+    pick: p.pick,
+    odds: p.odds,
+    evPct: p.evPct,
+    score: p.score,
+    minute: p.minute,
+    source: 'late-lock',
+  })));
 
   logger.info({
     picks: picks.length,

@@ -22,6 +22,7 @@
 import { logger } from '../utils/logger.js';
 import { getSportyLiveGames } from './sportybet-live.js';
 import { predictLiveState, kellyEdge } from './live-state-predictor.js';
+import { broadcastPicks } from './telegram-broadcaster.js';
 
 /**
  * Market-shrinkage blending (adapted from soccer-bet-bot's odds-based Bayesian blend).
@@ -128,6 +129,18 @@ const OUTCOME_MAP: Record<string, OutcomeMapping> = {
   // Draw No Bet (refund on draw)
   dnbHome: { marketId: '11', outcomeId: '4', specifier: '', market: 'Draw No Bet', pickLabel: (h) => h + ' (DNB)' },
   dnbAway: { marketId: '11', outcomeId: '5', specifier: '', market: 'Draw No Bet', pickLabel: (_, a) => a + ' (DNB)' },
+  // Odd/Even total goals (Betradar market 26, outcomes 70=odd, 72=even)
+  oddTotal: { marketId: '26', outcomeId: '70', specifier: '', market: 'Odd/Even', pickLabel: () => 'Odd' },
+  evenTotal: { marketId: '26', outcomeId: '72', specifier: '', market: 'Odd/Even', pickLabel: () => 'Even' },
+  // Team totals — home side (market 19), away side (market 20)
+  homeOver05: { marketId: '19', outcomeId: '12', specifier: 'total=0.5', market: 'Home Total', pickLabel: (h) => h + ' Over 0.5' },
+  homeUnder05: { marketId: '19', outcomeId: '13', specifier: 'total=0.5', market: 'Home Total', pickLabel: (h) => h + ' Under 0.5' },
+  homeOver15: { marketId: '19', outcomeId: '12', specifier: 'total=1.5', market: 'Home Total', pickLabel: (h) => h + ' Over 1.5' },
+  homeUnder15: { marketId: '19', outcomeId: '13', specifier: 'total=1.5', market: 'Home Total', pickLabel: (h) => h + ' Under 1.5' },
+  awayOver05: { marketId: '20', outcomeId: '12', specifier: 'total=0.5', market: 'Away Total', pickLabel: (_, a) => a + ' Over 0.5' },
+  awayUnder05: { marketId: '20', outcomeId: '13', specifier: 'total=0.5', market: 'Away Total', pickLabel: (_, a) => a + ' Under 0.5' },
+  awayOver15: { marketId: '20', outcomeId: '12', specifier: 'total=1.5', market: 'Away Total', pickLabel: (_, a) => a + ' Over 1.5' },
+  awayUnder15: { marketId: '20', outcomeId: '13', specifier: 'total=1.5', market: 'Away Total', pickLabel: (_, a) => a + ' Under 1.5' },
 };
 
 /**
@@ -306,6 +319,18 @@ export async function getLiveValuePicks(forceRefresh = false): Promise<LiveValue
       // Draw No Bet (prob of winning given not-a-draw)
       { key: 'dnbHome', probPct: modelProbs.drawPct >= 99 ? 50 : modelProbs.homeWinPct / (1 - modelProbs.drawPct / 100) },
       { key: 'dnbAway', probPct: modelProbs.drawPct >= 99 ? 50 : modelProbs.awayWinPct / (1 - modelProbs.drawPct / 100) },
+      // Odd/Even total goals
+      { key: 'oddTotal', probPct: modelProbs.oddTotalPct },
+      { key: 'evenTotal', probPct: modelProbs.evenTotalPct },
+      // Team totals
+      { key: 'homeOver05', probPct: modelProbs.homeOver05Pct },
+      { key: 'homeUnder05', probPct: 100 - modelProbs.homeOver05Pct },
+      { key: 'homeOver15', probPct: modelProbs.homeOver15Pct },
+      { key: 'homeUnder15', probPct: 100 - modelProbs.homeOver15Pct },
+      { key: 'awayOver05', probPct: modelProbs.awayOver05Pct },
+      { key: 'awayUnder05', probPct: 100 - modelProbs.awayOver05Pct },
+      { key: 'awayOver15', probPct: modelProbs.awayOver15Pct },
+      { key: 'awayUnder15', probPct: 100 - modelProbs.awayOver15Pct },
     ];
 
     for (const { key, probPct } of outcomeChecks) {
@@ -421,6 +446,23 @@ export async function getLiveValuePicks(forceRefresh = false): Promise<LiveValue
 
   cache = result;
   cacheTime = Date.now();
+
+  broadcastPicks(picks.map(p => ({
+    eventId: p.eventId,
+    marketId: p.marketId,
+    outcomeId: p.outcomeId,
+    specifier: p.specifier,
+    home: p.home,
+    away: p.away,
+    league: p.league,
+    market: p.market,
+    pick: p.pick,
+    odds: p.odds,
+    evPct: p.edge,
+    score: p.score,
+    minute: p.minute,
+    source: 'live-value',
+  })));
 
   logger.info({
     totalPicks: picks.length,

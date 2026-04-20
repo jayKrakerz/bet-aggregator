@@ -37,6 +37,12 @@ export interface LiveStateProbs {
   over35Pct: number;
   bttsYesPct: number;
   bttsNoPct: number;
+  oddTotalPct: number;  // P(total goals is odd at FT)
+  evenTotalPct: number;
+  homeOver05Pct: number; // team totals
+  homeOver15Pct: number;
+  awayOver05Pct: number;
+  awayOver15Pct: number;
   valid: boolean;       // false if we can't parse state
   reason: string;       // which branch computed the probs
 }
@@ -156,6 +162,23 @@ function predictFootball(score: [number, number], minute: number): LiveStateProb
     btts = (1 - poissonPmf(0, homeRateRemaining)) * (1 - poissonPmf(0, awayRateRemaining));
   }
 
+  // Odd/Even total goals — current parity flips iff future goals are odd.
+  // For X~Poisson(λ), P(X even) = (1 + e^-2λ)/2.
+  const currentlyOdd = totalGoals % 2 === 1;
+  const pFutureEven = (1 + Math.exp(-2 * totalRemaining)) / 2;
+  const pOdd = currentlyOdd ? pFutureEven : 1 - pFutureEven;
+  const pEven = 1 - pOdd;
+
+  // Team totals: P(h + hMore >= T)
+  const pHomeOver = (T: number): number => {
+    if (h >= T) return 1;
+    return 1 - poissonCdf(T - h - 1, homeRateRemaining);
+  };
+  const pAwayOver = (T: number): number => {
+    if (a >= T) return 1;
+    return 1 - poissonCdf(T - a - 1, awayRateRemaining);
+  };
+
   return {
     homeWinPct: Math.round(pHomeWin * 1000) / 10,
     drawPct: Math.round(pDraw * 1000) / 10,
@@ -165,6 +188,12 @@ function predictFootball(score: [number, number], minute: number): LiveStateProb
     over35Pct: Math.round(over35 * 1000) / 10,
     bttsYesPct: Math.round(btts * 1000) / 10,
     bttsNoPct: Math.round((1 - btts) * 1000) / 10,
+    oddTotalPct: Math.round(pOdd * 1000) / 10,
+    evenTotalPct: Math.round(pEven * 1000) / 10,
+    homeOver05Pct: Math.round(pHomeOver(1) * 1000) / 10,
+    homeOver15Pct: Math.round(pHomeOver(2) * 1000) / 10,
+    awayOver05Pct: Math.round(pAwayOver(1) * 1000) / 10,
+    awayOver15Pct: Math.round(pAwayOver(2) * 1000) / 10,
     valid: true,
     reason: `Football state model: ${h}-${a} at ${minute}', λ_remaining=${totalRate.toFixed(2)}`,
   };
@@ -191,6 +220,8 @@ function predictBasketball(score: [number, number], minute: number, totalMinutes
     awayWinPct: Math.round((1 - pHome) * 1000) / 10,
     over15Pct: 100, over25Pct: 100, over35Pct: 100, // always over in basketball
     bttsYesPct: 99, bttsNoPct: 1,
+    oddTotalPct: 50, evenTotalPct: 50, // N/A for basketball — use neutral
+    homeOver05Pct: 100, homeOver15Pct: 100, awayOver05Pct: 100, awayOver15Pct: 100,
     valid: true,
     reason: `Basketball state model: ${h}-${a} diff=${diff} with ${remaining.toFixed(1)}min left`,
   };
@@ -203,6 +234,8 @@ export function predictLiveState(input: LiveStateInput): LiveStateProbs {
     homeWinPct: 33, drawPct: 33, awayWinPct: 33,
     over15Pct: 50, over25Pct: 50, over35Pct: 50,
     bttsYesPct: 50, bttsNoPct: 50,
+    oddTotalPct: 50, evenTotalPct: 50,
+    homeOver05Pct: 50, homeOver15Pct: 50, awayOver05Pct: 50, awayOver15Pct: 50,
     valid: false, reason: 'could not parse state',
   };
 

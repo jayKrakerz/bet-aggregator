@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { config } from '../../config.js';
 import { getAllBookingCodes } from '../booking-codes-scraper.js';
 import { enrichMatches, hasFootballApi } from '../football-enrichment.js';
 import { fotmobEnrichMatches } from '../fotmob-enrichment.js';
@@ -50,7 +51,34 @@ function isValidSelection(s: unknown): s is { eventId: string; marketId: string;
   return true;
 }
 
+// Premium endpoints require a valid X-Unlock-Key header when UNLOCK_KEYS is set.
+const UNLOCK_SET = new Set(
+  (config.UNLOCK_KEYS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+);
+function requireUnlock(request: { headers: Record<string, string | string[] | undefined> }, reply: { status: (n: number) => { send: (x: unknown) => unknown } }): boolean {
+  if (UNLOCK_SET.size === 0) return true; // no keys configured → open access
+  const hdr = request.headers['x-unlock-key'];
+  const key = Array.isArray(hdr) ? hdr[0] : hdr;
+  if (!key || !UNLOCK_SET.has(key)) {
+    void reply.status(402).send({ error: 'premium', message: 'X-Unlock-Key required' });
+    return false;
+  }
+  return true;
+}
+
 export const predictionsRoutes: FastifyPluginAsync = async (app) => {
+
+  // GET /predictions/config — public monetization + affiliate config for frontend
+  app.get('/config', async (_request, reply) => {
+    void reply.header('Cache-Control', 'public, max-age=300');
+    return {
+      sportyAffilTag: config.SPORTY_AFFIL_TAG || null,
+      buyMeACoffeeUrl: config.BUYMEACOFFEE_URL || null,
+      adsenseClientId: config.ADSENSE_CLIENT_ID || null,
+      telegramEnabled: Boolean(config.TELEGRAM_BOT_TOKEN && config.TELEGRAM_CHAT_ID),
+      paywallEnabled: UNLOCK_SET.size > 0,
+    };
+  });
 
   // GET /predictions/track-codes?codes=ABC123,DEF456 — bulk live status
   app.get('/track-codes', async (request, reply) => {
@@ -518,6 +546,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   // GET /predictions/live-predict — live games with full AI analysis
   // Optional: ?timeline=prematch&limit=10 for testing when no live games
   app.get('/live-predict', async (request, reply) => {
+    if (!requireUnlock(request as never, reply as never)) return;
     const query = request.query as { timeline?: string; limit?: string };
     const timeline = query.timeline === 'prematch' ? 'prematch' as const : 'live' as const;
     const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
@@ -597,6 +626,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   // Targets odd/even, far Under lines, leader double-chance, and tied-match draws —
   // markets where soft-book lag leaves thin but real EV near full-time.
   app.get('/late-locks', async (request, reply) => {
+    if (!requireUnlock(request as never, reply as never)) return;
     const query = request.query as { minEv?: string; refresh?: string };
     const minEv = parseFloat(query.minEv || '0');
     const forceRefresh = query.refresh === '1';
@@ -1061,6 +1091,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   // GET /predictions/dropping-odds — Oddspedia line-movement signals.
   // Query: sport=football|basketball|tennis|all, minDrop=10, period=1hour|6hours|1day|3days
   app.get('/dropping-odds', async (request, reply) => {
+    if (!requireUnlock(request as never, reply as never)) return;
     const q = request.query as { sport?: string; minDrop?: string; period?: string };
     const sport = q.sport === 'basketball' || q.sport === 'tennis' || q.sport === 'all' ? q.sport : 'football';
     const minDropPct = q.minDrop ? Math.max(0, Math.min(100, parseFloat(q.minDrop))) : 10;
