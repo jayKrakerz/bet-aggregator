@@ -79,7 +79,13 @@ const oddsCache = new Map<number, { data: Map<number, PinnacleOdds>; ts: number 
 async function pinnacleFetch<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(`${PINNACLE_BASE}${path}`, {
-      headers: { 'Accept': 'application/json' },
+      headers: {
+        'Accept': 'application/json',
+        'X-API-Key': 'CmX2KcMrXuFmNg6YFbmTxE0y9CIrOi0R',
+        'Referer': 'https://www.pinnacle.com/',
+        'Origin': 'https://www.pinnacle.com',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     });
     if (!res.ok) return null;

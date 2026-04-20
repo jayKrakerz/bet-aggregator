@@ -16,6 +16,7 @@ import { getDroppingOdds } from '../oddspedia-dropping-odds.js';
 import { getFlashLiveMatches, toSportyFormat } from '../flashscore-live.js';
 import { getSportyLiveGames } from '../sportybet-live.js';
 import { getLiveValuePicks } from '../live-value-picks.js';
+import { getLateLockPicks } from '../late-lock-scanner.js';
 import { getPromoEdges } from '../promo-detector.js';
 import { analyzeCashout } from '../cashout-analyzer.js';
 let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
@@ -589,6 +590,28 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       withPinnacle: result.withPinnacle,
       scrapedAt: result.scrapedAt,
       analysisSources: result.analysisSources,
+    };
+  });
+
+  // GET /predictions/late-locks — positive-EV picks on 85+ minute football matches
+  // Targets odd/even, far Under lines, leader double-chance, and tied-match draws —
+  // markets where soft-book lag leaves thin but real EV near full-time.
+  app.get('/late-locks', async (request, reply) => {
+    const query = request.query as { minEv?: string; refresh?: string };
+    const minEv = parseFloat(query.minEv || '0');
+    const forceRefresh = query.refresh === '1';
+
+    const result = await getLateLockPicks(forceRefresh);
+    const filtered = minEv > 0 ? result.picks.filter(p => p.evPct >= minEv) : result.picks;
+
+    void reply.header('Cache-Control', 'public, max-age=30');
+    return {
+      picks: filtered,
+      count: filtered.length,
+      totalCount: result.count,
+      scanned: result.scanned,
+      lateMatches: result.lateMatches,
+      scrapedAt: result.scrapedAt,
     };
   });
 
