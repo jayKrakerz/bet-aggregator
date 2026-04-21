@@ -25,6 +25,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { logger } from '../utils/logger.js';
+import { kv } from '@vercel/kv';
 
 // ── Tunables ─────────────────────────────────────────────
 
@@ -72,11 +73,43 @@ interface PersistedEloState {
 }
 
 // ── Persistence ──────────────────────────────────────────
+//
+// Pluggable storage: Vercel KV (Upstash Redis) when env vars are set,
+// otherwise local filesystem. Lets the same build run as a stateful dev
+// server AND a persistent serverless deploy.
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const STATE_FILE = path.join(DATA_DIR, 'elo_ratings.json');
+const KV_KEY = 'elo:state:v1';
+const USE_KV = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
-function loadState(): { teams: Map<string, TeamRating>; bootstrappedAt: string | null } {
+function trimIfOversized(): void {
+  if (teams.size <= MAX_TEAMS_RETAINED) return;
+  const sorted = [...teams.entries()].sort(
+    (a, b) => new Date(a[1].lastUpdated).getTime() - new Date(b[1].lastUpdated).getTime(),
+  );
+  const drop = sorted.slice(0, teams.size - MAX_TEAMS_RETAINED);
+  for (const [name] of drop) teams.delete(name);
+}
+
+function buildStateBlob(): PersistedEloState {
+  trimIfOversized();
+  return { version: 1, bootstrappedAt, teams: [...teams.entries()] };
+}
+
+async function loadStateAsync(): Promise<{ teams: Map<string, TeamRating>; bootstrappedAt: string | null }> {
+  // 1) KV first on serverless deploys.
+  if (USE_KV) {
+    try {
+      const raw = await kv.get<PersistedEloState>(KV_KEY);
+      if (raw && Array.isArray(raw.teams)) {
+        return { teams: new Map(raw.teams), bootstrappedAt: raw.bootstrappedAt ?? null };
+      }
+    } catch (err) {
+      logger.warn({ err }, 'KV read failed; falling back to fs');
+    }
+  }
+  // 2) Filesystem for local dev.
   try {
     if (fs.existsSync(STATE_FILE)) {
       const raw = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) as PersistedEloState;
@@ -91,31 +124,71 @@ function loadState(): { teams: Map<string, TeamRating>; bootstrappedAt: string |
   return { teams: new Map(), bootstrappedAt: null };
 }
 
-function saveState(): void {
+// Debounced persist — hot-path updates don't block on the I/O. We schedule
+// one save after activity quiets for DEBOUNCE_MS. KV costs a round trip per
+// write so batching matters.
+const DEBOUNCE_MS = 1500;
+let saveTimer: NodeJS.Timeout | null = null;
+let savingInFlight = false;
+let savePending = false;
+
+async function persistNow(): Promise<void> {
+  const state = buildStateBlob();
+  if (USE_KV) {
+    try {
+      await kv.set(KV_KEY, state);
+      return;
+    } catch (err) {
+      logger.warn({ err }, 'KV write failed; falling back to fs');
+    }
+  }
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    // Trim oldest-seen-first if we blow past the retention cap.
-    if (teams.size > MAX_TEAMS_RETAINED) {
-      const sorted = [...teams.entries()].sort(
-        (a, b) => new Date(a[1].lastUpdated).getTime() - new Date(b[1].lastUpdated).getTime(),
-      );
-      const drop = sorted.slice(0, teams.size - MAX_TEAMS_RETAINED);
-      for (const [name] of drop) teams.delete(name);
-    }
-    const state: PersistedEloState = {
-      version: 1,
-      bootstrappedAt,
-      teams: [...teams.entries()],
-    };
     fs.writeFileSync(STATE_FILE, JSON.stringify(state));
   } catch (err) {
     logger.warn({ err }, 'Could not persist ELO state');
   }
 }
 
-const _loaded = loadState();
-const teams = _loaded.teams;
-let bootstrappedAt: string | null = _loaded.bootstrappedAt;
+function saveState(): void {
+  // Coalesce bursty writes.
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    saveTimer = null;
+    if (savingInFlight) { savePending = true; return; }
+    savingInFlight = true;
+    try { await persistNow(); }
+    finally {
+      savingInFlight = false;
+      if (savePending) { savePending = false; saveState(); }
+    }
+  }, DEBOUNCE_MS);
+}
+
+/** Force-flush any pending save (useful before shutdown). */
+export async function flushEloState(): Promise<void> {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  await persistNow();
+}
+
+const teams = new Map<string, TeamRating>();
+let bootstrappedAt: string | null = null;
+
+// Kick off async load; predictions made before this completes just see
+// neutral ratings, which is fine — they fall through non-confident and
+// don't influence Live Value picks.
+let _loadPromise: Promise<void> | null = null;
+function ensureLoaded(): Promise<void> {
+  if (_loadPromise) return _loadPromise;
+  _loadPromise = loadStateAsync().then(({ teams: loaded, bootstrappedAt: ts }) => {
+    for (const [k, v] of loaded) teams.set(k, v);
+    bootstrappedAt = ts;
+    logger.info({ teams: teams.size, bootstrappedAt, backend: USE_KV ? 'kv' : 'fs' }, 'ELO state loaded');
+  });
+  return _loadPromise;
+}
+// Fire-and-forget; caller doesn't need to await.
+void ensureLoaded();
 
 // ── Name normalization (shared lightweight form) ─────────
 
@@ -263,6 +336,7 @@ async function fetchEspnDay(dateStr: string): Promise<Array<{ home: string; away
  * rating trajectory is as close to real as possible.
  */
 export async function bootstrapEloFromEspn(): Promise<{ matchesSeeded: number; teamsSeen: number }> {
+  await ensureLoaded();
   if (bootstrappedAt) {
     return { matchesSeeded: 0, teamsSeen: teams.size };
   }
@@ -302,6 +376,7 @@ export async function bootstrapEloFromEspn(): Promise<{ matchesSeeded: number; t
 export function getEloStats(): {
   teams: number;
   bootstrappedAt: string | null;
+  backend: 'kv' | 'fs';
   top10: Array<{ team: string; rating: number; matches: number }>;
 } {
   const top10 = [...teams.entries()]
@@ -309,5 +384,5 @@ export function getEloStats(): {
     .filter(x => x.matches >= 3)
     .sort((a, b) => b.rating - a.rating)
     .slice(0, 10);
-  return { teams: teams.size, bootstrappedAt, top10 };
+  return { teams: teams.size, bootstrappedAt, backend: USE_KV ? 'kv' : 'fs', top10 };
 }
