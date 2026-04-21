@@ -21,6 +21,7 @@ import { getLateLockPicks } from '../late-lock-scanner.js';
 import { getPromoEdges } from '../promo-detector.js';
 import { analyzeCashout } from '../cashout-analyzer.js';
 import { predictElo, bootstrapEloFromEspn, getEloStats } from '../elo-predictor.js';
+import { getEloPicks } from '../elo-picker.js';
 let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
 const aviatorTracker = async () => {
   if (!_aviatorModule) _aviatorModule = await import('../aviator-tracker.js');
@@ -81,6 +82,21 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   app.get('/elo/stats', async (_request, reply) => {
     void reply.header('Cache-Control', 'public, max-age=120');
     return getEloStats();
+  });
+
+  // GET /predictions/elo/picks — pickable selections from ELO across upcoming matches.
+  // Query: minEdge, minProbability, maxOdds, minOdds, refresh
+  app.get('/elo/picks', async (request, reply) => {
+    const q = request.query as Record<string, string | undefined>;
+    const opts = {
+      minEdge: q.minEdge !== undefined ? parseFloat(q.minEdge) : undefined,
+      minProbability: q.minProbability !== undefined ? parseFloat(q.minProbability) : undefined,
+      maxOdds: q.maxOdds !== undefined ? parseFloat(q.maxOdds) : undefined,
+      minOdds: q.minOdds !== undefined ? parseFloat(q.minOdds) : undefined,
+    };
+    const result = await getEloPicks(opts, q.refresh === '1');
+    void reply.header('Cache-Control', 'public, max-age=120');
+    return result;
   });
 
   // POST /predictions/elo/bootstrap — seed ratings from ~180 days of ESPN history.

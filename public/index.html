@@ -7178,9 +7178,12 @@ async function loadSharp(tab, forceRefresh) {
       content.innerHTML = renderOddsLag(data);
       if (status) status.textContent = (data && data.lags ? data.lags.length : 0) + ' lagged lines';
     } else if (tab === 'elo') {
-      const data = await api('/predictions/elo/stats');
-      content.innerHTML = renderEloStats(data);
-      if (status) status.textContent = (data && data.teams ? data.teams + ' teams rated' : 'not seeded');
+      const [stats, picks] = await Promise.all([
+        api('/predictions/elo/stats'),
+        api('/predictions/elo/picks?minEdge=3'),
+      ]);
+      content.innerHTML = renderEloPicks(stats, picks);
+      if (status) status.textContent = (picks && picks.count ? picks.count + ' picks · ' : '') + (stats && stats.teams ? stats.teams + ' teams rated' : 'not seeded');
     }
   } catch (err) {
     console.error(err);
@@ -7263,30 +7266,63 @@ function renderLivePredict(data) {
   }).join('');
 }
 
-function renderEloStats(data) {
-  const boot = data && data.bootstrappedAt;
-  const total = data && data.teams || 0;
-  const top = (data && data.top10) || [];
-  let html = '<div class="card" style="padding:12px;margin-bottom:10px">';
-  html += '<div style="font-size:13px;font-weight:700;margin-bottom:4px">ELO Rating System</div>';
-  html += '<div style="font-size:11px;color:var(--text-3);line-height:1.5">Self-learning team-strength model, independent from the Poisson goal model. Starts at 1500 for every team; adjusts by match result after each settle. Blends into Live Value picks as an early-minute prior.</div>';
+function renderEloPicks(stats, picksData) {
+  const boot = stats && stats.bootstrappedAt;
+  const total = (stats && stats.teams) || 0;
+  const picks = (picksData && picksData.picks) || [];
+
+  let html = '';
+
+  // Header card
+  html += '<div class="card" style="padding:10px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;font-size:12px">';
+  html += '<div><b>ELO</b> · ' + total + ' teams · ' + (boot ? 'seeded ' + new Date(boot).toLocaleDateString() : '<span style="color:var(--amber)">not seeded</span>') + '</div>';
+  html += '<div style="color:var(--text-3)">' + (picksData && picksData.scanned ? picksData.scanned + ' scanned' : '') + '</div>';
   html += '</div>';
-  html += '<div class="card" style="padding:10px 12px;margin-bottom:10px">';
-  html += '<div style="display:flex;justify-content:space-between;font-size:12px"><div>Teams rated</div><div style="font-weight:700">' + total + '</div></div>';
-  html += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><div>Bootstrapped</div><div style="font-weight:700">' + (boot ? new Date(boot).toLocaleDateString() : '<span style="color:var(--amber)">not yet</span>') + '</div></div>';
-  if (!boot) {
-    html += '<button id="elo-bootstrap-btn" class="btn btn-blue btn-sm" style="margin-top:8px;width:100%">Seed from ESPN history (180 days)</button>';
+
+  // Code-generator CTA
+  if (picks.length) {
+    html += '<div class="card" style="border-color:rgba(52,212,114,0.35);padding:12px;margin-bottom:12px">';
+    html += '<div style="font-size:13px;font-weight:700;margin-bottom:6px">Generate ELO Code</div>';
+    html += '<div style="font-size:11px;color:var(--text-3);margin-bottom:8px">Builds a Sportybet booking code from the top ELO picks. Targets are multiplied legs — 3 legs ≈ 3-5× odds, 5 legs ≈ 8-15× odds.</div>';
+    html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">';
+    html += '<span style="font-size:11px;color:var(--text-3)">Legs:</span>';
+    html += '<select id="elo-gen-legs" class="input-sm" style="flex:0 0 auto;padding:4px 8px">';
+    for (const n of [2, 3, 4, 5, 6, 8]) html += '<option value="' + n + '"' + (n === 3 ? ' selected' : '') + '>' + n + '</option>';
+    html += '</select>';
+    html += '<button id="elo-gen-btn" class="btn btn-green btn-sm" style="flex:1">Generate Code</button>';
+    html += '</div>';
+    html += '<div id="elo-gen-result"></div>';
+    html += '</div>';
+  } else if (!boot) {
+    html += '<div class="card" style="padding:16px;text-align:center">';
+    html += '<div style="font-size:13px;margin-bottom:8px">Seed the model first to get picks</div>';
+    html += '<button id="elo-bootstrap-btn" class="btn btn-blue btn-sm" style="width:100%">Seed from ESPN (180 days)</button>';
+    html += '</div>';
+  } else {
+    html += '<div class="empty" style="padding:20px">No +edge ELO picks right now. Refresh or lower the threshold.</div>';
   }
-  html += '</div>';
-  if (top.length) {
-    html += '<div style="font-size:11px;color:var(--text-3);margin-bottom:6px">Top-rated teams</div>';
-    for (const t of top) {
-      html += '<div class="card" style="padding:8px 12px;margin-bottom:4px;display:flex;justify-content:space-between;font-size:12px"><div>' + esc(t.team) + '</div><div><span style="color:var(--amber);font-weight:700">' + t.rating + '</span> <span style="color:var(--text-3)">· ' + t.matches + 'm</span></div></div>';
-    }
-  } else if (boot) {
-    html += '<div class="empty" style="padding:16px">No ratings yet — waiting for settled matches.</div>';
+
+  // Picks list
+  for (const p of picks.slice(0, 40)) {
+    const ko = p.kickoff ? new Date(p.kickoff).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    html += '<div class="card" style="margin-bottom:8px;padding:10px 12px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+    html += '<div style="font-size:13px;font-weight:700">' + esc(p.home) + ' vs ' + esc(p.away) + '</div>';
+    html += '<div style="font-size:12px;color:var(--green);font-weight:800">+' + (p.edge || 0).toFixed(1) + '%</div>';
+    html += '</div>';
+    html += '<div style="font-size:11px;color:var(--text-3);margin-bottom:6px">' + esc(p.league || '') + (ko ? ' · ' + esc(ko) : '') + '</div>';
+    html += '<div style="font-size:12px;margin-bottom:6px"><b>' + esc(p.market) + '</b>: ' + esc(p.pick) + ' @ <span style="color:var(--amber);font-weight:700">' + (p.odds || 0).toFixed(2) + '</span></div>';
+    html += '<div style="display:flex;gap:8px;font-size:10px;color:var(--text-3);margin-bottom:8px">';
+    html += '<span>ELO ' + (p.probability || 0).toFixed(1) + '%</span>';
+    html += '<span>Book ' + (p.bookImpliedPct || 0).toFixed(1) + '%</span>';
+    html += '<span>' + p.homeRating + ' vs ' + p.awayRating + '</span>';
+    html += kellyBadge(p.probability, p.odds);
+    html += '</div>';
+    html += '<button class="btn btn-green btn-sm" style="width:100%" onclick="playPick(this,\'' + esc(p.eventId || '') + '\',\'' + esc(p.marketId || '') + '\',\'' + esc(p.outcomeId || '') + '\',\'' + esc(p.specifier || '') + '\',\'' + esc(p.sportId || 'sr:sport:1') + '\')">Play on Sportybet</button>';
+    html += '</div>';
   }
-  // Wire up bootstrap button if present (runs on next tick after innerHTML)
+
+  // Wire buttons after innerHTML
   setTimeout(() => {
     const b = document.getElementById('elo-bootstrap-btn');
     if (b) b.onclick = async () => {
@@ -7298,8 +7334,71 @@ function renderEloStats(data) {
         loadSharp('elo', true);
       } catch (e) { showToast('Seed failed', 'error'); b.disabled = false; b.textContent = 'Retry seeding'; }
     };
+    const gen = document.getElementById('elo-gen-btn');
+    if (gen) gen.onclick = () => generateEloCode(picks);
   }, 0);
+
   return html;
+}
+
+async function generateEloCode(picks) {
+  const legsSel = document.getElementById('elo-gen-legs');
+  const legs = Math.max(2, Math.min(10, parseInt((legsSel && legsSel.value) || '3', 10)));
+  const gen = document.getElementById('elo-gen-btn');
+  const out = document.getElementById('elo-gen-result');
+  if (!gen || !out) return;
+  gen.disabled = true;
+  const origLabel = gen.textContent;
+  gen.textContent = 'Creating code…';
+  out.innerHTML = '';
+
+  // Deduplicate by eventId (can't bet two legs on same match)
+  const seen = new Set();
+  const chosen = [];
+  for (const p of picks) {
+    if (chosen.length >= legs) break;
+    if (seen.has(p.eventId)) continue;
+    seen.add(p.eventId);
+    chosen.push(p);
+  }
+  if (chosen.length < 2) {
+    gen.disabled = false; gen.textContent = origLabel;
+    showToast('Not enough picks to build a code', 'error');
+    return;
+  }
+  const sels = chosen.map(p => ({ eventId: p.eventId, marketId: p.marketId, outcomeId: p.outcomeId, specifier: p.specifier || '', sportId: p.sportId || 'sr:sport:1' }));
+
+  try {
+    const res = await fetch('/predictions/create-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ selections: sels }),
+    });
+    const data = await res.json();
+    const code = data && data.data && data.data.shareCode;
+    if (!code) throw new Error((data && data.message) || 'create-code failed');
+    const totalOdds = chosen.reduce((acc, p) => acc * (p.odds || 1), 1);
+    out.innerHTML = '<div style="border:2px solid rgba(52,212,114,0.4);border-radius:var(--r-sm);background:var(--green-soft);padding:14px;text-align:center;margin-top:10px">'
+      + '<div style="font-size:10px;color:var(--text-3);margin-bottom:4px">ELO CODE · ' + chosen.length + ' LEGS · @' + totalOdds.toFixed(2) + '</div>'
+      + '<div class="gen-code-val" style="color:var(--green);margin-bottom:8px">' + esc(code) + '</div>'
+      + '<div style="display:flex;gap:6px;justify-content:center">'
+      + '<button onclick="sportyOpen(\'' + esc(code) + '\', this)" class="btn btn-green">Copy Code</button>'
+      + '<button onclick="navigator.clipboard.writeText(\'' + esc(code) + '\').then(()=>{this.textContent=\'Copied!\';setTimeout(()=>this.textContent=\'Copy\',2000)})" class="btn btn-ghost">Copy</button>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--text-3);margin-top:8px">'
+      + chosen.map(p => '<div>' + esc(p.home) + ' vs ' + esc(p.away) + ' — ' + esc(p.pick) + ' @ ' + (p.odds || 0).toFixed(2) + '</div>').join('')
+      + '</div></div>';
+    // Save to history like other generated codes
+    if (typeof codeHistory !== 'undefined') {
+      codeHistory.unshift({ code, odds: totalOdds, events: chosen.length, createdAt: Date.now(), status: 'pending', source: 'elo' });
+      if (typeof saveCHistory === 'function') saveCHistory();
+    }
+  } catch (err) {
+    out.innerHTML = '<div style="padding:10px;color:var(--red);font-size:12px">Could not create code: ' + (err && err.message ? err.message : 'unknown') + '</div>';
+  } finally {
+    gen.disabled = false;
+    gen.textContent = origLabel;
+  }
 }
 
 function renderOddsLag(data) {
