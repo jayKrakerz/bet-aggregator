@@ -15,6 +15,7 @@ import { getSportsAiData, getSportsAiBotResults, findPredictionForMatch, findVal
 import { getLivePredictions } from '../live-predictor.js';
 import { getDroppingOdds } from '../oddspedia-dropping-odds.js';
 import { getEsportsMatches } from '../pinnacle-esports.js';
+import { getArbCandidates } from '../arb-candidates.js';
 import { getFlashLiveMatches, toSportyFormat } from '../flashscore-live.js';
 import { getSportyLiveGames } from '../sportybet-live.js';
 import { getLiveValuePicks } from '../live-value-picks.js';
@@ -1019,6 +1020,16 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     const teams = getAvailableTeams();
     void reply.header('Cache-Control', 'public, max-age=3600');
     return { data: teams, count: teams.length };
+  });
+
+  // GET /predictions/arb-candidates — upcoming football matches where the
+  // bet-Under-pre-match + hedge-Over-at-5'-goalless cycle locks a positive
+  // guaranteed return. Math from Pinnacle's de-vigged O/U 2.5 line.
+  app.get('/arb-candidates', async (request, reply) => {
+    const q = request.query as { refresh?: string };
+    const result = await getArbCandidates(q.refresh === '1');
+    void reply.header('Cache-Control', 'public, max-age=300');
+    return result;
   });
 
   // GET /predictions/sharp-esports — Pinnacle's upcoming CS2 / LoL / Dota /

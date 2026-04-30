@@ -1527,6 +1527,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     <button class="chip" data-stab="lag" style="padding:5px 12px;font-size:11px;flex-shrink:0">Odds Lag</button>
     <button class="chip" data-stab="elo" style="padding:5px 12px;font-size:11px;flex-shrink:0">ELO</button>
     <button class="chip" data-stab="esports" style="padding:5px 12px;font-size:11px;flex-shrink:0">Esports</button>
+    <button class="chip" data-stab="arb5" style="padding:5px 12px;font-size:11px;flex-shrink:0">Arb 5'</button>
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -6760,6 +6761,12 @@ async function loadSharp(tab, forceRefresh) {
       const total = (data && data.totalMatches) || 0;
       const fifa = (data && data.byGame && data.byGame.fifae) || 0;
       if (status) status.textContent = total + ' matches · FIFAe ' + (fifa > 0 ? fifa : 'off-season');
+    } else if (tab === 'arb5') {
+      const data = await api('/predictions/arb-candidates' + (forceRefresh ? '?refresh=1' : ''));
+      content.innerHTML = renderArb5(data);
+      const strong = ((data && data.candidates) || []).filter(c => c.verdict === 'STRONG').length;
+      const marginal = ((data && data.candidates) || []).filter(c => c.verdict === 'MARGINAL').length;
+      if (status) status.textContent = strong + ' strong · ' + marginal + ' marginal · ' + (data && data.totalScanned || 0) + ' analysed';
     }
   } catch (err) {
     console.error(err);
@@ -7050,6 +7057,73 @@ function renderEsportsMatch(m) {
     +     '<div style="display:flex;justify-content:space-between"><span>Pinnacle ' + probA + '%</span><span style="color:var(--green);font-weight:700">Fair ≥ ' + fairA + '</span></div>'
     +     '<div style="font-size:10px;color:var(--text-3)">@ ' + m.decimalAway.toFixed(2) + ' on Pinnacle</div>'
     +   '</div>'
+    + '</div>'
+  + '</div>';
+}
+
+// ===== ARB 5' (5-min hedge candidates) =====
+// For each upcoming football match, shows the math behind the
+// "bet Under pre-match → if 5' goalless, hedge with live Over" cycle.
+// Fair-value arb % is what the math says the cycle locks in. Real arb %
+// is what's left after assumed bookmaker margins (~7% live). Most matches
+// show negative realArb — that's the honest friction. STRONG verdict
+// flags matches where the math is strong enough to potentially survive
+// real margins if you have access to a sharp pre-match book.
+function renderArb5(data) {
+  const cands = (data && data.candidates) || [];
+  let html = '';
+
+  // Explainer at top
+  html += '<div class="card" style="padding:12px;margin-bottom:10px;font-size:11px;line-height:1.5">'
+    + '<div style="font-size:13px;font-weight:700;margin-bottom:6px">5-min Hedge Candidates</div>'
+    + '<div style="color:var(--text-3);margin-bottom:6px">'
+    + '  <b>Workflow:</b> Bet Under pre-match → wait 5 min → if no goal, hedge with live Over at the fair-value price. '
+    + '  Locks a guaranteed return regardless of which side wins.'
+    + '</div>'
+    + '<div style="color:var(--text-3)">'
+    + '  <b>Reality:</b> Most "fair arb" is eaten by bookmaker margins. To realise it you need a <b>sharp pre-match book</b> '
+    + '  (Pinnacle preferred) AND a <b>slow-updating live book</b> (Sportybet / 22bet often work). '
+    + '  Same book on both sides triggers anti-arb detection.'
+    + '</div>'
+    + '</div>';
+
+  if (!cands.length) {
+    html += '<div class="empty" style="padding:20px">No upcoming football fixtures with O/U totals on Pinnacle right now. Check back closer to a busy match weekend.</div>';
+    return html;
+  }
+
+  for (const c of cands) {
+    html += renderArb5Card(c);
+  }
+  return html;
+}
+
+function renderArb5Card(c) {
+  const ko = c.startTime ? new Date(c.startTime).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const verdictColor = c.verdict === 'STRONG' ? 'var(--green)' : c.verdict === 'MARGINAL' ? 'var(--amber)' : 'var(--text-3)';
+  const verdictBg = c.verdict === 'STRONG' ? 'rgba(52,212,114,0.10)' : c.verdict === 'MARGINAL' ? 'rgba(245,166,35,0.10)' : 'rgba(120,120,120,0.06)';
+  const verdictBorder = c.verdict === 'STRONG' ? 'rgba(52,212,114,0.3)' : c.verdict === 'MARGINAL' ? 'rgba(245,166,35,0.3)' : 'rgba(120,120,120,0.2)';
+  const realArbColor = c.realArbPct > 0 ? 'var(--green)' : 'var(--red)';
+  const realArbSign = c.realArbPct > 0 ? '+' : '';
+  return '<div class="card" style="margin-bottom:8px;padding:10px 12px;background:' + verdictBg + ';border-color:' + verdictBorder + '">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+    +   '<div style="font-size:13px;font-weight:700">' + esc(c.homeTeam) + ' <span style="color:var(--text-3);font-weight:400">vs</span> ' + esc(c.awayTeam) + '</div>'
+    +   '<div style="font-size:10px;background:' + verdictBg + ';color:' + verdictColor + ';padding:1px 6px;border-radius:3px;font-weight:800;border:1px solid ' + verdictBorder + '">' + c.verdict + '</div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--text-3);margin-bottom:8px">' + (ko ? esc(ko) + ' · ' : '') + 'O/U line ' + c.pinnacleLine + ' · xG ' + c.xgImplied.toFixed(2) + ' · P(no goal in 5\') = ' + (c.pNoGoalIn5 * 100).toFixed(1) + '%</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;margin-bottom:8px">'
+    +   '<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);padding:6px 8px">'
+    +     '<div style="color:var(--text-3);font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px">Pre-match Under</div>'
+    +     '<div style="display:flex;justify-content:space-between"><span>Pinnacle <b style="color:var(--amber)">' + c.pinnacleUnder.toFixed(2) + '</b></span><span>Fair ≥ ' + c.fairPreMatchUnder.toFixed(2) + '</span></div>'
+    +   '</div>'
+    +   '<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);padding:6px 8px">'
+    +     '<div style="color:var(--text-3);font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px">Live Over @ 5\' 0-0</div>'
+    +     '<div style="display:flex;justify-content:space-between"><span>Need <b style="color:var(--amber)">' + c.fairLiveOverAt5.toFixed(2) + '</b></span><span>or higher</span></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:14px;font-size:11px">'
+    +   '<span><span style="color:var(--text-3)">Fair-value arb:</span> <b style="color:var(--green)">+' + c.fairValueArbPct.toFixed(2) + '%</b></span>'
+    +   '<span><span style="color:var(--text-3)">After ~7% live margin:</span> <b style="color:' + realArbColor + '">' + realArbSign + c.realArbPct.toFixed(2) + '%</b></span>'
     + '</div>'
   + '</div>';
 }

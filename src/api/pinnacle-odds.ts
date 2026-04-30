@@ -12,6 +12,17 @@ const PINNACLE_BASE = 'https://guest.api.arcadia.pinnacle.com/0.1';
 const CACHE_TTL = 30 * 60 * 1000; // 30 min (odds move fast)
 const REQUEST_TIMEOUT = 10_000;
 
+// Football-only league IDs (subset of PINNACLE_LEAGUES, excluding basketball
+// entries). Used by the arb-candidates scanner to iterate all upcoming
+// football fixtures Pinnacle is booking.
+export const PINNACLE_FOOTBALL_LEAGUES: number[] = [
+  1980, 2196, 1842, 2436, 2036,                  // Top 5 European
+  1977, 1817, 2245, 2197, 1928, 1975, 2185, 2231, // Other European
+  2627, 2630, 2635,                              // European cups
+  2663, 2640, 2641,                              // Americas
+  7932, 2270,                                    // Other
+];
+
 // League IDs on Pinnacle (guest API) — soccer + basketball + tennis
 const PINNACLE_LEAGUES: Record<string, number> = {
   // Basketball
@@ -321,4 +332,42 @@ export async function batchPinnacleOdds(
 
   logger.info({ requested: matches.length, matched: results.size }, 'Pinnacle odds matched');
   return results;
+}
+
+// ===== ARB-CANDIDATES SUPPORT =====
+
+export interface FootballFixture {
+  matchupId: number;
+  leagueId: number;
+  startTime: string;
+  homeTeam: string;
+  awayTeam: string;
+  totals?: PinnacleOdds['totals'];
+}
+
+/**
+ * Iterate every supported football league and return all upcoming matches
+ * with their O/U totals. Used by the 5-min arb-candidates scanner so it
+ * can de-vig each match's O/U 2.5 line and derive an implied xG.
+ */
+export async function getAllFootballFixturesWithOdds(): Promise<FootballFixture[]> {
+  const perLeague = await Promise.all(
+    PINNACLE_FOOTBALL_LEAGUES.map(async (leagueId) => {
+      const [matchups, odds] = await Promise.all([getMatchups(leagueId), getOdds(leagueId)]);
+      const out: FootballFixture[] = [];
+      for (const m of matchups) {
+        const o = odds.get(m.matchupId);
+        out.push({
+          matchupId: m.matchupId,
+          leagueId,
+          startTime: m.startTime,
+          homeTeam: m.homeTeam,
+          awayTeam: m.awayTeam,
+          totals: o?.totals,
+        });
+      }
+      return out;
+    }),
+  );
+  return perLeague.flat();
 }
