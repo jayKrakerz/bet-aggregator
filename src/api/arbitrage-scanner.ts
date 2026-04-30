@@ -540,9 +540,11 @@ export async function scanArbitrage(): Promise<ArbitrageScanResult> {
   // 2. Collect Sportybet odds grouped by event+market
   const sportybetEvents = collectSportybetOdds(codes);
 
-  // 3. Build match list for Pinnacle lookup
+  // 3. Build match list for Pinnacle lookup — include matchDate so the
+  // resolver can disambiguate fixtures with overlapping team names across
+  // different kickoff days (e.g. Paris FC vs Brest 03/05 vs PSG vs Brest 10/05).
   const seenEvents = new Set<string>();
-  const matchList: { homeTeam: string; awayTeam: string; league: string; eventId: string }[] = [];
+  const matchList: { homeTeam: string; awayTeam: string; league: string; eventId: string; matchDate?: string | null }[] = [];
 
   for (const [, event] of sportybetEvents) {
     if (seenEvents.has(event.eventId)) continue;
@@ -552,6 +554,7 @@ export async function scanArbitrage(): Promise<ArbitrageScanResult> {
       awayTeam: event.awayTeam,
       league: event.league,
       eventId: event.eventId,
+      matchDate: event.matchDate,
     });
   }
 

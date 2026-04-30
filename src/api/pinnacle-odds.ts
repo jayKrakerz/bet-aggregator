@@ -75,6 +75,7 @@ export interface PinnacleOdds {
   matchupId: number;
   homeTeam: string;
   awayTeam: string;
+  startTime?: string;     // ISO string from Pinnacle's matchup record — used to disambiguate same-name fixtures across dates
   moneyline?: { home: number; draw: number; away: number };
   totals?: Array<{ line: number; over: number; under: number }>;
   spreads?: Array<{ line: number; home: number; away: number }>;
@@ -178,6 +179,7 @@ async function getOdds(leagueId: number): Promise<Map<number, PinnacleOdds>> {
       matchupId: m.matchupId,
       homeTeam: m.homeTeam,
       awayTeam: m.awayTeam,
+      startTime: m.startTime,
     });
   }
 
@@ -243,11 +245,31 @@ function normName(name: string): string {
 function nameMatch(a: string, b: string): boolean {
   const na = normName(a);
   const nb = normName(b);
+  if (!na || !nb) return false;
   if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
+  // Substring match — but only if the strings are similar in length. Otherwise
+  // "paris" (Paris FC) collapses into "paris saintgermain" (PSG) and we
+  // confuse two different teams that share a city name.
+  if (na.includes(nb) || nb.includes(na)) {
+    const minLen = Math.min(na.length, nb.length);
+    const maxLen = Math.max(na.length, nb.length);
+    // Allow up to ~70% extra characters or 5 fixed-char buffer (handles "fc",
+    // "ii", "(home)" etc.). Reject when the longer string adds a whole
+    // qualifier word.
+    if (maxLen <= minLen * 1.7 + 5) return true;
+    return false;
+  }
+  // First-token equality fallback — but require the rest of both strings to
+  // be very short, so "paris saintgermain" can't slip past via shared "paris".
   const fa = na.split(/\s+/)[0]!;
   const fb = nb.split(/\s+/)[0]!;
-  if (fa.length >= 4 && fa === fb) return true;
+  if (fa.length >= 4 && fa === fb) {
+    const restA = na.slice(fa.length).trim();
+    const restB = nb.slice(fb.length).trim();
+    if (restA.length === 0 && restB.length === 0) return true;
+    if (Math.max(restA.length, restB.length) <= 4) return true;
+    return false;
+  }
   return false;
 }
 
@@ -286,9 +308,15 @@ export async function findPinnacleOdds(
 /**
  * Batch-fetch Pinnacle odds for multiple matches.
  * Returns a map of eventId -> PinnacleOdds.
+ *
+ * Optional `matchDate` per request (ISO string or YYYY-MM-DD) is used to
+ * disambiguate fixtures with overlapping team names — e.g. "Paris FC vs
+ * Brest" (May 3) and "PSG vs Brest" (May 10) used to collide because of
+ * loose substring name matching. Now we score candidates by date proximity
+ * and pick the best match.
  */
 export async function batchPinnacleOdds(
-  matches: Array<{ homeTeam: string; awayTeam: string; league: string; eventId: string }>,
+  matches: Array<{ homeTeam: string; awayTeam: string; league: string; eventId: string; matchDate?: string | null }>,
 ): Promise<Map<string, PinnacleOdds>> {
   const results = new Map<string, PinnacleOdds>();
 
@@ -317,17 +345,41 @@ export async function batchPinnacleOdds(
     for (const [, entry] of odds) pinnacleMatches.push(entry);
   }
 
-  // Match each request to Pinnacle data
+  // Match each request: collect ALL name-matching Pinnacle entries, then
+  // pick the one with the closest kickoff to the Sportybet matchDate. If
+  // matchDate is missing, fall back to the first name match (legacy behavior).
+  const MAX_DATE_DIFF_MS = 48 * 3600_000;  // 48h tolerance
   for (const m of matches) {
+    const candidates: PinnacleOdds[] = [];
     for (const p of pinnacleMatches) {
       if (
         (nameMatch(m.homeTeam, p.homeTeam) && nameMatch(m.awayTeam, p.awayTeam)) ||
         (nameMatch(m.homeTeam, p.awayTeam) && nameMatch(m.awayTeam, p.homeTeam))
       ) {
-        results.set(m.eventId, p);
-        break;
+        candidates.push(p);
       }
     }
+    if (!candidates.length) continue;
+
+    let chosen: PinnacleOdds | null = null;
+    if (m.matchDate && candidates.length > 1) {
+      const targetMs = new Date(m.matchDate).getTime();
+      if (!isNaN(targetMs)) {
+        let bestDiff = Infinity;
+        for (const c of candidates) {
+          if (!c.startTime) continue;
+          const cMs = new Date(c.startTime).getTime();
+          if (isNaN(cMs)) continue;
+          const diff = Math.abs(cMs - targetMs);
+          if (diff < bestDiff && diff <= MAX_DATE_DIFF_MS) {
+            bestDiff = diff;
+            chosen = c;
+          }
+        }
+      }
+    }
+    if (!chosen) chosen = candidates[0]!;
+    results.set(m.eventId, chosen);
   }
 
   logger.info({ requested: matches.length, matched: results.size }, 'Pinnacle odds matched');
