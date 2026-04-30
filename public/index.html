@@ -7061,29 +7061,31 @@ function renderEsportsMatch(m) {
   + '</div>';
 }
 
-// ===== ARB 5' (5-min hedge candidates) =====
-// For each upcoming football match, shows the math behind the
-// "bet Under pre-match → if 5' goalless, hedge with live Over" cycle.
-// Fair-value arb % is what the math says the cycle locks in. Real arb %
-// is what's left after assumed bookmaker margins (~7% live). Most matches
-// show negative realArb — that's the honest friction. STRONG verdict
-// flags matches where the math is strong enough to potentially survive
-// real margins if you have access to a sharp pre-match book.
+// ===== ARB 5' (multi-minute hedge candidates) =====
+// For each upcoming football match, shows the FULL hedge timeline.
+// As the match goes goalless, Over odds inflate → arb % keeps growing.
+// User picks their tradeoff: hedge early (lower arb, higher chance of
+// reaching the window) vs hedge late (much bigger arb, but more risk
+// of a goal cancelling everything en route).
 function renderArb5(data) {
   const cands = (data && data.candidates) || [];
+  const bankroll = getBankroll();
+
   let html = '';
 
-  // Explainer at top
+  // Explainer
   html += '<div class="card" style="padding:12px;margin-bottom:10px;font-size:11px;line-height:1.5">'
-    + '<div style="font-size:13px;font-weight:700;margin-bottom:6px">5-min Hedge Candidates</div>'
+    + '<div style="font-size:13px;font-weight:700;margin-bottom:6px">Hedge Candidates — full timeline</div>'
     + '<div style="color:var(--text-3);margin-bottom:6px">'
-    + '  <b>Workflow:</b> Bet Under pre-match → wait 5 min → if no goal, hedge with live Over at the fair-value price. '
-    + '  Locks a guaranteed return regardless of which side wins.'
+    + '  <b>Workflow:</b> Bet Under pre-match. Watch the match. If still 0-0 at the recommended minute, hedge with live Over. '
+    + '  The arb % grows the longer you wait — but so does the chance a goal kills your Under bet first.'
     + '</div>'
     + '<div style="color:var(--text-3)">'
-    + '  <b>Reality:</b> Most "fair arb" is eaten by bookmaker margins. To realise it you need a <b>sharp pre-match book</b> '
-    + '  (Pinnacle preferred) AND a <b>slow-updating live book</b> (Sportybet / 22bet often work). '
-    + '  Same book on both sides triggers anti-arb detection.'
+    + '  <b>Bankroll:</b> stakes shown for your current bankroll of <b>GHS ' + bankroll + '</b>, sized at 5% of bankroll per cycle. '
+    + '  Adjust the bankroll input above to recompute. Realised profit = both legs settling at the assumed live margin.'
+    + '</div>'
+    + '<div style="color:var(--text-3);margin-top:6px">'
+    + '  <b>Friction:</b> needs sharp pre-match book (Pinnacle) + slow live book (Sportybet/22bet). Same book on both sides = anti-arb flag.'
     + '</div>'
     + '</div>';
 
@@ -7092,39 +7094,87 @@ function renderArb5(data) {
     return html;
   }
 
-  for (const c of cands) {
-    html += renderArb5Card(c);
-  }
+  for (const c of cands) html += renderArb5Card(c, bankroll);
   return html;
 }
 
-function renderArb5Card(c) {
+// Stake sizing: balanced cross-leg payouts.
+//   preStake × under = hedgeStake × over   (equal payouts each scenario)
+//   total = preStake × (1 + under/over)
+// Given target total stake (5% of bankroll), solve for both legs and the
+// guaranteed profit (which is negative if real arb is negative).
+function arbStakes(under, over, totalStake) {
+  if (over <= 1 || under <= 1) return null;
+  const preStake = totalStake * over / (over + under);
+  const hedgeStake = totalStake * under / (over + under);
+  const payout = preStake * under;     // same as hedgeStake * over
+  const profit = payout - totalStake;
+  return { preStake, hedgeStake, payout, profit, profitPct: (profit / totalStake) * 100 };
+}
+
+function renderArb5Card(c, bankroll) {
   const ko = c.startTime ? new Date(c.startTime).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
   const verdictColor = c.verdict === 'STRONG' ? 'var(--green)' : c.verdict === 'MARGINAL' ? 'var(--amber)' : 'var(--text-3)';
   const verdictBg = c.verdict === 'STRONG' ? 'rgba(52,212,114,0.10)' : c.verdict === 'MARGINAL' ? 'rgba(245,166,35,0.10)' : 'rgba(120,120,120,0.06)';
   const verdictBorder = c.verdict === 'STRONG' ? 'rgba(52,212,114,0.3)' : c.verdict === 'MARGINAL' ? 'rgba(245,166,35,0.3)' : 'rgba(120,120,120,0.2)';
-  const realArbColor = c.realArbPct > 0 ? 'var(--green)' : 'var(--red)';
-  const realArbSign = c.realArbPct > 0 ? '+' : '';
+
+  const targetTotal = Math.max(10, Math.round(bankroll * 0.05));
+  const stakesAtBest = arbStakes(c.pinnacleUnder, c.bestRealLiveOver, targetTotal);
+
+  // Timeline rows — collapsed by default.
+  let timelineRows = '';
+  for (const tp of c.timeline) {
+    const realColor = tp.realArbPct > 0 ? 'var(--green)' : 'var(--red)';
+    const sign = tp.realArbPct > 0 ? '+' : '';
+    const isBest = tp.minute === c.bestMinute;
+    timelineRows += '<tr style="' + (isBest ? 'background:rgba(52,212,114,0.07);font-weight:700' : '') + '">'
+      + '<td style="padding:3px 6px">' + tp.minute + "'" + (isBest ? ' ★' : '') + '</td>'
+      + '<td style="padding:3px 6px;text-align:right">' + (tp.pNoGoalReached * 100).toFixed(0) + '%</td>'
+      + '<td style="padding:3px 6px;text-align:right">' + tp.fairLiveOver.toFixed(2) + '</td>'
+      + '<td style="padding:3px 6px;text-align:right;color:var(--green)">+' + tp.fairArbPct.toFixed(1) + '%</td>'
+      + '<td style="padding:3px 6px;text-align:right;color:' + realColor + '">' + sign + tp.realArbPct.toFixed(1) + '%</td>'
+      + '</tr>';
+  }
+
+  let stakeBlock = '';
+  if (stakesAtBest) {
+    const profitColor = stakesAtBest.profit >= 0 ? 'var(--green)' : 'var(--red)';
+    const profitSign = stakesAtBest.profit >= 0 ? '+' : '';
+    stakeBlock = '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--r-xs);padding:8px 10px;margin-top:8px;font-size:11px">'
+      + '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--text-3)">Stake plan @ ' + c.bestMinute + "' (5% of bankroll)" + '</span></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'
+      +   '<div><div style="color:var(--text-3);font-size:10px">Pre-match Under</div><div style="font-weight:700">GHS ' + stakesAtBest.preStake.toFixed(2) + ' @ ' + c.pinnacleUnder.toFixed(2) + '</div></div>'
+      +   '<div><div style="color:var(--text-3);font-size:10px">Hedge Over @ ' + c.bestMinute + "'" + '</div><div style="font-weight:700">GHS ' + stakesAtBest.hedgeStake.toFixed(2) + ' @ ' + c.bestRealLiveOver.toFixed(2) + '</div></div>'
+      +   '<div><div style="color:var(--text-3);font-size:10px">Locked profit</div><div style="font-weight:700;color:' + profitColor + '">' + profitSign + 'GHS ' + stakesAtBest.profit.toFixed(2) + ' (' + profitSign + stakesAtBest.profitPct.toFixed(1) + '%)</div></div>'
+      + '</div></div>';
+  }
+
   return '<div class="card" style="margin-bottom:8px;padding:10px 12px;background:' + verdictBg + ';border-color:' + verdictBorder + '">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
     +   '<div style="font-size:13px;font-weight:700">' + esc(c.homeTeam) + ' <span style="color:var(--text-3);font-weight:400">vs</span> ' + esc(c.awayTeam) + '</div>'
     +   '<div style="font-size:10px;background:' + verdictBg + ';color:' + verdictColor + ';padding:1px 6px;border-radius:3px;font-weight:800;border:1px solid ' + verdictBorder + '">' + c.verdict + '</div>'
     + '</div>'
-    + '<div style="font-size:11px;color:var(--text-3);margin-bottom:8px">' + (ko ? esc(ko) + ' · ' : '') + 'O/U line ' + c.pinnacleLine + ' · xG ' + c.xgImplied.toFixed(2) + ' · P(no goal in 5\') = ' + (c.pNoGoalIn5 * 100).toFixed(1) + '%</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;margin-bottom:8px">'
-    +   '<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);padding:6px 8px">'
-    +     '<div style="color:var(--text-3);font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px">Pre-match Under</div>'
-    +     '<div style="display:flex;justify-content:space-between"><span>Pinnacle <b style="color:var(--amber)">' + c.pinnacleUnder.toFixed(2) + '</b></span><span>Fair ≥ ' + c.fairPreMatchUnder.toFixed(2) + '</span></div>'
-    +   '</div>'
-    +   '<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--r-xs);padding:6px 8px">'
-    +     '<div style="color:var(--text-3);font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px">Live Over @ 5\' 0-0</div>'
-    +     '<div style="display:flex;justify-content:space-between"><span>Need <b style="color:var(--amber)">' + c.fairLiveOverAt5.toFixed(2) + '</b></span><span>or higher</span></div>'
-    +   '</div>'
+    + '<div style="font-size:11px;color:var(--text-3);margin-bottom:6px">' + (ko ? esc(ko) + ' · ' : '') + 'O/U ' + c.pinnacleLine + ' · xG ' + c.xgImplied.toFixed(2) + ' · Pinnacle U/O ' + c.pinnacleUnder.toFixed(2) + '/' + c.pinnacleOver.toFixed(2) + '</div>'
+    // Recommended best line
+    + '<div style="font-size:12px;margin-bottom:6px">'
+    +   '<b>Best window:</b> hedge at <b style="color:var(--green)">' + c.bestMinute + "'" + '</b> if still 0-0 — '
+    +   'live Over needs ≥ <b style="color:var(--amber)">' + c.bestRealLiveOver.toFixed(2) + '</b>, '
+    +   'real arb <b style="color:' + (c.bestRealArbPct > 0 ? 'var(--green)' : 'var(--red)') + '">' + (c.bestRealArbPct > 0 ? '+' : '') + c.bestRealArbPct.toFixed(2) + '%</b>, '
+    +   'P(reach 0-0) <b>' + (c.bestPNoGoalReached * 100).toFixed(0) + '%</b>'
     + '</div>'
-    + '<div style="display:flex;gap:14px;font-size:11px">'
-    +   '<span><span style="color:var(--text-3)">Fair-value arb:</span> <b style="color:var(--green)">+' + c.fairValueArbPct.toFixed(2) + '%</b></span>'
-    +   '<span><span style="color:var(--text-3)">After ~7% live margin:</span> <b style="color:' + realArbColor + '">' + realArbSign + c.realArbPct.toFixed(2) + '%</b></span>'
-    + '</div>'
+    + stakeBlock
+    // Collapsible timeline
+    + '<details style="margin-top:8px">'
+    +   '<summary style="cursor:pointer;font-size:11px;color:var(--text-3)">Show full timeline (5\'–60\')</summary>'
+    +   '<table style="width:100%;font-size:10px;margin-top:6px;border-collapse:collapse">'
+    +     '<thead><tr style="color:var(--text-3);text-transform:uppercase;font-weight:700">'
+    +       '<th style="text-align:left;padding:3px 6px">Min</th>'
+    +       '<th style="text-align:right;padding:3px 6px">P(reach)</th>'
+    +       '<th style="text-align:right;padding:3px 6px">Fair Over</th>'
+    +       '<th style="text-align:right;padding:3px 6px">Fair arb</th>'
+    +       '<th style="text-align:right;padding:3px 6px">Real arb</th>'
+    +     '</tr></thead><tbody>' + timelineRows + '</tbody></table>'
+    + '</details>'
   + '</div>';
 }
 

@@ -1,23 +1,24 @@
 /**
- * 5-Min Arb Candidates Scanner.
+ * Multi-minute Arb Candidates Scanner.
  *
- * Identifies upcoming football matches where a "bet Under pre-match, hedge
- * with live Over after 5' goalless" cycle locks in a positive guaranteed
- * return. The math comes purely from Pinnacle's de-vigged O/U 2.5 line:
+ * For each upcoming football match Pinnacle is booking:
+ *   1) De-vig the O/U half-line nearest 2.5 → implied P(Over)
+ *   2) Solve for total xG λ via Poisson bisection
+ *   3) For each candidate hedge minute m in HEDGE_MINUTES:
+ *        - P(game still 0-0 at minute m) = e^(-λ × m/90)
+ *        - Fair live Over odds at m'0-0 = 1 / P(≥3 goals in remaining (90-m) min)
+ *        - Fair-value arb % = 1 - (1/fair_pre_under + 1/fair_live_over_m)
+ *        - Real arb % assumes ~7% margin on the live hedge book
+ *   4) Find the optimal hedge minute — the strategy is "ride the goalless
+ *      stretch as long as possible because Over odds keep inflating".
  *
- *   1) De-vig the Pinnacle O/U 2.5 → implied P(Over)
- *   2) Solve for total xG λ such that P(Over | Poisson(λ)) matches
- *   3) Compute P(no goal in 5 min) = e^(-λ × 5/90)
- *   4) Compute fair live Over odds at 5'0-0 = 1 / P(≥3 goals in remaining 85')
- *   5) Fair-value arb = 1 - (1/fairPreMatchUnder + 1/fairLiveOver5)
- *   6) Real arb estimate assumes ~7% margin on the live hedge book
+ * The user's open Under bet stays alive for the full 90 min. They can hedge
+ * at any minute — earlier = smaller arb but higher chance of reaching it,
+ * later = bigger arb but more goal risk en route. The scanner shows the
+ * full curve so the user picks their tradeoff.
  *
- * We flag matches where:
- *   - P(no goal in 5 min) ≥ 0.85   (high chance the hedge window opens)
- *   - real arb ≥ 1.5%              (after assumed live margin)
- *
- * Caveats are real (book detection, live limits, suspensions). The scanner
- * surfaces math-eligible matches; the user decides which to act on.
+ * Filters out non-goals prop markets (corners/bookings/cards) — the Poisson
+ * goal model doesn't apply to those arrival rates.
  */
 
 import { logger } from '../utils/logger.js';
@@ -25,15 +26,26 @@ import { getAllFootballFixturesWithOdds, type FootballFixture } from './pinnacle
 
 // ── Tunables ─────────────────────────────────────────────
 
-const HEDGE_MINUTE = 5;
+// Hedge windows we evaluate. Strategy assumes the user is watching the match
+// live and will execute the hedge at one of these minutes if the game is
+// still goalless. After 60' live limits collapse on most soft books and
+// suspensions become frequent, so we stop there.
+const HEDGE_MINUTES = [5, 10, 15, 20, 25, 30, 35, 40, 50, 60];
 const MATCH_LENGTH = 90;
-const ASSUMED_LIVE_MARGIN = 0.07;   // ~7% extra margin live books typically apply
-const MIN_P_NO_GOAL = 0.85;
-const MIN_REAL_ARB_PCT = 1.5;
+const ASSUMED_LIVE_MARGIN = 0.07;
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const HORIZON_HOURS = 36;            // only show matches kicking off within 36h
+const HORIZON_HOURS = 36;
 
 // ── Types ────────────────────────────────────────────────
+
+export interface HedgeCheckpoint {
+  minute: number;
+  pNoGoalReached: number;       // probability the game is still 0-0 at this minute
+  fairLiveOver: number;         // fair-value Over odds at minute m, score 0-0
+  realLiveOver: number;         // assumed real Over odds (live margin baked in)
+  fairArbPct: number;           // % using fair pre-Under and fair live-Over
+  realArbPct: number;           // % using Pinnacle pre-Under and assumed real live-Over
+}
 
 export interface ArbCandidate {
   matchupId: number;
@@ -43,22 +55,27 @@ export interface ArbCandidate {
   awayTeam: string;
 
   // Pinnacle raw — line may not always be 2.5 if the bookmaker's main-line
-  // shifted. We adapt and use whatever half-line is available.
+  // shifted. We adapt to whatever half-line is available.
   pinnacleLine: number;
   pinnacleOver: number;
   pinnacleUnder: number;
   pinnacleMargin: number;
 
-  // Derived
-  xgImplied: number;                 // total expected goals
-  pNoGoalIn5: number;                // 0-1
-  fairPreMatchUnder: number;         // 1 / devigged P(Under)
-  fairLiveOverAt5: number;           // 1 / P(≥3 goals from minute 5, score 0-0)
+  xgImplied: number;
+  fairPreMatchUnder: number;
 
-  // Arb math
-  fairValueArbPct: number;           // % ROI if you got fair-value odds at both books
-  realArbPct: number;                // % ROI accounting for assumed live margin
-  recommendedHedgeStakeFraction: number;  // X / (100 + X) for $100 base bet
+  // Per-minute hedge math
+  timeline: HedgeCheckpoint[];
+
+  // Best window — the minute with the highest realArbPct, capped to the
+  // first minute where realArb is positive if any. If none positive, picks
+  // the minute with highest fairArbPct (so the user still sees the math).
+  bestMinute: number;
+  bestPNoGoalReached: number;
+  bestFairArbPct: number;
+  bestRealArbPct: number;
+  bestFairLiveOver: number;
+  bestRealLiveOver: number;
 
   verdict: 'STRONG' | 'MARGINAL' | 'SKIP';
 }
@@ -66,7 +83,7 @@ export interface ArbCandidate {
 export interface ArbCandidatesResult {
   candidates: ArbCandidate[];
   totalScanned: number;
-  totalUpcoming: number;             // upcoming football fixtures within horizon
+  totalUpcoming: number;
   scrapedAt: string;
 }
 
@@ -85,14 +102,9 @@ function poissonCdf(k: number, lambda: number): number {
 }
 
 function pOverFromLambda(line: number, lambda: number): number {
-  // P(total goals > line) = 1 - cdf(floor(line), lambda)
   return 1 - poissonCdf(Math.floor(line), lambda);
 }
 
-/**
- * Solve for λ such that P(Over `line` | Poisson(λ)) = targetProb.
- * Uses simple bisection — pOver is monotonic in λ.
- */
 function solveLambda(line: number, targetProb: number): number {
   let lo = 0.05;
   let hi = 8.0;
@@ -110,18 +122,11 @@ function solveLambda(line: number, targetProb: number): number {
 let cache: ArbCandidatesResult | null = null;
 let cacheTime = 0;
 
-// ── Per-match arb math ──────────────────────────────────
+// ── Per-match arb analysis ───────────────────────────────
 
 function analyse(f: FootballFixture, nowMs: number): ArbCandidate | null {
-  // Pinnacle duplicates the same matchup under "(Corners)" / "(Bookings)" /
-  // "(Cards)" suffixes for prop markets. Those have completely different
-  // arrival rates than goals — the Poisson goal model doesn't apply. Skip.
   if (/\((Corners|Bookings|Cards|Free Kicks|Throw[\- ]ins|Offsides|Goal Kicks)\)/i.test(f.homeTeam + f.awayTeam)) return null;
 
-  // Pick the half-line total closest to 2.5 — most books carry 2.5 as the
-  // main line, but some matches anchor at 2.0, 2.75, 3.0, 3.5 depending on
-  // expected total. Quarter-lines (2.25, 2.75) need split-stake math we don't
-  // do here, so prefer half-lines (X.5).
   const halves = (f.totals ?? []).filter(
     (x) => x.over > 1 && x.under > 1 && Math.abs(x.line - Math.floor(x.line) - 0.5) < 1e-6,
   );
@@ -137,48 +142,44 @@ function analyse(f: FootballFixture, nowMs: number): ArbCandidate | null {
   const pUnderDevig = 1 / t.under / sumImplied;
 
   const lambda = solveLambda(t.line, pOverDevig);
-  const pNoGoalIn5 = Math.exp((-lambda * HEDGE_MINUTE) / MATCH_LENGTH);
-
-  // At 5'0-0 the remaining-time goal rate scales linearly down by 5/90
-  const lambdaRemaining = lambda * (MATCH_LENGTH - HEDGE_MINUTE) / MATCH_LENGTH;
-  const pOver5 = pOverFromLambda(t.line, lambdaRemaining);
-  if (pOver5 <= 0 || pOver5 >= 1) return null;
-
   const fairPreMatchUnder = 1 / pUnderDevig;
-  const fairLiveOverAt5 = 1 / pOver5;
 
-  const fairValueArbPct = (1 - (1 / fairPreMatchUnder + 1 / fairLiveOverAt5)) * 100;
+  // Build timeline: for each candidate hedge minute, compute the math.
+  const timeline: HedgeCheckpoint[] = [];
+  for (const m of HEDGE_MINUTES) {
+    if (m >= MATCH_LENGTH) break;
+    const lambdaRemaining = lambda * (MATCH_LENGTH - m) / MATCH_LENGTH;
+    const pOverRem = pOverFromLambda(t.line, lambdaRemaining);
+    if (pOverRem <= 0 || pOverRem >= 1) continue;
+    const fairLiveOver = 1 / pOverRem;
+    const realLiveOver = fairLiveOver * (1 - ASSUMED_LIVE_MARGIN);
+    const fairArbPct = (1 - (1 / fairPreMatchUnder + 1 / fairLiveOver)) * 100;
+    const realArbPct = (1 - (1 / t.under + 1 / realLiveOver)) * 100;
+    const pNoGoalReached = Math.exp((-lambda * m) / MATCH_LENGTH);
+    timeline.push({ minute: m, pNoGoalReached, fairLiveOver, realLiveOver, fairArbPct, realArbPct });
+  }
+  if (!timeline.length) return null;
 
-  // Real arb: assume the live hedge book applies ASSUMED_LIVE_MARGIN of vig.
-  // The pre-match Under price we use is Pinnacle's actual price (sharp, ~2%
-  // margin already baked in) — that's what the user would book at Pinnacle
-  // or a similarly-priced soft book.
-  const realLiveOver = fairLiveOverAt5 * (1 - ASSUMED_LIVE_MARGIN);
-  const realArbPct = (1 - (1 / t.under + 1 / realLiveOver)) * 100;
-  void margin;  // surfaced via pinnacleMargin but otherwise unused
+  // Pick the best hedge minute. Prefer the one with highest realArbPct that
+  // still has P(reaching it 0-0) ≥ 0.55. If none have realArb > 0, fall back
+  // to the minute with the highest fairArbPct so the user sees the ceiling.
+  const tradeable = timeline.filter((c) => c.pNoGoalReached >= 0.55);
+  const bestByReal = (tradeable.length ? tradeable : timeline).reduce((best, cur) =>
+    cur.realArbPct > best.realArbPct ? cur : best,
+  );
+  const bestByFair = timeline.reduce((best, cur) => (cur.fairArbPct > best.fairArbPct ? cur : best));
+  const best = bestByReal.realArbPct > 0 ? bestByReal : bestByFair;
 
-  // Optimal hedge stake fraction (for a $1 pre-match Under bet, what to
-  // stake on the live Over side to balance both outcomes' returns):
-  //   1.4X - 1 = (under-1) - X        →   X = (under) / (1 + (over-1))
-  // Generalised: X / (1+X) ≈ 1/over_live  for moderate values.
-  const recommendedHedgeStakeFraction = 1 / realLiveOver;
-
-  // Verdict ranks the math, not real-world feasibility — surface the candidate
-  // pool and let the user judge whether their book combo (sharp pre-match +
-  // slow live) closes the fair-value gap.
-  //
-  //   STRONG   = fairArb ≥ 4% AND P(no goal in 5') ≥ 88%
-  //   MARGINAL = fairArb ≥ 2% AND P(no goal in 5') ≥ 82%
-  //   SKIP     = otherwise
-  //
-  // realArb is shown alongside as the "after typical book margins" estimate;
-  // it's almost always lower or negative. That's the honest friction warning.
+  // Verdict — based on best window's math.
+  //   STRONG   = realArb ≥ 2% at the best minute AND P(reach) ≥ 65%
+  //   MARGINAL = fairArb ≥ 3% somewhere in timeline (math works in theory)
+  //   SKIP     = neither
   const verdict: ArbCandidate['verdict'] =
-    fairValueArbPct >= 4 && pNoGoalIn5 >= 0.88 ? 'STRONG'
-    : fairValueArbPct >= 2 && pNoGoalIn5 >= 0.82 ? 'MARGINAL'
+    best.realArbPct >= 2 && best.pNoGoalReached >= 0.65 ? 'STRONG'
+    : best.fairArbPct >= 3 ? 'MARGINAL'
     : 'SKIP';
-  void MIN_P_NO_GOAL; void MIN_REAL_ARB_PCT;
 
+  void margin;
   const startMs = f.startTime ? new Date(f.startTime).getTime() : 0;
   const hoursUntilKickoff = startMs > 0 ? (startMs - nowMs) / 3_600_000 : -1;
 
@@ -193,12 +194,14 @@ function analyse(f: FootballFixture, nowMs: number): ArbCandidate | null {
     pinnacleUnder: t.under,
     pinnacleMargin: margin,
     xgImplied: lambda,
-    pNoGoalIn5,
     fairPreMatchUnder,
-    fairLiveOverAt5,
-    fairValueArbPct,
-    realArbPct,
-    recommendedHedgeStakeFraction,
+    timeline,
+    bestMinute: best.minute,
+    bestPNoGoalReached: best.pNoGoalReached,
+    bestFairArbPct: best.fairArbPct,
+    bestRealArbPct: best.realArbPct,
+    bestFairLiveOver: best.fairLiveOver,
+    bestRealLiveOver: best.realLiveOver,
     verdict,
   };
 }
@@ -224,10 +227,14 @@ export async function getArbCandidates(forceRefresh = false): Promise<ArbCandida
     if (a) allAnalysed.push(a);
   }
 
-  // Sort by realArbPct descending. Show all analysed (frontend can filter
-  // on verdict — this lets the user see the full landscape, not just the
-  // ones that passed our threshold).
-  const candidates = allAnalysed.sort((a, b) => b.realArbPct - a.realArbPct);
+  // Sort by bestRealArbPct desc — the user's actionable order. STRONG first.
+  const candidates = allAnalysed.sort((a, b) => {
+    if (a.verdict !== b.verdict) {
+      const order = { STRONG: 0, MARGINAL: 1, SKIP: 2 };
+      return order[a.verdict] - order[b.verdict];
+    }
+    return b.bestRealArbPct - a.bestRealArbPct;
+  });
 
   const result: ArbCandidatesResult = {
     candidates,
