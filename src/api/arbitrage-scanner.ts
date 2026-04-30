@@ -66,11 +66,6 @@ function arbProfit(odds1: number, odds2: number): number {
   return (1 - impliedSum) * 100;
 }
 
-function arbProfit3Way(odds1: number, odds2: number, odds3: number): number {
-  const impliedSum = 1 / odds1 + 1 / odds2 + 1 / odds3;
-  return (1 - impliedSum) * 100;
-}
-
 /** Calculate optimal stakes for a given total outlay and odds */
 function calcStakes(totalOutlay: number, legs: ArbLeg[]): ArbOpportunity['stakes'] {
   const impliedSum = legs.reduce((s, l) => s + 1 / l.odds, 0);
@@ -264,61 +259,11 @@ function findArbs(
 
     const { marketNorm } = event;
 
-    // ── 1X2 market ──────────────────────────────────────────────
-    if (marketNorm.type === '1x2' && pinnacle.moneyline) {
-      const sportyHome = event.outcomes.get('home');
-      const sportyDraw = event.outcomes.get('draw');
-      const sportyAway = event.outcomes.get('away');
-      const pinn = pinnacle.moneyline;
-
-      // Check all 3-way combos: best odds for each outcome across both bookmakers
-      const bestHome = Math.max(sportyHome?.odds ?? 0, pinn.home);
-      const bestDraw = Math.max(sportyDraw?.odds ?? 0, pinn.draw);
-      const bestAway = Math.max(sportyAway?.odds ?? 0, pinn.away);
-
-      if (bestHome > 0 && bestDraw > 0 && bestAway > 0) {
-        const profit = arbProfit3Way(bestHome, bestDraw, bestAway);
-        if (profit > 0) {
-          const legs: ArbLeg[] = [
-            {
-              bookmaker: (sportyHome?.odds ?? 0) >= pinn.home ? 'Sportybet' : 'Pinnacle',
-              pick: 'Home',
-              odds: bestHome,
-              impliedProb: 1 / bestHome,
-              sourceCode: (sportyHome?.odds ?? 0) >= pinn.home ? sportyHome?.sourceCode : undefined,
-            },
-            {
-              bookmaker: (sportyDraw?.odds ?? 0) >= pinn.draw ? 'Sportybet' : 'Pinnacle',
-              pick: 'Draw',
-              odds: bestDraw,
-              impliedProb: 1 / bestDraw,
-              sourceCode: (sportyDraw?.odds ?? 0) >= pinn.draw ? sportyDraw?.sourceCode : undefined,
-            },
-            {
-              bookmaker: (sportyAway?.odds ?? 0) >= pinn.away ? 'Sportybet' : 'Pinnacle',
-              pick: 'Away',
-              odds: bestAway,
-              impliedProb: 1 / bestAway,
-              sourceCode: (sportyAway?.odds ?? 0) >= pinn.away ? sportyAway?.sourceCode : undefined,
-            },
-          ];
-
-          arbs.push({
-            eventId: event.eventId,
-            homeTeam: event.homeTeam,
-            awayTeam: event.awayTeam,
-            league: event.league,
-            matchDate: event.matchDate,
-            kickoff: event.kickoff,
-            market: '1X2',
-            legs,
-            profitPct: Math.round(profit * 100) / 100,
-            stakes: calcStakes(100, legs),
-          });
-        }
-      }
-
-    }
+    // ── 1X2 (3-way) market intentionally skipped ─────────────────
+    // 3-way arbs require executing legs at three separate prices simultaneously
+    // — the Draw leg's price tends to drift independently and the cycle is
+    // hard to lock cleanly. We only surface 2-way arbs (O/U, BTTS) where each
+    // leg covers half of the outcome space. See marketNorm.type checks below.
 
     // ── Over/Under market ───────────────────────────────────────
     if (marketNorm.type === 'totals' && pinnacle.totals?.length) {
