@@ -1526,6 +1526,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     <button class="chip" data-stab="predict" style="padding:5px 12px;font-size:11px;flex-shrink:0">Live Predict</button>
     <button class="chip" data-stab="lag" style="padding:5px 12px;font-size:11px;flex-shrink:0">Odds Lag</button>
     <button class="chip" data-stab="elo" style="padding:5px 12px;font-size:11px;flex-shrink:0">ELO</button>
+    <button class="chip" data-stab="esports" style="padding:5px 12px;font-size:11px;flex-shrink:0">Esports</button>
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -6753,6 +6754,12 @@ async function loadSharp(tab, forceRefresh) {
       ]);
       content.innerHTML = renderEloPicks(stats, picks);
       if (status) status.textContent = (picks && picks.count ? picks.count + ' picks · ' : '') + (stats && stats.teams ? stats.teams + ' teams rated' : 'not seeded');
+    } else if (tab === 'esports') {
+      const data = await api('/predictions/sharp-esports' + (forceRefresh ? '?refresh=1' : ''));
+      content.innerHTML = renderSharpEsports(data);
+      const total = (data && data.totalMatches) || 0;
+      const fifa = (data && data.byGame && data.byGame.fifae) || 0;
+      if (status) status.textContent = total + ' matches · FIFAe ' + (fifa > 0 ? fifa : 'off-season');
     }
   } catch (err) {
     console.error(err);
@@ -6973,6 +6980,92 @@ async function generateEloCode(picks) {
   }
 }
 
+// ===== ESPORTS (Pinnacle sharp lines) =====
+// Surfaces Pinnacle's upcoming CS2 / LoL / Dota / Valorant / FIFAe / CoD / ML
+// matches with de-vigged implied probabilities + the same Fair-odds badge.
+// You bet at 22bet (or wherever) when their price ≥ Fair anywhere.
+const ESPORTS_GAMES = [
+  { key: 'cs2', label: 'CS2' },
+  { key: 'lol', label: 'LoL' },
+  { key: 'dota2', label: 'Dota 2' },
+  { key: 'valorant', label: 'Valorant' },
+  { key: 'fifae', label: 'FIFAe / EA FC' },
+  { key: 'cod', label: 'CoD' },
+  { key: 'mobilelegends', label: 'Mobile Legends' },
+  { key: 'rainbow6', label: 'R6' },
+  { key: 'starcraft', label: 'StarCraft' },
+];
+
+function renderSharpEsports(data) {
+  const matches = (data && data.matches) || [];
+  const byGame = (data && data.byGame) || {};
+  let html = '';
+
+  // Game tab strip
+  html += '<div style="display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:3px;margin-bottom:10px;overflow-x:auto" id="esports-game-tabs">';
+  html += '<button class="chip esports-game-tab active" data-egame="all" style="padding:4px 10px;font-size:11px;flex-shrink:0">All <span style="opacity:0.6">' + (data && data.totalMatches || 0) + '</span></button>';
+  for (const g of ESPORTS_GAMES) {
+    const cnt = byGame[g.key] || 0;
+    if (cnt === 0) continue;
+    html += '<button class="chip esports-game-tab" data-egame="' + g.key + '" style="padding:4px 10px;font-size:11px;flex-shrink:0">' + g.label + ' <span style="opacity:0.6">' + cnt + '</span></button>';
+  }
+  // FIFAe always visible even when 0 — explicit off-season note
+  if (!byGame.fifae) {
+    html += '<span style="padding:4px 10px;font-size:10px;color:var(--text-3);align-self:center">FIFAe: off-season — returns May–Aug, Nov–Mar</span>';
+  }
+  html += '</div>';
+
+  html += '<div style="font-size:11px;color:var(--text-3);margin-bottom:10px">Pinnacle sharp lines · de-vigged. Bet at any book offering ≥ Fair odds (22bet, Bet365, Stake).</div>';
+
+  if (!matches.length) {
+    html += '<div class="empty" style="padding:20px">No real esports matches booked on Pinnacle right now.</div>';
+    return html;
+  }
+
+  html += '<div id="esports-list">' + matches.map(renderEsportsMatch).join('') + '</div>';
+  return html;
+}
+
+function renderEsportsMatch(m) {
+  const ko = m.startTime ? new Date(m.startTime).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const probH = (m.impliedHome * 100).toFixed(1);
+  const probA = (m.impliedAway * 100).toFixed(1);
+  const fairH = (1 / m.impliedHome).toFixed(2);
+  const fairA = (1 / m.impliedAway).toFixed(2);
+  const gameLabel = (ESPORTS_GAMES.find(g => g.key === m.game) || {}).label || m.game;
+  return '<div class="card esports-row" data-egame="' + m.game + '" style="margin-bottom:6px;padding:10px 12px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">'
+    +   '<div style="font-size:13px;font-weight:700">' + esc(m.homeTeam) + ' <span style="color:var(--text-3);font-weight:400">vs</span> ' + esc(m.awayTeam) + '</div>'
+    +   '<div style="font-size:10px;background:var(--purple-soft);color:var(--purple);padding:1px 6px;border-radius:3px;font-weight:700">' + esc(gameLabel) + '</div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--text-3);margin-bottom:6px">' + esc(m.leagueName) + (ko ? ' · ' + esc(ko) : '') + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">'
+    +   '<div style="background:rgba(52,212,114,0.04);border:1px solid rgba(52,212,114,0.18);border-radius:var(--r-xs);padding:6px 8px">'
+    +     '<div style="font-weight:700;margin-bottom:2px">' + esc(m.homeTeam) + '</div>'
+    +     '<div style="display:flex;justify-content:space-between"><span>Pinnacle ' + probH + '%</span><span style="color:var(--green);font-weight:700">Fair ≥ ' + fairH + '</span></div>'
+    +     '<div style="font-size:10px;color:var(--text-3)">@ ' + m.decimalHome.toFixed(2) + ' on Pinnacle</div>'
+    +   '</div>'
+    +   '<div style="background:rgba(52,212,114,0.04);border:1px solid rgba(52,212,114,0.18);border-radius:var(--r-xs);padding:6px 8px">'
+    +     '<div style="font-weight:700;margin-bottom:2px">' + esc(m.awayTeam) + '</div>'
+    +     '<div style="display:flex;justify-content:space-between"><span>Pinnacle ' + probA + '%</span><span style="color:var(--green);font-weight:700">Fair ≥ ' + fairA + '</span></div>'
+    +     '<div style="font-size:10px;color:var(--text-3)">@ ' + m.decimalAway.toFixed(2) + ' on Pinnacle</div>'
+    +   '</div>'
+    + '</div>'
+  + '</div>';
+}
+
+// Game-tab filter wiring (event delegation, attached once)
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement)) return;
+  const btn = t.closest('.esports-game-tab');
+  if (!btn) return;
+  const game = btn.getAttribute('data-egame');
+  document.querySelectorAll('.esports-game-tab').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('.esports-row').forEach(row => {
+    row.style.display = (game === 'all' || row.getAttribute('data-egame') === game) ? '' : 'none';
+  });
+});
 
 function renderOddsLag(data) {
   const lags = (data && data.lags) || [];

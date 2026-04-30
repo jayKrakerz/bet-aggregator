@@ -14,6 +14,7 @@ import { getScraperHealth, getScraperHealthSummary } from '../scraper-health.js'
 import { getSportsAiData, getSportsAiBotResults, findPredictionForMatch, findValueBetsForMatch, getBotPerformanceSummary } from '../sports-ai-scraper.js';
 import { getLivePredictions } from '../live-predictor.js';
 import { getDroppingOdds } from '../oddspedia-dropping-odds.js';
+import { getEsportsMatches } from '../pinnacle-esports.js';
 import { getFlashLiveMatches, toSportyFormat } from '../flashscore-live.js';
 import { getSportyLiveGames } from '../sportybet-live.js';
 import { getLiveValuePicks } from '../live-value-picks.js';
@@ -1018,6 +1019,21 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     const teams = getAvailableTeams();
     void reply.header('Cache-Control', 'public, max-age=3600');
     return { data: teams, count: teams.length };
+  });
+
+  // GET /predictions/sharp-esports — Pinnacle's upcoming CS2 / LoL / Dota /
+  // Valorant / FIFAe matches with de-vigged moneyline implied probabilities.
+  // Pinnacle is the sharpest market; we surface their lines so the user can
+  // line-shop the same match at 22bet or other soft books.
+  app.get('/sharp-esports', async (request, reply) => {
+    const q = request.query as { game?: string; refresh?: string };
+    const result = await getEsportsMatches(q.refresh === '1');
+    void reply.header('Cache-Control', 'public, max-age=120');
+    if (q.game) {
+      const filtered = result.matches.filter((m) => m.game === q.game);
+      return { ...result, matches: filtered, totalMatches: filtered.length };
+    }
+    return result;
   });
 
   // GET /predictions/dropping-odds — Oddspedia line-movement signals.
