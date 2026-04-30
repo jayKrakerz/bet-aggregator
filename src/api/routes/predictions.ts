@@ -22,11 +22,6 @@ import { getPromoEdges } from '../promo-detector.js';
 import { analyzeCashout } from '../cashout-analyzer.js';
 import { predictElo, bootstrapEloFromEspn, getEloStats } from '../elo-predictor.js';
 import { getEloPicks } from '../elo-picker.js';
-let _aviatorModule: typeof import('../aviator-tracker.js') | null = null;
-const aviatorTracker = async () => {
-  if (!_aviatorModule) _aviatorModule = await import('../aviator-tracker.js');
-  return _aviatorModule;
-};
 // Lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
 const liveMonitor = () => import('../live-monitor.js');
 const oddsportal = () => import('../oddsportal-scraper.js');
@@ -36,8 +31,8 @@ const crossOddsScanner = () => import('../cross-odds-scanner.js');
 // Strict alphanumeric pattern for booking codes
 const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
 
-// Validate a Sportybet event/market/outcome ID format
-// Event IDs can be digits (real matches) OR base64-like strings (virtuals)
+// Validate a Sportybet event/market/outcome ID format. Real match IDs are
+// numeric. Sport/market/outcome refs use the Betradar `sr:type:id` pattern.
 const BETRADAR_ID = /^sr:[a-z]+:[A-Za-z0-9_-]{1,50}$/;
 const NUMERIC_ID = /^\d+$/;
 
@@ -239,8 +234,13 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         sportId: s.sportId,
       });
     }
+
     const payload = JSON.stringify({ selections: validated });
     const countries = ['ng', 'gh', 'ke', 'tz', 'zm', 'cm'];
+    let createResp: { bizCode?: number; data?: { shareCode?: string }; message?: string } | null = null;
+    let shareCode: string | null = null;
+    let activeCc: string | null = null;
+    let lastErrResp: { bizCode?: number; data?: { shareCode?: string }; message?: string } | null = null;
     for (const cc of countries) {
       try {
         const res = await fetch(`https://www.sportybet.com/api/${cc}/orders/share`, {
@@ -251,19 +251,86 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
         });
         const data = await res.json() as { bizCode?: number; data?: { shareCode?: string }; message?: string };
         if (data.bizCode === 10000 && data.data?.shareCode) {
-          return data;
+          createResp = data;
+          shareCode = data.data.shareCode;
+          activeCc = cc;
+          break;
         }
-        // If last country also failed, return its error
-        if (cc === countries[countries.length - 1]) {
-          return data;
-        }
+        lastErrResp = data;
       } catch {
-        if (cc === countries[countries.length - 1]) {
+        if (cc === countries[countries.length - 1] && !lastErrResp) {
           return reply.status(502).send({ error: 'Failed to reach Sportybet API' });
         }
       }
     }
-    return reply.status(502).send({ error: 'All Sportybet endpoints failed' });
+    if (!createResp || !shareCode || !activeCc) {
+      return lastErrResp ?? reply.status(502).send({ error: 'All Sportybet endpoints failed' });
+    }
+
+    // Authoritative validation: refetch the share code and inspect each leg's
+    // isActive flag. Sportybet often issues a share code even when an outcome
+    // is currently suspended — the user only sees "suspended" when loading the
+    // betslip. This re-fetch hits the same endpoint Sportybet's UI uses, so it
+    // reflects the actual betslip state. If any leg is suspended we drop the
+    // (already-issued) code and return 409 so the UI can prompt for a refresh.
+    try {
+      const verifyRes = await fetch(`https://www.sportybet.com/api/${activeCc}/orders/share/${encodeURIComponent(shareCode)}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(8000),
+      });
+      const verify = await verifyRes.json() as {
+        bizCode?: number;
+        data?: {
+          outcomes?: Array<{
+            eventId: string;
+            homeTeamName?: string;
+            awayTeamName?: string;
+            playedSeconds?: string;
+            matchStatus?: string;
+            markets?: Array<{
+              id: string;
+              specifier?: string;
+              status?: number;
+              outcomes?: Array<{ id: string; isActive?: number }>;
+            }>;
+          }>;
+        };
+      };
+      if (verify.bizCode === 10000 && verify.data?.outcomes) {
+        const suspended: Array<{ eventId: string; marketId: string; outcomeId: string; match: string; minute: string | null; reason: string }> = [];
+        for (const sel of validated) {
+          const ev = verify.data.outcomes.find(o => o.eventId === sel.eventId);
+          if (!ev) continue;
+          const match = `${ev.homeTeamName ?? ''} v ${ev.awayTeamName ?? ''}`.trim();
+          const minute = ev.playedSeconds ? `${ev.playedSeconds.split(':')[0]}'` : (ev.matchStatus ?? null);
+          const mkt = ev.markets?.find(m => m.id === sel.marketId && (m.specifier ?? '') === sel.specifier);
+          if (!mkt) {
+            suspended.push({ eventId: sel.eventId, marketId: sel.marketId, outcomeId: sel.outcomeId, match, minute, reason: 'market not active' });
+            continue;
+          }
+          if (mkt.status !== undefined && mkt.status !== 0) {
+            suspended.push({ eventId: sel.eventId, marketId: sel.marketId, outcomeId: sel.outcomeId, match, minute, reason: 'market suspended' });
+            continue;
+          }
+          const out = mkt.outcomes?.find(o => o.id === sel.outcomeId);
+          if (!out || out.isActive !== 1) {
+            suspended.push({ eventId: sel.eventId, marketId: sel.marketId, outcomeId: sel.outcomeId, match, minute, reason: 'outcome suspended' });
+          }
+        }
+        if (suspended.length > 0) {
+          return reply.status(409).send({
+            error: 'suspended',
+            message: 'Sportybet generated the code but one or more legs are suspended — try a different pick.',
+            suspended,
+          });
+        }
+      }
+    } catch {
+      // Verification failed (network/parse) — fall through and return the code.
+      // Better to give the user a code that might work than to block on a flaky check.
+    }
+
+    return createResp;
   });
 
   // POST /predictions/enrich — batch enrich matches with external data
@@ -951,187 +1018,6 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     const teams = getAvailableTeams();
     void reply.header('Cache-Control', 'public, max-age=3600');
     return { data: teams, count: teams.length };
-  });
-
-  // ── Aviator Tracker ──────────────────────────────────────
-
-  // POST /predictions/aviator/start — open Aviator in browser and start tracking
-  app.post('/aviator/start', async () => {
-    try {
-      const { startAviator } = await aviatorTracker();
-      return await startAviator();
-    } catch (err) {
-      return { success: false, message: `Failed: ${err}` };
-    }
-  });
-
-  // POST /predictions/aviator/stop — stop tracking
-  app.post('/aviator/stop', async () => {
-    try {
-      const { stopAviator } = await aviatorTracker();
-      await stopAviator();
-      return { success: true };
-    } catch {
-      return { success: false };
-    }
-  });
-
-  // GET /predictions/aviator — get current state, history, signals
-  app.get('/aviator', async () => {
-    try {
-      const { getAviatorState } = await aviatorTracker();
-      return getAviatorState();
-    } catch {
-      return { running: false, connected: false, history: [], signals: [], stats: { total: 0, avg: 0, median: 0, above2x: 0, above5x: 0, above10x: 0, lastLowStreak: 0, recentAvg: 0 }, lastUpdate: 0 };
-    }
-  });
-
-  // GET /predictions/aviator/history — full crash history
-  app.get('/aviator/history', async () => {
-    try {
-      const { getFullHistory } = await aviatorTracker();
-      return { data: getFullHistory() };
-    } catch {
-      return { data: [] };
-    }
-  });
-
-  // GET /predictions/aviator/predictions — prediction accuracy log
-  app.get('/aviator/predictions', async () => {
-    try {
-      const { getPredictions } = await aviatorTracker();
-      return { data: getPredictions() };
-    } catch {
-      return { data: [] };
-    }
-  });
-
-  // GET /predictions/aviator/audit — data quality stats for the recorded history
-  app.get('/aviator/audit', async () => {
-    try {
-      const { getHistoryAudit, getAviatorState } = await aviatorTracker();
-      return {
-        history: getHistoryAudit(),
-        coverage: getAviatorState().coverage,
-      };
-    } catch (err) {
-      return { error: String(err) };
-    }
-  });
-
-  // GET /predictions/aviator/backtest — replay strategies against full history
-  app.get('/aviator/backtest', async () => {
-    try {
-      const { runBacktestSuite } = await aviatorTracker();
-      return { data: runBacktestSuite() };
-    } catch (err) {
-      return { data: [], error: String(err) };
-    }
-  });
-
-  // ── Auto-Bet Endpoints ──────────────────────────────────
-
-  // POST /predictions/aviator/autobet/start — start auto-betting
-  app.post('/aviator/autobet/start', async (request, reply) => {
-    const body = request.body as {
-      initialBank?: number;
-      betAmount?: number;
-      cashoutAt?: number;
-      minStreak?: number;
-      maxBetsPerSession?: number;
-      takeProfitPct?: number;
-      stopLossPct?: number;
-      cooldownRounds?: number;
-    } | null;
-
-    const initialBank = Number(body?.initialBank ?? 100);
-    if (!Number.isFinite(initialBank) || initialBank <= 0 || initialBank > 100000) {
-      return reply.status(400).send({ error: 'initialBank must be 1-100000' });
-    }
-
-    try {
-      const { configureAutoBet, startAutoBet } = await aviatorTracker();
-
-      // Apply config from request (with safe defaults + bounds)
-      const config: Record<string, number | boolean> = {};
-      if (body?.betAmount !== undefined) {
-        const v = Number(body.betAmount);
-        if (!Number.isFinite(v) || v < 0.1 || v > initialBank * 0.5) {
-          return reply.status(400).send({ error: 'betAmount must be 0.1 to 50% of bank' });
-        }
-        config.betAmount = v;
-      }
-      if (body?.cashoutAt !== undefined) {
-        const v = Number(body.cashoutAt);
-        if (!Number.isFinite(v) || v < 1.01 || v > 100) {
-          return reply.status(400).send({ error: 'cashoutAt must be 1.01-100' });
-        }
-        config.cashoutAt = v;
-      }
-      if (body?.minStreak !== undefined) {
-        const v = Number(body.minStreak);
-        if (!Number.isInteger(v) || v < 0 || v > 10) {
-          return reply.status(400).send({ error: 'minStreak must be 0-10' });
-        }
-        config.minStreak = v;
-      }
-      if (body?.maxBetsPerSession !== undefined) {
-        const v = Number(body.maxBetsPerSession);
-        if (!Number.isInteger(v) || v < 1 || v > 500) {
-          return reply.status(400).send({ error: 'maxBetsPerSession must be 1-500' });
-        }
-        config.maxBetsPerSession = v;
-      }
-      if (body?.takeProfitPct !== undefined) {
-        const v = Number(body.takeProfitPct);
-        if (!Number.isFinite(v) || v < 1 || v > 1000) {
-          return reply.status(400).send({ error: 'takeProfitPct must be 1-1000' });
-        }
-        config.takeProfitPct = v;
-      }
-      if (body?.stopLossPct !== undefined) {
-        const v = Number(body.stopLossPct);
-        if (!Number.isFinite(v) || v < 1 || v > 100) {
-          return reply.status(400).send({ error: 'stopLossPct must be 1-100' });
-        }
-        config.stopLossPct = v;
-      }
-      if (body?.cooldownRounds !== undefined) {
-        const v = Number(body.cooldownRounds);
-        if (!Number.isInteger(v) || v < 0 || v > 20) {
-          return reply.status(400).send({ error: 'cooldownRounds must be 0-20' });
-        }
-        config.cooldownRounds = v;
-      }
-      config.enabled = true;
-
-      configureAutoBet(config as Parameters<typeof configureAutoBet>[0]);
-      const state = startAutoBet(initialBank);
-      return { success: true, state };
-    } catch (err) {
-      return reply.status(500).send({ error: `Failed to start auto-bet: ${err}` });
-    }
-  });
-
-  // POST /predictions/aviator/autobet/stop — stop auto-betting
-  app.post('/aviator/autobet/stop', async () => {
-    try {
-      const { stopAutoBet } = await aviatorTracker();
-      const state = stopAutoBet('Manually stopped via API');
-      return { success: true, state };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
-  });
-
-  // GET /predictions/aviator/autobet — get current auto-bet state + config
-  app.get('/aviator/autobet', async () => {
-    try {
-      const { getAutoBetState, getAutoBetConfig } = await aviatorTracker();
-      return { state: getAutoBetState(), config: getAutoBetConfig() };
-    } catch {
-      return { state: null, config: null };
-    }
   });
 
   // GET /predictions/dropping-odds — Oddspedia line-movement signals.

@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { logger } from '../utils/logger.js';
-import { getAllBookingCodes, type BookingCode } from './booking-codes-scraper.js';
+import { getAllValidatedBookingCodes, type BookingCode } from './booking-codes-scraper.js';
 import { getStats as getConsensusStats } from './consensus-tracker.js';
 
 // ── Historical archive ─────────────────────────────────────
@@ -203,7 +203,9 @@ function isWon(c: BookingCode): boolean {
 export async function getCodePerformance(): Promise<CodePerformance> {
   if (!archive) archive = loadArchive();
 
-  const codes = await getAllBookingCodes();
+  // Use the unfiltered validated set so losing codes aren't dropped before
+  // they reach the archive. Otherwise win/loss stats are survivorship-biased.
+  const codes = await getAllValidatedBookingCodes();
 
   // Append any freshly-settled codes to the archive so stats span multiple
   // scrape cycles instead of just the last 2 hours.

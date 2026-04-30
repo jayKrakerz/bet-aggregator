@@ -58,8 +58,13 @@ export interface BookingCode {
 import fs from 'node:fs';
 import path from 'node:path';
 const DISK_CACHE_PATH = path.join(process.cwd(), 'data', 'codes-cache.json');
+const DISK_CACHE_PATH_UNFILTERED = path.join(process.cwd(), 'data', 'codes-cache-unfiltered.json');
 let codesCache: BookingCode[] | null = null;
 let codesCacheTime = 0;
+// Parallel cache that retains losing codes too — used by the performance
+// tracker so its archive sees actual losses, not just survivorship-biased wins.
+let codesCacheUnfiltered: BookingCode[] | null = null;
+let codesCacheUnfilteredTime = 0;
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 const HEADERS = {
@@ -668,6 +673,45 @@ function saveDiskCache(codes: BookingCode[]) {
   } catch { /* ignore */ }
 }
 
+function loadUnfilteredDisk(): BookingCode[] | null {
+  try {
+    if (fs.existsSync(DISK_CACHE_PATH_UNFILTERED)) {
+      const raw = JSON.parse(fs.readFileSync(DISK_CACHE_PATH_UNFILTERED, 'utf-8')) as { data: BookingCode[]; time: number };
+      if (Date.now() - raw.time < 24 * 60 * 60 * 1000) return raw.data;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function saveUnfilteredDisk(codes: BookingCode[]) {
+  try {
+    const dir = path.dirname(DISK_CACHE_PATH_UNFILTERED);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(DISK_CACHE_PATH_UNFILTERED, JSON.stringify({ data: codes, time: Date.now() }));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Returns ALL validated codes including losers. Used by the performance
+ * tracker so its archive captures actual win/loss rates instead of being
+ * biased toward survivorship. Triggers a refresh if no cache present.
+ */
+export async function getAllValidatedBookingCodes(): Promise<BookingCode[]> {
+  if (codesCacheUnfiltered && Date.now() - codesCacheUnfilteredTime < CACHE_TTL) {
+    return codesCacheUnfiltered;
+  }
+  const disk = loadUnfilteredDisk();
+  if (disk) {
+    codesCacheUnfiltered = disk;
+    codesCacheUnfilteredTime = Date.now() - CACHE_TTL + 60_000;
+    return disk;
+  }
+  // Fall back: trigger a refresh by calling the main fetcher; it populates
+  // codesCacheUnfiltered as a side effect during validation.
+  await getAllBookingCodes();
+  return codesCacheUnfiltered ?? [];
+}
+
 let refreshing = false;
 let refreshPromise: Promise<BookingCode[]> | null = null;
 
@@ -792,11 +836,19 @@ async function refreshCodes(): Promise<BookingCode[]> {
     }
   }
 
-  // Quality filtering
+  // Snapshot the validated set BEFORE filtering out losses. The performance
+  // tracker reads from this — preserves both winners and losers so the
+  // archive isn't survivorship-biased.
+  const validatedAll = raw.filter(c => c.isValid);
+  codesCacheUnfiltered = validatedAll;
+  codesCacheUnfilteredTime = Date.now();
+  saveUnfilteredDisk(validatedAll);
+
+  // Quality filtering — applied to the user-facing "playable codes" view.
   const MAX_TOTAL_ODDS = 500;   // astronomical accumulators rarely hit
   const result = raw.filter(c => {
     if (!c.isValid) return false;
-    // Drop dead codes (any leg already lost)
+    // Drop dead codes (any leg already lost) — for the user-facing list only.
     if (c.lostCount > 0) return false;
     // Keep fully-won codes (proves tipster quality) + pending codes
     // Drop astronomical odds
