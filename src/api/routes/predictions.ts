@@ -24,6 +24,13 @@ import { getPromoEdges } from '../promo-detector.js';
 import { analyzeCashout } from '../cashout-analyzer.js';
 import { predictElo, bootstrapEloFromEspn, getEloStats } from '../elo-predictor.js';
 import { getEloPicks } from '../elo-picker.js';
+import { getOver15Picks } from '../over15-picker.js';
+import { getSrlFixtures, fetchSrlEventResult } from '../srl-fixtures.js';
+import { ingestFixtures, getHistoryStats, computeLeaguePriors, getStaleOpenEventIds, settleFromLookup } from '../srl-history.js';
+import { predictFixtures } from '../srl-predictor.js';
+import { computeCalibration } from '../srl-evaluator.js';
+import { lookupOU } from '../ou-lookup.js';
+import { preloadEspnTeams, getEspnIndexStats } from '../espn-form.js';
 // Lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
 const liveMonitor = () => import('../live-monitor.js');
 const oddsportal = () => import('../oddsportal-scraper.js');
@@ -93,6 +100,22 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     };
     const result = await getEloPicks(opts, q.refresh === '1');
     void reply.header('Cache-Control', 'public, max-age=120');
+    return result;
+  });
+
+  // GET /predictions/over15-picks — top N Over 1.5 picks ranked by Poisson edge.
+  // Query: limit (default 4), minEdge, minProbability, maxOdds, minOdds, refresh
+  app.get('/over15-picks', async (request, reply) => {
+    const q = request.query as Record<string, string | undefined>;
+    const opts = {
+      limit: q.limit !== undefined ? Math.min(Math.max(parseInt(q.limit, 10) || 4, 1), 25) : 4,
+      minEdge: q.minEdge !== undefined ? parseFloat(q.minEdge) : undefined,
+      minProbability: q.minProbability !== undefined ? parseFloat(q.minProbability) : undefined,
+      maxOdds: q.maxOdds !== undefined ? parseFloat(q.maxOdds) : undefined,
+      minOdds: q.minOdds !== undefined ? parseFloat(q.minOdds) : undefined,
+    };
+    const result = await getOver15Picks(opts, q.refresh === '1');
+    void reply.header('Cache-Control', 'public, max-age=300');
     return result;
   });
 
@@ -1044,6 +1067,110 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       const filtered = result.matches.filter((m) => m.game === q.game);
       return { ...result, matches: filtered, totalMatches: filtered.length };
     }
+    return result;
+  });
+
+  // ── SRL Predictor ────────────────────────────────────────
+
+  // Background ingester — every 30s pull SRL fixtures, snapshot new ones,
+  // settle finished ones. Cached fixture list is shared with the route below.
+  let srlIngestErrors = 0;
+  const srlTick = async () => {
+    try {
+      const fixtures = await getSrlFixtures(true);
+      ingestFixtures(fixtures);
+
+      // Settle fallback: SB drops finished events from the grouped fetch
+      // before we ever see matchStatus=Ended. Snapshots older than ~30 min
+      // (one match-length-ish) and younger than 6 h are candidates for the
+      // per-event lookup. Younger: still in-progress, group fetch will catch.
+      // Older: presumed lost (network / SB schema drift) — stop polling.
+      const seen = new Set(fixtures.map(f => f.eventId));
+      const stale = getStaleOpenEventIds(30 * 60 * 1000, 6 * 60 * 60 * 1000)
+        .filter(id => !seen.has(id));
+      // Cap per-tick to avoid hammering SB.
+      const batch = stale.slice(0, 10);
+      let settled = 0;
+      for (const eventId of batch) {
+        const result = await fetchSrlEventResult(eventId);
+        if (result.isFinished && result.setScore) {
+          if (settleFromLookup(eventId, result.setScore, true)) settled++;
+        }
+      }
+      if (settled > 0) app.log.info({ settled, polled: batch.length }, 'SRL settle fallback');
+
+      srlIngestErrors = 0;
+    } catch (err) {
+      srlIngestErrors++;
+      if (srlIngestErrors <= 3) app.log.warn({ err }, 'SRL ingest tick failed');
+    }
+  };
+  // Kick off immediately (non-blocking) and on a 30s interval.
+  void srlTick();
+  setInterval(() => { void srlTick(); }, 30 * 1000).unref();
+
+  // GET /predictions/srl/fixtures — current SRL fixtures + per-fixture
+  // model prediction, bookie engine truth, divergence, sample-size.
+  app.get('/srl/fixtures', async (request, reply) => {
+    const q = request.query as { refresh?: string; league?: string };
+    let fixtures = await getSrlFixtures(q.refresh === '1');
+    if (q.league) {
+      const f = q.league.toLowerCase();
+      fixtures = fixtures.filter(x => x.realLeague.toLowerCase().includes(f) || x.tournamentName.toLowerCase().includes(f));
+    }
+    // Snapshot any new fixtures we observe via this request too — keeps
+    // history accruing even if the background tick is wedged.
+    ingestFixtures(fixtures);
+    const predictions = await predictFixtures(fixtures);
+    void reply.header('Cache-Control', 'public, max-age=15');
+    return {
+      predictions,
+      count: predictions.length,
+      historyStats: getHistoryStats(),
+      fetchedAt: new Date().toISOString(),
+    };
+  });
+
+  // GET /predictions/srl/history — per-league empirical priors + counts.
+  app.get('/srl/history', async (_request, reply) => {
+    const priors = [...computeLeaguePriors().values()];
+    priors.sort((a, b) => b.n - a.n);
+    void reply.header('Cache-Control', 'public, max-age=60');
+    return {
+      priors,
+      stats: getHistoryStats(),
+    };
+  });
+
+  // Preload ESPN team index in background — covers ~20 leagues (Honduras,
+  // Bolivia, Peru, Nigeria, Ghana, Saudi, Eredivisie 2, etc.) that the
+  // local CSV-Poisson doesn't.
+  void preloadEspnTeams().catch(err => app.log.warn({ err }, 'ESPN team preload failed'));
+
+  // GET /predictions/espn/index — diagnostic for ESPN coverage
+  app.get('/espn/index', async (_request, reply) => {
+    void reply.header('Cache-Control', 'public, max-age=300');
+    return getEspnIndexStats();
+  });
+
+  // GET /predictions/ou-lookup?home=X&away=Y&league=Z — manual O/U lookup
+  //   for any pair of teams. Returns expected goals, O/U at 0.5/1.5/2.5/3.5/4.5,
+  //   BTTS, plus per-team form + H2H + SRL empirical form (when available).
+  app.get('/ou-lookup', async (request, reply) => {
+    const q = request.query as { home?: string; away?: string; league?: string };
+    if (!q.home || !q.away) return reply.status(400).send({ error: 'Provide home and away team names' });
+    if (q.home.length > 80 || q.away.length > 80 || (q.league && q.league.length > 80)) {
+      return reply.status(400).send({ error: 'Team or league name too long' });
+    }
+    const result = await lookupOU(q.home, q.away, q.league);
+    void reply.header('Cache-Control', 'public, max-age=300');
+    return result;
+  });
+
+  // GET /predictions/srl/calibration — Brier/log-loss/CLV vs bookie.
+  app.get('/srl/calibration', async (_request, reply) => {
+    const result = await computeCalibration();
+    void reply.header('Cache-Control', 'public, max-age=300');
     return result;
   });
 

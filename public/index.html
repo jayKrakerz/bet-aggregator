@@ -1521,6 +1521,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   <!-- Tabs -->
   <div style="display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xs);padding:3px;margin-bottom:12px;overflow-x:auto" id="sharp-tabs">
     <button class="chip active" data-stab="late" style="padding:5px 12px;font-size:11px;flex-shrink:0">Late Locks</button>
+    <button class="chip" data-stab="ov15" style="padding:5px 12px;font-size:11px;flex-shrink:0">Ov 1.5</button>
     <button class="chip" data-stab="live" style="padding:5px 12px;font-size:11px;flex-shrink:0">Live Value</button>
     <button class="chip" data-stab="steam" style="padding:5px 12px;font-size:11px;flex-shrink:0">Steam Moves</button>
     <button class="chip" data-stab="predict" style="padding:5px 12px;font-size:11px;flex-shrink:0">Live Predict</button>
@@ -1528,6 +1529,7 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     <button class="chip" data-stab="elo" style="padding:5px 12px;font-size:11px;flex-shrink:0">ELO</button>
     <button class="chip" data-stab="esports" style="padding:5px 12px;font-size:11px;flex-shrink:0">Esports</button>
     <button class="chip" data-stab="arb5" style="padding:5px 12px;font-size:11px;flex-shrink:0">Arb 5'</button>
+    <button class="chip" data-stab="srl" style="padding:5px 12px;font-size:11px;flex-shrink:0">SRL</button>
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -6729,6 +6731,10 @@ async function loadSharp(tab, forceRefresh) {
       content.innerHTML = renderLateLocks(data);
       firePushForPicks('late-lock', data && data.picks);
       if (status) status.textContent = (data.count||0) + ' picks · ' + (data.lateMatches||0) + ' late matches';
+    } else if (tab === 'ov15') {
+      const data = await api('/predictions/over15-picks?limit=4' + (forceRefresh ? '&refresh=1' : ''));
+      content.innerHTML = renderOver15(data);
+      if (status) status.textContent = (data.count||0) + ' picks · ' + (data.scanned||0) + ' scanned';
     } else if (tab === 'live') {
       const data = await api('/predictions/live-value-picks?minEdge=2');
       content.innerHTML = renderLiveValue(data);
@@ -6767,6 +6773,16 @@ async function loadSharp(tab, forceRefresh) {
       const strong = ((data && data.candidates) || []).filter(c => c.verdict === 'STRONG').length;
       const marginal = ((data && data.candidates) || []).filter(c => c.verdict === 'MARGINAL').length;
       if (status) status.textContent = strong + ' strong · ' + marginal + ' marginal · ' + (data && data.totalScanned || 0) + ' analysed';
+    } else if (tab === 'srl') {
+      const [fixtures, calibration] = await Promise.all([
+        api('/predictions/srl/fixtures' + (forceRefresh ? '?refresh=1' : '')),
+        api('/predictions/srl/calibration'),
+      ]);
+      content.innerHTML = renderOuLookupForm() + renderSrl(fixtures, calibration);
+      bindOuLookupForm();
+      const n = (fixtures && fixtures.count) || 0;
+      const settled = (fixtures && fixtures.historyStats && fixtures.historyStats.settled) || 0;
+      if (status) status.textContent = n + ' live fixtures · ' + settled + ' settled in history';
     }
   } catch (err) {
     console.error(err);
@@ -6800,6 +6816,36 @@ function renderLateLocks(data) {
       </div>
       <button class="btn btn-green btn-sm" style="width:100%" onclick="playPick(this,'${esc(p.eventId||'')}','${esc(p.marketId||'')}','${esc(p.outcomeId||'')}','${esc(p.specifier||'')}','${esc(p.sportId||'sr:sport:1')}')">Play on Sportybet</button>
     </div>`).join('');
+}
+
+function renderOver15(data) {
+  const picks = (data && data.picks) || [];
+  if (!picks.length) {
+    return '<div class="empty" style="padding:20px">No Over 1.5 picks above edge threshold. Coverage is limited to ~12 European leagues — try refreshing closer to the matchday.</div>';
+  }
+  let html = '<div class="card" style="padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--text-3)">'
+    + 'Top ' + picks.length + ' Over 1.5 picks by Poisson edge. Scanned ' + (data.scanned||0) + ' upcoming matches.'
+    + '</div>';
+  for (const p of picks) {
+    const ko = p.kickoff ? new Date(p.kickoff).toLocaleString(undefined, { weekday:'short', hour:'2-digit', minute:'2-digit' }) : '';
+    html += '<div class="card" style="margin-bottom:8px;padding:10px 12px;border-color:rgba(52,212,114,0.2)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+      + '<div style="font-size:13px;font-weight:700">' + esc(p.home) + ' vs ' + esc(p.away) + '</div>'
+      + '<div style="font-size:12px;color:var(--green);font-weight:800">+' + (p.edge||0).toFixed(1) + '%</div>'
+      + '</div>'
+      + '<div style="font-size:11px;color:var(--text-3);margin-bottom:6px">' + esc(p.league||'') + (ko ? ' · ' + esc(ko) : '') + '</div>'
+      + '<div style="font-size:12px;margin-bottom:6px"><b>' + esc(p.market||'O/U 1.5') + '</b>: ' + esc(p.pick||'Over 1.5') + ' @ <span style="color:var(--amber);font-weight:700">' + (p.odds||0).toFixed(2) + '</span></div>'
+      + '<div style="display:flex;gap:8px;font-size:10px;color:var(--text-3);margin-bottom:8px;flex-wrap:wrap">'
+      + '<span>Model ' + (p.probability||0).toFixed(1) + '%</span>'
+      + '<span>Implied ' + (p.bookImpliedPct||0).toFixed(1) + '%</span>'
+      + '<span>xG ' + (p.expectedGoals||0).toFixed(2) + '</span>'
+      + '<span>Conf ' + (p.confidence||0) + '</span>'
+      + kellyBadge(p.probability, p.odds)
+      + '</div>'
+      + '<button class="btn btn-green btn-sm" style="width:100%" onclick="playPick(this,\'' + esc(p.eventId||'') + '\',\'' + esc(p.marketId||'') + '\',\'' + esc(p.outcomeId||'') + '\',\'' + esc(p.specifier||'') + '\',\'' + esc(p.sportId||'sr:sport:1') + '\')">Play on Sportybet</button>'
+      + '</div>';
+  }
+  return html;
 }
 
 function renderLiveValue(data) {
@@ -7067,6 +7113,329 @@ function renderEsportsMatch(m) {
 // User picks their tradeoff: hedge early (lower arb, higher chance of
 // reaching the window) vs hedge late (much bigger arb, but more risk
 // of a goal cancelling everything en route).
+// ===== O/U Lookup form (lives at the top of the SRL tab) =====
+function renderOuLookupForm() {
+  return '<div class="card" style="padding:12px;margin-bottom:10px;border-color:rgba(52,212,114,0.2)">'
+    + '<div style="font-size:13px;font-weight:700;margin-bottom:8px">🔮 Over/Under Lookup</div>'
+    + '<div style="font-size:10px;color:var(--text-3);margin-bottom:8px">Enter two teams — get O/U probabilities, BTTS, and the factor breakdown (form, H2H, home/away splits) the model uses. Strips "SRL" suffix automatically.</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+    + '  <input id="ou-home" type="text" class="input-sm" placeholder="Home team (e.g. Arsenal)" style="flex:1 1 140px;min-width:0">'
+    + '  <input id="ou-away" type="text" class="input-sm" placeholder="Away team (e.g. Chelsea)" style="flex:1 1 140px;min-width:0">'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;align-items:stretch">'
+    + '  <input id="ou-league" type="text" class="input-sm" placeholder="League hint (optional)" style="flex:2;min-width:0">'
+    + '  <button id="ou-go" class="btn btn-green btn-sm" style="flex-shrink:0">Predict</button>'
+    + '</div>'
+    + '<div id="ou-result" style="margin-top:10px"></div>'
+    + '</div>';
+}
+
+function bindOuLookupForm() {
+  const goBtn = document.getElementById('ou-go');
+  if (!goBtn) return;
+  const home = document.getElementById('ou-home');
+  const away = document.getElementById('ou-away');
+  const league = document.getElementById('ou-league');
+  const result = document.getElementById('ou-result');
+  const submit = async () => {
+    const h = (home && home.value || '').trim();
+    const a = (away && away.value || '').trim();
+    if (!h || !a) {
+      result.innerHTML = '<div style="color:var(--red);font-size:11px">Enter both teams.</div>';
+      return;
+    }
+    const lg = (league && league.value || '').trim();
+    result.innerHTML = '<div class="empty" style="padding:14px;font-size:12px"><div class="spinner" style="width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 6px"></div>Computing…</div>';
+    try {
+      const url = '/predictions/ou-lookup?home=' + encodeURIComponent(h) + '&away=' + encodeURIComponent(a) + (lg ? '&league=' + encodeURIComponent(lg) : '');
+      const data = await api(url);
+      result.innerHTML = renderOuResult(data);
+    } catch (err) {
+      result.innerHTML = '<div style="color:var(--red);font-size:11px">Lookup failed: ' + esc(err && err.message || 'unknown') + '</div>';
+    }
+  };
+  goBtn.onclick = submit;
+  for (const el of [home, away, league]) {
+    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  }
+}
+
+function renderOuResult(d) {
+  if (!d) return '<div style="color:var(--red);font-size:11px">No response.</div>';
+
+  const ouRows = (d.ou || []).map(l => {
+    const overC = l.overPct >= 60 ? 'var(--green)' : l.overPct <= 40 ? 'var(--red)' : 'var(--text-1)';
+    const underC = l.underPct >= 60 ? 'var(--green)' : l.underPct <= 40 ? 'var(--red)' : 'var(--text-1)';
+    return '<tr>'
+      + '<td style="padding:4px 8px;font-weight:700">O/U ' + l.line.toFixed(1) + '</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:' + overC + ';font-weight:700">' + l.overPct.toFixed(1) + '%</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:' + underC + ';font-weight:700">' + l.underPct.toFixed(1) + '%</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:var(--text-3)">' + (l.overPct > 0 ? (100 / l.overPct).toFixed(2) : '–') + '</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:var(--text-3)">' + (l.underPct > 0 ? (100 / l.underPct).toFixed(2) : '–') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  let sourceBadge;
+  if (d.usedFallback) {
+    sourceBadge = '<span style="background:var(--amber-soft);color:var(--amber);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700">FALLBACK PRIOR</span>';
+  } else if (d.source === 'espn') {
+    sourceBadge = '<span style="background:rgba(52,212,114,0.15);color:var(--green);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700" title="From ESPN public API (free)">ESPN · ' + esc(d.league || '') + '</span>';
+  } else if (d.source === 'api-football') {
+    sourceBadge = '<span style="background:rgba(176,124,255,0.15);color:var(--purple);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700" title="From API-Football">API-FOOTBALL · ' + esc(d.league || '') + '</span>';
+  } else {
+    sourceBadge = '<span style="background:var(--green-soft);color:var(--green);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700">' + esc(d.league || '') + '</span>';
+  }
+  const quotaNote = (d.apiFootball && d.apiFootball.enabled && d.source === 'api-football')
+    ? '<div style="font-size:9px;color:var(--text-3);margin-top:2px">API-Football quota today: ' + d.apiFootball.quotaUsed + ' / ' + d.apiFootball.quotaCap + '</div>'
+    : '';
+
+  let html = ''
+    + '<div style="background:var(--surface-2);border-radius:var(--r-xs);padding:10px;margin-bottom:8px">'
+    + '  <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+    + '    <div style="font-size:13px;font-weight:700">' + esc(d.homeNormalized) + ' <span style="color:var(--text-3);font-weight:500">vs</span> ' + esc(d.awayNormalized) + '</div>'
+    + '    <div style="text-align:right">' + sourceBadge + quotaNote + '</div>'
+    + '  </div>'
+    + (d.reason ? '<div style="font-size:10px;color:var(--amber);margin-bottom:6px">⚠ ' + esc(d.reason) + '</div>' : '')
+    + '  <div style="display:flex;gap:14px;font-size:11px;flex-wrap:wrap">'
+    + '    <span style="color:var(--text-3)">Expected goals <b style="color:var(--text-1)">' + d.expected.home.toFixed(2) + ' – ' + d.expected.away.toFixed(2) + '</b> (total ' + d.expected.total.toFixed(2) + ')</span>'
+    + '    <span style="color:var(--text-3)">1 <b style="color:var(--text-1)">' + d.homePct.toFixed(1) + '%</b> · X <b style="color:var(--text-1)">' + d.drawPct.toFixed(1) + '%</b> · 2 <b style="color:var(--text-1)">' + d.awayPct.toFixed(1) + '%</b></span>'
+    + '    <span style="color:var(--text-3)">BTTS <b style="color:var(--text-1)">' + d.bttsYesPct.toFixed(1) + '% / ' + d.bttsNoPct.toFixed(1) + '%</b></span>'
+    + '  </div>'
+    + '</div>'
+    // O/U table
+    + '<div style="overflow-x:auto;margin-bottom:10px"><table style="width:100%;border-collapse:collapse;font-size:11px">'
+    + '<thead><tr style="color:var(--text-3);font-size:9px;border-bottom:1px solid var(--border)">'
+    + '<th style="padding:4px 8px;text-align:left">Line</th>'
+    + '<th style="padding:4px 8px;text-align:right">Over %</th>'
+    + '<th style="padding:4px 8px;text-align:right">Under %</th>'
+    + '<th style="padding:4px 8px;text-align:right">Min Over odds</th>'
+    + '<th style="padding:4px 8px;text-align:right">Min Under odds</th>'
+    + '</tr></thead>'
+    + '<tbody>' + ouRows + '</tbody></table></div>';
+
+  // Factor breakdown
+  html += '<details style="margin-bottom:6px"><summary style="cursor:pointer;font-size:11px;font-weight:700;color:var(--text-3);padding:4px 0">Factor breakdown ▾</summary>';
+  html += '<div style="padding:6px 0">';
+
+  if (d.factors && d.factors.homeForm) html += renderFormBlock('Home', esc(d.homeNormalized), d.factors.homeForm, 'home');
+  if (d.factors && d.factors.awayForm) html += renderFormBlock('Away', esc(d.awayNormalized), d.factors.awayForm, 'away');
+  if (d.factors && d.factors.apiFootballHomeForm) html += renderApiFootballForm('Home', d.factors.apiFootballHomeForm);
+  if (d.factors && d.factors.apiFootballAwayForm) html += renderApiFootballForm('Away', d.factors.apiFootballAwayForm);
+  if (d.factors && d.factors.h2h) html += renderH2HBlock(d.factors.h2h, d.homeNormalized, d.awayNormalized);
+  if (d.factors && d.factors.leagueAverages) {
+    const la = d.factors.leagueAverages;
+    html += '<div style="font-size:10px;color:var(--text-3);margin-top:6px">League avg goals — home <b style="color:var(--text-1)">' + la.avgHomeGoals.toFixed(2) + '</b>, away <b style="color:var(--text-1)">' + la.avgAwayGoals.toFixed(2) + '</b> (n=' + la.matches + ')</div>';
+  }
+
+  // SRL form on top, when present.
+  if (d.srl && (d.srl.homeSrlForm || d.srl.awaySrlForm || d.srl.leaguePrior)) {
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">';
+    html += '<div style="font-size:10px;font-weight:700;color:var(--purple);margin-bottom:4px">SRL empirical form</div>';
+    if (d.srl.leaguePrior) {
+      const lp = d.srl.leaguePrior;
+      html += '<div style="font-size:10px;color:var(--text-3)">'
+        + esc(lp.realLeague) + ' · n=' + lp.n
+        + ' · home ' + (lp.homeRate * 100).toFixed(1) + '%'
+        + ' · draw ' + (lp.drawRate * 100).toFixed(1) + '%'
+        + ' · away ' + (lp.awayRate * 100).toFixed(1) + '%'
+        + ' · O2.5 ' + (lp.over25Rate * 100).toFixed(1) + '%'
+        + ' · BTTS ' + (lp.bttsRate * 100).toFixed(1) + '%'
+        + ' · avg goals ' + lp.avgGoals.toFixed(2)
+        + '</div>';
+    }
+    if (d.srl.homeSrlForm) {
+      const f = d.srl.homeSrlForm;
+      html += '<div style="font-size:10px;color:var(--text-3)">' + esc(f.team) + ' (home) · n=' + f.played + ' · attack ' + f.attackIndex.toFixed(2) + ' · defense ' + f.defenseIndex.toFixed(2) + '</div>';
+    }
+    if (d.srl.awaySrlForm) {
+      const f = d.srl.awaySrlForm;
+      html += '<div style="font-size:10px;color:var(--text-3)">' + esc(f.team) + ' (away) · n=' + f.played + ' · attack ' + f.attackIndex.toFixed(2) + ' · defense ' + f.defenseIndex.toFixed(2) + '</div>';
+    }
+    html += '</div>';
+  }
+
+  html += '</div></details>';
+  return html;
+}
+
+function renderFormBlock(label, name, f, splitKey) {
+  const split = f[splitKey] || {};
+  const formStr = (f.recentForm || []).map(r => {
+    const c = r === 'W' ? 'var(--green)' : r === 'L' ? 'var(--red)' : 'var(--text-3)';
+    return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:' + c + ';color:white;border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">' + r + '</span>';
+  }).join('');
+  return ''
+    + '<div style="margin-bottom:6px">'
+    + '  <div style="font-size:10px;font-weight:700;color:var(--text-3);margin-bottom:2px">' + label + ' · ' + name + '</div>'
+    + '  <div style="font-size:10px;color:var(--text-3)">'
+    + '    Overall: ' + f.played + ' GP · ' + f.wins + 'W ' + f.draws + 'D ' + f.losses + 'L · ' + f.goalsFor + ' GF ' + f.goalsAgainst + ' GA · ' + f.ppg.toFixed(2) + ' PPG'
+    + '  </div>'
+    + '  <div style="font-size:10px;color:var(--text-3)">'
+    + '    ' + (label === 'Home' ? 'At home' : 'Away') + ': ' + (split.played || 0) + ' GP · ' + (split.wins || 0) + 'W ' + (split.draws || 0) + 'D ' + (split.losses || 0) + 'L · ' + (split.goalsFor || 0) + ' GF ' + (split.goalsAgainst || 0) + ' GA'
+    + '  </div>'
+    + '  <div style="font-size:10px;color:var(--text-3);margin-top:2px">Last ' + (f.recentForm || []).length + ': ' + formStr + '</div>'
+    + '</div>';
+}
+
+function renderApiFootballForm(label, f) {
+  const formStr = (f.recentForm || []).map(r => {
+    const c = r === 'W' ? 'var(--green)' : r === 'L' ? 'var(--red)' : 'var(--text-3)';
+    return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:' + c + ';color:white;border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">' + r + '</span>';
+  }).join('');
+  const split = label === 'Home' ? f.homeSplit : f.awaySplit;
+  return ''
+    + '<div style="margin-bottom:6px">'
+    + '  <div style="font-size:10px;font-weight:700;color:var(--purple);margin-bottom:2px">' + label + ' · ' + esc(f.teamName) + ' <span style="font-weight:500;color:var(--text-3)">· API-Football · ' + esc(f.league) + ' (' + esc(f.country) + ')</span></div>'
+    + '  <div style="font-size:10px;color:var(--text-3)">'
+    + '    Season ' + f.season + ': ' + f.played + ' GP · ' + f.wins + 'W ' + f.draws + 'D ' + f.losses + 'L · ' + f.goalsFor + ' GF ' + f.goalsAgainst + ' GA · avg ' + (f.played > 0 ? (f.goalsFor / f.played).toFixed(2) : '–') + '–' + (f.played > 0 ? (f.goalsAgainst / f.played).toFixed(2) : '–')
+    + '  </div>'
+    + '  <div style="font-size:10px;color:var(--text-3)">'
+    + '    ' + (label === 'Home' ? 'At home' : 'Away') + ': ' + (split.played || 0) + ' GP · ' + (split.wins || 0) + 'W ' + (split.draws || 0) + 'D ' + (split.losses || 0) + 'L · avg goals ' + (label === 'Home' ? f.avgGoalsForHome.toFixed(2) + ' for / ' + f.avgGoalsAgainstHome.toFixed(2) + ' against' : f.avgGoalsForAway.toFixed(2) + ' for / ' + f.avgGoalsAgainstAway.toFixed(2) + ' against')
+    + '  </div>'
+    + (formStr ? '  <div style="font-size:10px;color:var(--text-3);margin-top:2px">Recent: ' + formStr + '</div>' : '')
+    + '</div>';
+}
+
+function renderH2HBlock(h, home, away) {
+  if (!h.played) {
+    return '<div style="font-size:10px;color:var(--text-3);margin-bottom:6px">H2H: no meetings in current-season data</div>';
+  }
+  const recent = (h.recent || []).map(m => esc(m.home) + ' ' + m.homeGoals + '-' + m.awayGoals + ' ' + esc(m.away)).join('<br>');
+  return ''
+    + '<div style="margin-bottom:6px">'
+    + '  <div style="font-size:10px;font-weight:700;color:var(--text-3);margin-bottom:2px">Head-to-head</div>'
+    + '  <div style="font-size:10px;color:var(--text-3)">'
+    + '    ' + h.played + ' meetings · ' + h.homeWins + ' for ' + esc(home) + ' · ' + h.draws + ' draws · ' + h.awayWins + ' for ' + esc(away) + ' · ' + h.avgGoals.toFixed(2) + ' avg goals'
+    + '  </div>'
+    + (recent ? '  <div style="font-size:10px;color:var(--text-3);margin-top:2px;line-height:1.5">' + recent + '</div>' : '')
+    + '</div>';
+}
+
+// ===== SRL Predictor renderer =====
+function renderSrl(fixtures, calibration) {
+  const preds = (fixtures && fixtures.predictions) || [];
+  const stats = (fixtures && fixtures.historyStats) || {};
+  const cal = calibration || {};
+  const verdict = cal.verdict || 'No calibration data yet.';
+  const global = cal.global || {};
+
+  const verdictColor = global.modelBeatsBookieTrue ? 'var(--green)'
+                     : (global.n || 0) < 30 ? 'var(--amber)'
+                     : 'var(--red)';
+
+  let html = '';
+
+  // Honesty banner — always shown.
+  html += '<div class="card" style="padding:12px;margin-bottom:10px;border-color:' + verdictColor + ';border-left-width:3px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:start;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
+    + '  <div style="font-size:13px;font-weight:700">SRL Predictor — calibration</div>'
+    + '  <div style="font-size:10px;color:var(--text-3)">' + (stats.snapshots || 0) + ' snaps · ' + (stats.settled || 0) + ' settled</div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:' + verdictColor + ';line-height:1.4;font-weight:600">' + esc(verdict) + '</div>'
+    + '<div style="font-size:10px;color:var(--text-3);margin-top:6px;line-height:1.45">'
+    + '  <b>What "predictor" means here:</b> the bookmaker IS the simulation engine. Beating their <i>true probability</i> '
+    + '(engine output) is the only honest edge — beating their <i>implied probability</i> (1/odds) just means you\'re '
+    + 'paying margin. We show both so the gap stays visible. SRL margins are heavy (typically 8-15%); without a real '
+    + 'edge against the engine you are -EV by exactly that margin.'
+    + '</div>';
+
+  if (global.modelBrier !== null && global.bookieTrueBrier !== null) {
+    html += '<div style="display:flex;gap:10px;margin-top:8px;font-size:10px;flex-wrap:wrap">'
+      + '<span style="color:var(--text-3)">Model Brier <b style="color:var(--text-1)">' + global.modelBrier.toFixed(4) + '</b></span>'
+      + '<span style="color:var(--text-3)">Engine Brier <b style="color:var(--text-1)">' + global.bookieTrueBrier.toFixed(4) + '</b></span>'
+      + (global.bookieImpliedBrier !== null ? '<span style="color:var(--text-3)">Implied Brier <b style="color:var(--text-1)">' + global.bookieImpliedBrier.toFixed(4) + '</b></span>' : '')
+      + (global.avgMargin1x2 !== null ? '<span style="color:var(--text-3)">Avg margin <b style="color:var(--amber)">' + global.avgMargin1x2.toFixed(1) + '%</b></span>' : '')
+      + '</div>';
+  }
+  html += '</div>';
+
+  if (!preds.length) {
+    html += '<div class="empty" style="padding:20px">No SRL fixtures right now. SRL leagues rotate by time-of-day on Sportybet; check back in a few minutes.</div>';
+    return html;
+  }
+
+  // Group by league.
+  const byLeague = {};
+  for (const p of preds) {
+    const k = p.realLeague || p.league || 'SRL';
+    (byLeague[k] = byLeague[k] || []).push(p);
+  }
+
+  for (const lg of Object.keys(byLeague).sort()) {
+    html += '<div style="font-size:11px;font-weight:700;color:var(--text-3);margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.04em">' + esc(lg) + ' <span style="color:var(--text-3);font-weight:500;text-transform:none">(' + byLeague[lg].length + ')</span></div>';
+    for (const p of byLeague[lg]) html += renderSrlCard(p);
+  }
+
+  return html;
+}
+
+function renderSrlCard(p) {
+  const status = p.isFinished ? 'FT' : (p.matchStatus || (p.isInProgress ? 'LIVE' : 'pre'));
+  const statusColor = p.isFinished ? 'var(--text-3)' : p.isInProgress ? 'var(--red)' : 'var(--green)';
+  const sampleBadge = p.sampleConfidence < 25
+    ? '<span style="background:var(--amber-soft);color:var(--amber);padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700">THIN n=' + p.leagueSampleN + '</span>'
+    : '<span style="background:var(--green-soft);color:var(--green);padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700">n=' + p.leagueSampleN + '</span>';
+  const fallbackBadge = p.usedFallback
+    ? ' <span style="background:rgba(176,124,255,0.15);color:var(--purple);padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700">NO REAL PRIOR</span>'
+    : '';
+  const marginBadge = p.bookieMarginPct1x2 !== null
+    ? '<span style="color:' + (p.bookieMarginPct1x2 > 10 ? 'var(--red)' : p.bookieMarginPct1x2 > 6 ? 'var(--amber)' : 'var(--text-3)') + ';font-size:10px">vig ' + p.bookieMarginPct1x2.toFixed(1) + '%</span>'
+    : '';
+
+  // Highest divergence vs bookie TRUE — that's the only honest signal.
+  const ranked = (p.signals || []).slice().filter(s => s.edgeVsBookieTruePct !== null && s.modelPct >= 15)
+    .sort((a, b) => (b.edgeVsBookieTruePct || 0) - (a.edgeVsBookieTruePct || 0));
+  const topDivergence = ranked[0];
+
+  let signalHtml = '';
+  for (const s of (p.signals || [])) {
+    if (s.modelPct < 5 && (!s.edgeVsImpliedPct || s.edgeVsImpliedPct < 5)) continue;
+    const edgeImp = s.edgeVsImpliedPct;
+    const edgeTrue = s.edgeVsBookieTruePct;
+    const edgeImpStr = edgeImp !== null ? (edgeImp >= 0 ? '+' : '') + edgeImp.toFixed(1) + '%' : '–';
+    const edgeTrueStr = edgeTrue !== null ? (edgeTrue >= 0 ? '+' : '') + edgeTrue.toFixed(1) + '%' : '–';
+    const edgeImpColor = edgeImp === null ? 'var(--text-3)' : edgeImp > 3 ? 'var(--green)' : edgeImp < -3 ? 'var(--red)' : 'var(--text-3)';
+    const edgeTrueColor = edgeTrue === null ? 'var(--text-3)' : edgeTrue > 3 ? 'var(--green)' : edgeTrue < -3 ? 'var(--red)' : 'var(--text-3)';
+    signalHtml += '<tr>'
+      + '<td style="padding:3px 6px;font-size:11px">' + esc(s.pick) + '</td>'
+      + '<td style="padding:3px 6px;font-size:11px;text-align:right">' + s.modelPct.toFixed(1) + '%</td>'
+      + '<td style="padding:3px 6px;font-size:11px;text-align:right;color:var(--text-3)">' + (s.bookieTruePct !== null ? s.bookieTruePct.toFixed(1) + '%' : '–') + '</td>'
+      + '<td style="padding:3px 6px;font-size:11px;text-align:right;color:var(--text-3)">' + (s.impliedPct !== null ? s.impliedPct.toFixed(1) + '%' : '–') + '</td>'
+      + '<td style="padding:3px 6px;font-size:11px;text-align:right;color:' + edgeTrueColor + ';font-weight:600">' + edgeTrueStr + '</td>'
+      + '<td style="padding:3px 6px;font-size:11px;text-align:right;color:' + edgeImpColor + '">' + edgeImpStr + '</td>'
+      + '<td style="padding:3px 6px;font-size:11px;text-align:right">' + (s.odds ? s.odds.toFixed(2) : '–') + '</td>'
+      + '</tr>';
+  }
+
+  return '<div class="card" style="margin-bottom:8px;padding:10px 12px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:start;gap:8px;margin-bottom:4px;flex-wrap:wrap">'
+    + '  <div style="font-size:13px;font-weight:700">' + esc(p.homeReal) + ' <span style="color:var(--text-3);font-weight:500">vs</span> ' + esc(p.awayReal) + '</div>'
+    + '  <div style="display:flex;gap:6px;align-items:center">'
+    + '    <span style="color:' + statusColor + ';font-size:10px;font-weight:700">' + esc(status) + (p.setScore ? ' ' + esc(p.setScore) : '') + '</span>'
+    + '  </div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">'
+    + '  ' + sampleBadge + fallbackBadge
+    + '  ' + marginBadge
+    + (p.bookieBrier1x2 !== null ? ' <span style="color:var(--text-3);font-size:10px">engine Brier ' + p.bookieBrier1x2.toFixed(3) + '</span>' : '')
+    + '</div>'
+    + (topDivergence && topDivergence.edgeVsBookieTruePct > 5
+        ? '<div style="font-size:10px;color:var(--green);margin-bottom:6px">⚑ Largest divergence vs engine: <b>' + esc(topDivergence.pick) + '</b> (model ' + topDivergence.modelPct.toFixed(1) + '% vs engine ' + (topDivergence.bookieTruePct || 0).toFixed(1) + '%)</div>'
+        : '')
+    + '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'
+    + '<thead><tr style="color:var(--text-3);font-size:9px;text-align:left;border-bottom:1px solid var(--border)">'
+    + '<th style="padding:3px 6px;text-align:left">Pick</th>'
+    + '<th style="padding:3px 6px;text-align:right">Model</th>'
+    + '<th style="padding:3px 6px;text-align:right">Engine</th>'
+    + '<th style="padding:3px 6px;text-align:right">Implied</th>'
+    + '<th style="padding:3px 6px;text-align:right">vs Engine</th>'
+    + '<th style="padding:3px 6px;text-align:right">vs Implied</th>'
+    + '<th style="padding:3px 6px;text-align:right">Odds</th>'
+    + '</tr></thead>'
+    + '<tbody>' + signalHtml + '</tbody></table></div>'
+    + '</div>';
+}
+
 function renderArb5(data) {
   const cands = (data && data.candidates) || [];
   const bankroll = getBankroll();
