@@ -62,6 +62,13 @@ export interface FlashscoreTeamForm {
   avgGoalsAgainstHome: number;
   avgGoalsForAway: number;
   avgGoalsAgainstAway: number;
+  /** Consecutive home matches without a loss (W or D), counted from most
+   *  recent backward. ≥5 triggers the Home Fortress modifier downstream. */
+  homeUnbeatenStreak: number;
+  /** Signed recent momentum: +N = N consecutive wins (any venue), -N = N
+   *  consecutive losses. 0 means streak broken or mixed. Drives the
+   *  Form Momentum (Importance Index) modifier. */
+  momentumStreak: number;
 }
 
 export interface FlashscoreLookup {
@@ -400,6 +407,29 @@ function buildForm(teamName: string, entry: TeamIndexEntry): FlashscoreTeamForm 
   recents.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const recentForm = recents.slice(0, 5).map(r => r.result);
 
+  // Home Fortress: consecutive HOME matches without a loss, from most
+  // recent backward. Scan entry.matches sorted desc.
+  const sortedDesc = [...entry.matches].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  let homeUnbeatenStreak = 0;
+  for (const m of sortedDesc) {
+    if (normName(m.home) !== tNorm) continue;       // only home games
+    if (m.homeGoals >= m.awayGoals) homeUnbeatenStreak++;
+    else break;
+  }
+
+  // Momentum streak: consecutive same-result (W or L) across all venues,
+  // from most recent backward. Stops at draw or opposite result.
+  let momentumStreak = 0;
+  if (recents.length > 0) {
+    const first = recents[0]!.result;
+    if (first === 'W' || first === 'L') {
+      for (const r of recents) {
+        if (r.result !== first) break;
+        momentumStreak += first === 'W' ? 1 : -1;
+      }
+    }
+  }
+
   // Dominant league = most-played for this team within the window.
   let dominantLeague = entry.matches[0]?.league ?? '';
   let bestCount = 0;
@@ -425,6 +455,8 @@ function buildForm(teamName: string, entry: TeamIndexEntry): FlashscoreTeamForm 
     avgGoalsAgainstHome: wHome.weight > 0 ? wHome.ga / wHome.weight : 0,
     avgGoalsForAway: wAway.weight > 0 ? wAway.gf / wAway.weight : 0,
     avgGoalsAgainstAway: wAway.weight > 0 ? wAway.ga / wAway.weight : 0,
+    homeUnbeatenStreak,
+    momentumStreak,
   };
 }
 
@@ -541,6 +573,34 @@ export async function lookupViaFlashscore(home: string, away: string): Promise<F
 
 function headerFromForm(f: FlashscoreTeamForm): string {
   return f.country ? `${f.country}: ${f.league}` : f.league;
+}
+
+/** For the calibration tracker — find a finished match between these two
+ *  teams in the rolling window, optionally restricted to on/after `sinceDate`.
+ *  Returns the most recent matching match, or null. */
+export async function findFinishedMatch(
+  homeQuery: string,
+  awayQuery: string,
+  sinceDate?: string,
+): Promise<{ date: string; home: string; away: string; homeGoals: number; awayGoals: number } | null> {
+  await preloadFlashscore();
+  const hEntry = findTeam(homeQuery);
+  if (!hEntry) return null;
+  const aNorm = normName(awayQuery);
+  const matches = hEntry.matches
+    .filter(m => {
+      // exact-pair check via normalized away name (either orientation acceptable
+      // since the input order might disagree with the actual venue assignment).
+      const mHome = normName(m.home);
+      const mAway = normName(m.away);
+      const pairs = (mHome === normName(homeQuery) && mAway === aNorm)
+        || (mHome === aNorm && mAway === normName(homeQuery));
+      if (!pairs) return false;
+      if (sinceDate && m.date < sinceDate) return false;
+      return true;
+    })
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return matches[0] ?? null;
 }
 
 export function getFlashscoreIndexStats(): { daysWindow: number; teamsIndexed: number; matchesIndexed: number; loadedAtIso: string | null } {

@@ -31,6 +31,7 @@ import { predictFixtures } from '../srl-predictor.js';
 import { computeCalibration } from '../srl-evaluator.js';
 import { lookupOU } from '../ou-lookup.js';
 import { predictMatchFull } from '../match-predictor.js';
+import { getCalibration as getMatchPredictCalibration } from '../predict-tracker.js';
 import { preloadEspnTeams, getEspnIndexStats } from '../espn-form.js';
 // Lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
 const liveMonitor = () => import('../live-monitor.js');
@@ -1179,6 +1180,14 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
     const result = await predictMatchFull(q.home, q.away, q.league);
     void reply.header('Cache-Control', 'public, max-age=300');
+    return result;
+  });
+
+  // GET /predictions/match-predict/calibration — recent hit-rate and the
+  //   multiplier the predictor applies to its reported confidence.
+  app.get('/match-predict/calibration', async (_request, reply) => {
+    const result = await getMatchPredictCalibration();
+    void reply.header('Cache-Control', 'public, max-age=60');
     return result;
   });
 

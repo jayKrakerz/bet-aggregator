@@ -99,6 +99,10 @@ export interface EspnTeamForm {
   avgGoalsAgainstHome: number;
   avgGoalsForAway: number;
   avgGoalsAgainstAway: number;
+  /** Consecutive home matches without a loss (W or D), most recent backward. */
+  homeUnbeatenStreak: number;
+  /** Signed recent momentum across all venues (+N wins / -N losses). */
+  momentumStreak: number;
 }
 
 export interface EspnLookup {
@@ -350,6 +354,28 @@ function buildForm(team: EspnTeamRef, events: EspnEventOutcome[]): EspnTeamForm 
   recents.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const recentForm = recents.slice(0, 5).map(r => r.result);
 
+  // Home Fortress streak: scan team's HOME events (only) in descending date.
+  const homeEventsDesc = events
+    .filter(ev => ev.homeId === team.teamId)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  let homeUnbeatenStreak = 0;
+  for (const ev of homeEventsDesc) {
+    if (ev.homeGoals >= ev.awayGoals) homeUnbeatenStreak++;
+    else break;
+  }
+
+  // Momentum streak across all venues.
+  let momentumStreak = 0;
+  if (recents.length > 0) {
+    const first = recents[0]!.result;
+    if (first === 'W' || first === 'L') {
+      for (const r of recents) {
+        if (r.result !== first) break;
+        momentumStreak += first === 'W' ? 1 : -1;
+      }
+    }
+  }
+
   const played = home.played + away.played;
   const goalsFor = home.goalsFor + away.goalsFor;
   const goalsAgainst = home.goalsAgainst + away.goalsAgainst;
@@ -372,6 +398,8 @@ function buildForm(team: EspnTeamRef, events: EspnEventOutcome[]): EspnTeamForm 
     avgGoalsAgainstHome: wHome.weight > 0 ? wHome.ga / wHome.weight : 0,
     avgGoalsForAway: wAway.weight > 0 ? wAway.gf / wAway.weight : 0,
     avgGoalsAgainstAway: wAway.weight > 0 ? wAway.ga / wAway.weight : 0,
+    homeUnbeatenStreak,
+    momentumStreak,
   };
 }
 

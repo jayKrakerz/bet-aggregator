@@ -20,6 +20,7 @@ import { logger } from '../utils/logger.js';
 import { lookupOU, type OuLookupResult } from './ou-lookup.js';
 import { predictElo, type EloPrediction } from './elo-predictor.js';
 import { getInjuryReport, hasInjurySource, type TeamInjuryReport } from './injury-fetcher.js';
+import { logPrediction, getCachedConfidenceMult } from './predict-tracker.js';
 
 // ── Tunables ────────────────────────────────────────────
 
@@ -32,6 +33,19 @@ const PER_KEY_PLAYER_DROP = 0.045;     // each key player out → -4.5% own λ
 const PER_KEY_PLAYER_GIFT = 0.020;     // each opp key out (assumed defender) → +2% your λ
 const MAX_OWN_DROP = 0.22;
 const MAX_OPP_GIFT = 0.10;
+
+// Home Fortress (port of bot-main FootStats v3.3 / fortress.py).
+// When the home side is unbeaten at home for ≥ FORTRESS_THRESHOLD games,
+// reduce their conceding λ — i.e. multiply the AWAY side's expected goals.
+const FORTRESS_THRESHOLD = 5;
+const FORTRESS_AWAY_MULT = 0.90;
+
+// Form Momentum (lean Importance Index v2). Without league standings we
+// can't do bot-main's late-season position logic, so we approximate
+// motivation via consecutive same-result streaks instead.
+const MOMENTUM_THRESHOLD = 3;          // 3+ same result triggers
+const MOMENTUM_HOT_ATTACK = 1.08;      // 3+ Ws → +8% own λ
+const MOMENTUM_COLD_ATTACK = 0.92;     // 3+ Ls → -8% own λ
 
 // Elo blend weights: when CSV-Poisson matched, trust the model more.
 const POISSON_WEIGHT_MATCHED = 0.7;
@@ -65,6 +79,13 @@ export interface LineupImpact {
   awayLambdaMult: number;   // multiplier applied to away λ
 }
 
+/** Contextual modifiers beyond injuries — fortress + form momentum. */
+export interface ContextImpact {
+  fortress: { active: boolean; homeUnbeatenStreak: number; awayLambdaMult: number };
+  homeMomentum: { streak: number; type: 'hot' | 'cold' | 'neutral'; lambdaMult: number };
+  awayMomentum: { streak: number; type: 'hot' | 'cold' | 'neutral'; lambdaMult: number };
+}
+
 export interface BlendedVerdict {
   pick: 'Home' | 'Draw' | 'Away';
   homePct: number;
@@ -72,6 +93,10 @@ export interface BlendedVerdict {
   awayPct: number;
   /** 0–100. Higher when Poisson and Elo agree on the same outcome. */
   confidence: number;
+  /** 0–100, after calibration haircut from recent prediction hit-rate. */
+  calibratedConfidence: number;
+  /** Multiplier applied to confidence from prediction tracker (0.7–1.2). */
+  calibrationMult: number;
   poissonWeight: number;
   eloWeight: number;
 }
@@ -104,6 +129,9 @@ export interface MatchPrediction {
     away: TeamInjuryReport | null;
     impact: LineupImpact;
   };
+
+  // Contextual modifiers (Fortress + Momentum).
+  context: ContextImpact;
 
   // Elo + blended verdict.
   elo: EloPrediction | null;
@@ -257,6 +285,7 @@ function blend(
   poisson: { homePct: number; drawPct: number; awayPct: number },
   elo: EloPrediction | null,
   matched: boolean,
+  calibrationMult: number,
 ): BlendedVerdict {
   // Discount unconfident Elo (e.g. teams the rating system has seen <N times)
   // so an empty rating doesn't pull the blended verdict toward 33/33/33.
@@ -299,6 +328,7 @@ function blend(
   const sorted = [homePct, drawPct, awayPct].sort((x, y) => y - x);
   const margin = ((sorted[0] ?? 0) - (sorted[1] ?? 0)) / 100; // 0–1
   const confidence = Math.min(100, Math.round(agreement * 60 + margin * 80));
+  const calibratedConfidence = Math.min(100, Math.max(0, Math.round(confidence * calibrationMult)));
 
   return {
     pick,
@@ -306,6 +336,8 @@ function blend(
     drawPct: r1(drawPct),
     awayPct: r1(awayPct),
     confidence,
+    calibratedConfidence,
+    calibrationMult: r2(calibrationMult),
     poissonWeight: r2(effWp),
     eloWeight: r2(wE),
   };
@@ -341,7 +373,8 @@ export async function predictMatchFull(
   const baseH = base.expected.home;
   const baseA = base.expected.away;
 
-  const { adjustedH, adjustedA, impact } = applyLineupImpact(baseH, baseA, homeInj, awayInj);
+  const { adjustedH: linH, adjustedA: linA, impact } = applyLineupImpact(baseH, baseA, homeInj, awayInj);
+  const { adjustedH, adjustedA, context } = applyContextImpact(linH, linA, base);
   const matrix = buildMatrix(adjustedH, adjustedA);
 
   const adjusted1x2 = oneXtwoFromMatrix(matrix);
@@ -350,7 +383,20 @@ export async function predictMatchFull(
   const ah = asianHandicaps(matrix);
   const ht = htftMatrix(adjustedH, adjustedA);
   const cs = cleanSheets(matrix);
-  const verdict = blend(adjusted1x2, eloRes, base.matched);
+  const calibrationMult = await getCachedConfidenceMult();
+  const verdict = blend(adjusted1x2, eloRes, base.matched, calibrationMult);
+
+  // Fire-and-forget: log this prediction so the tracker can later settle and
+  // refine the calibration multiplier. Errors swallowed — never block the
+  // user-facing response on the tracker.
+  void logPrediction({
+    home: base.homeNormalized,
+    away: base.awayNormalized,
+    pick: verdict.pick,
+    confidence: verdict.confidence,
+    expHome: adjustedH,
+    expAway: adjustedA,
+  }).catch(err => logger.warn({ err }, 'predict-tracker: logPrediction failed'));
 
   return {
     base,
@@ -371,8 +417,65 @@ export async function predictMatchFull(
       away: awayInj,
       impact,
     },
+    context,
     elo: eloRes,
     verdict,
+  };
+}
+
+// ── Contextual modifiers: Fortress + Form Momentum ────
+
+/** Read homeUnbeatenStreak and momentumStreak from whichever form source
+ *  populated the lookup. Returns 0 when no form source surfaced. */
+function readContextSignals(base: OuLookupResult): {
+  homeUnbeaten: number;
+  homeMomentum: number;
+  awayMomentum: number;
+} {
+  const f = base.factors;
+  const fsH = f.flashscoreHomeForm;
+  const fsA = f.flashscoreAwayForm;
+  const espnH = f.espnHomeForm;
+  const espnA = f.espnAwayForm;
+  return {
+    homeUnbeaten: fsH?.homeUnbeatenStreak ?? espnH?.homeUnbeatenStreak ?? 0,
+    homeMomentum: fsH?.momentumStreak ?? espnH?.momentumStreak ?? 0,
+    awayMomentum: fsA?.momentumStreak ?? espnA?.momentumStreak ?? 0,
+  };
+}
+
+function applyContextImpact(
+  baseH: number,
+  baseA: number,
+  base: OuLookupResult,
+): { adjustedH: number; adjustedA: number; context: ContextImpact } {
+  const sig = readContextSignals(base);
+
+  // Fortress: ≥5 home-unbeaten games → away λ × 0.90
+  const fortressActive = sig.homeUnbeaten >= FORTRESS_THRESHOLD;
+  const fortressMult = fortressActive ? FORTRESS_AWAY_MULT : 1;
+
+  // Momentum: ≥3 same-result streak shifts that team's λ
+  const momentumMult = (streak: number): { mult: number; type: 'hot' | 'cold' | 'neutral' } => {
+    if (streak >= MOMENTUM_THRESHOLD) return { mult: MOMENTUM_HOT_ATTACK, type: 'hot' };
+    if (streak <= -MOMENTUM_THRESHOLD) return { mult: MOMENTUM_COLD_ATTACK, type: 'cold' };
+    return { mult: 1, type: 'neutral' };
+  };
+  const homeM = momentumMult(sig.homeMomentum);
+  const awayM = momentumMult(sig.awayMomentum);
+
+  return {
+    adjustedH: baseH * homeM.mult,
+    adjustedA: baseA * fortressMult * awayM.mult,
+    context: {
+      fortress: {
+        active: fortressActive,
+        homeUnbeatenStreak: sig.homeUnbeaten,
+        awayLambdaMult: r3(fortressMult),
+      },
+      homeMomentum: { streak: sig.homeMomentum, type: homeM.type, lambdaMult: r3(homeM.mult) },
+      awayMomentum: { streak: sig.awayMomentum, type: awayM.type, lambdaMult: r3(awayM.mult) },
+    },
   };
 }
 
