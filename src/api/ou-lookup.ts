@@ -28,6 +28,7 @@ import { stripSrl } from './srl-fixtures.js';
 import { computeLeaguePriors, computeTeamForm, type LeaguePrior, type TeamForm } from './srl-history.js';
 import { lookupViaApiFootball, hasApiFootballKey, getApiFootballQuota, type ApiFootballForm } from './api-football-form.js';
 import { lookupViaEspn, preloadEspnTeams, type EspnTeamForm } from './espn-form.js';
+import { lookupViaFlashscore, type FlashscoreTeamForm } from './flashscore-form.js';
 
 export interface OuLine {
   line: number;
@@ -45,7 +46,7 @@ export interface OuLookupResult {
   /** True when neither CSV-Poisson nor API-Football could resolve both teams. */
   usedFallback: boolean;
   /** Which data source produced the prediction: */
-  source: 'csv-poisson' | 'espn' | 'api-football' | 'generic';
+  source: 'csv-poisson' | 'espn' | 'api-football' | 'flashscore' | 'generic';
   reason: string | null;
   expected: { home: number; away: number; total: number };
   ou: OuLine[];
@@ -65,6 +66,9 @@ export interface OuLookupResult {
     /** Populated when source='espn'. Same fields as ApiFootballForm, different source. */
     espnHomeForm: EspnTeamForm | null;
     espnAwayForm: EspnTeamForm | null;
+    /** Populated when source='flashscore'. Derived from flashscore.mobi's 14-day rolling results. */
+    flashscoreHomeForm: FlashscoreTeamForm | null;
+    flashscoreAwayForm: FlashscoreTeamForm | null;
   };
   srl: {
     leaguePrior: LeaguePrior | null;
@@ -243,7 +247,7 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
   let expAway = GENERIC_AVG_AWAY_GOALS;
   let usedFallback = true;
   let matched = false;
-  let source: 'csv-poisson' | 'espn' | 'api-football' | 'generic' = 'generic';
+  let source: 'csv-poisson' | 'espn' | 'api-football' | 'flashscore' | 'generic' = 'generic';
   let reason: string | null = null;
   let resolvedLeague: string | null = league;
   let pre: PoissonPrediction | null = null;
@@ -251,6 +255,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
   let apiFootballAwayForm: ApiFootballForm | null = null;
   let espnHomeForm: EspnTeamForm | null = null;
   let espnAwayForm: EspnTeamForm | null = null;
+  let flashscoreHomeForm: FlashscoreTeamForm | null = null;
+  let flashscoreAwayForm: FlashscoreTeamForm | null = null;
 
   try {
     pre = await predictMatch(home, away, league || undefined);
@@ -317,11 +323,37 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
     }
   }
 
+  // Fallback 3 (free): flashscore.mobi 14-day rolling results. Catches the
+  // niche leagues none of the above cover — Chilean Primera División Women,
+  // Argentine Primera A Women, Bhutan Premier, Australian state leagues,
+  // Eastern European 2nd divisions, etc. Plain HTTP, no Cloudflare, no key.
+  // Cold cost: 15 page fetches (~3MB total) once per hour, cached for 1h.
+  if (!matched) {
+    try {
+      const fsResult = await lookupViaFlashscore(home, away);
+      if (fsResult) {
+        expHome = fsResult.expHomeGoals;
+        expAway = fsResult.expAwayGoals;
+        usedFallback = false;
+        matched = true;
+        source = 'flashscore';
+        flashscoreHomeForm = fsResult.homeForm;
+        flashscoreAwayForm = fsResult.awayForm;
+        resolvedLeague = fsResult.league;
+        if (!fsResult.sameLeague) {
+          reason = 'Teams indexed in different flashscore competitions — lambdas are best-effort across leagues, treat as approximate.';
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, 'OU lookup: flashscore.mobi fallback failed');
+    }
+  }
+
   if (!matched) {
     if (hasApiFootballKey()) {
-      reason = 'Neither local CSVs, ESPN, nor API-Football found these teams. They may be reserves, women\'s, youth, or in a league none of the three sources cover. Used a generic football prior.';
+      reason = 'Neither local CSVs, ESPN, API-Football, nor flashscore.mobi found these teams in the last 14 days. They may be very low-tier (reserves, U-teams), exhibition friendlies, or names that drifted between sources. Used a generic football prior.';
     } else {
-      reason = 'No league coverage for this matchup — used a generic football prior. Local data covers 35 leagues / 700+ teams. ESPN adds another ~20 leagues (Honduras, Bolivia, Peru, Nigeria, Ghana, Eredivisie 2, etc.) but didn\'t find these specific teams. To extend further (Egyptian, Korean, women\'s, reserves) set FOOTBALL_API_KEY env var (free signup at api-football.com).';
+      reason = 'No league coverage for this matchup — used a generic football prior. Local data covers 35 leagues / 700+ teams; ESPN adds ~20 more; flashscore.mobi covers another ~150 leagues over a 14-day rolling window. To extend further with H2H + injuries set FOOTBALL_API_KEY env var (free signup at api-football.com).';
     }
   }
 
@@ -406,6 +438,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
       apiFootballAwayForm,
       espnHomeForm,
       espnAwayForm,
+      flashscoreHomeForm,
+      flashscoreAwayForm,
     },
     srl: {
       leaguePrior: srlLeaguePrior,

@@ -30,6 +30,7 @@ import { ingestFixtures, getHistoryStats, computeLeaguePriors, getStaleOpenEvent
 import { predictFixtures } from '../srl-predictor.js';
 import { computeCalibration } from '../srl-evaluator.js';
 import { lookupOU } from '../ou-lookup.js';
+import { predictMatchFull } from '../match-predictor.js';
 import { preloadEspnTeams, getEspnIndexStats } from '../espn-form.js';
 // Lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
 const liveMonitor = () => import('../live-monitor.js');
@@ -1163,6 +1164,20 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
       return reply.status(400).send({ error: 'Team or league name too long' });
     }
     const result = await lookupOU(q.home, q.away, q.league);
+    void reply.header('Cache-Control', 'public, max-age=300');
+    return result;
+  });
+
+  // GET /predictions/match-predict?home=X&away=Y&league=Z — full match
+  //   forecast: top-10 scorelines, Asian handicap, HT/FT, clean sheets,
+  //   injury-adjusted lambdas, plus an Elo + Poisson blended verdict.
+  app.get('/match-predict', async (request, reply) => {
+    const q = request.query as { home?: string; away?: string; league?: string };
+    if (!q.home || !q.away) return reply.status(400).send({ error: 'Provide home and away team names' });
+    if (q.home.length > 80 || q.away.length > 80 || (q.league && q.league.length > 80)) {
+      return reply.status(400).send({ error: 'Team or league name too long' });
+    }
+    const result = await predictMatchFull(q.home, q.away, q.league);
     void reply.header('Cache-Control', 'public, max-age=300');
     return result;
   });

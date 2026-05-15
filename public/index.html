@@ -1329,6 +1329,20 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
     </div>
   </div>
 
+  <!-- Match Predictor -->
+  <div class="card" style="border-color:rgba(176,124,255,0.25);cursor:pointer" onclick="switchPage('predictor')">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-icon" style="background:var(--purple-soft)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700">Match Predictor</div>
+        <div style="font-size:12px;color:var(--text-3)">Two teams in → score, 1X2, AH, HT/FT, lineups, blended verdict</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+
   <!-- Live Games -->
   <div class="card" style="border-color:rgba(52,212,114,0.15);cursor:pointer" onclick="switchPage('livegames')">
     <div style="display:flex;align-items:center;gap:10px">
@@ -1635,6 +1649,54 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   </div>
 </div>
 
+<!-- ===== PAGE: MATCH PREDICTOR ===== -->
+<div class="page" id="page-predictor">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <button class="btn btn-ghost btn-sm" onclick="switchPage('more')" style="padding:6px 10px">&larr; Back</button>
+    <h2 style="font-size:18px;font-weight:800;margin:0">🔮 Match Predictor</h2>
+  </div>
+
+  <div class="card" style="padding:14px;margin-bottom:12px;border-color:rgba(176,124,255,0.25)">
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:10px;line-height:1.5">
+      Enter two teams (optionally a league hint). Returns predicted score, top-10 scorelines, 1X2, Asian handicap, HT/FT, BTTS, clean sheets, and a blended Poisson + Elo verdict — adjusted for injuries when available.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <input id="mp-home" type="text" class="input-sm" placeholder="Home team (e.g. Arsenal)" style="flex:1 1 160px;min-width:0">
+      <input id="mp-away" type="text" class="input-sm" placeholder="Away team (e.g. Chelsea)" style="flex:1 1 160px;min-width:0">
+    </div>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input id="mp-league" type="text" class="input-sm" placeholder="League hint (optional, e.g. La Liga)" style="flex:2;min-width:0">
+      <button id="mp-go" class="btn btn-green btn-sm" style="flex-shrink:0;min-width:90px;font-weight:700">Predict</button>
+    </div>
+  </div>
+
+  <div id="mp-result"></div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px">
+    <div style="font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px">
+      <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);animation:lgPulse 1.4s ease-in-out infinite"></span>
+      Live SportyBet · Football
+    </div>
+    <button id="mp-live-refresh" class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:11px">Refresh</button>
+  </div>
+  <div id="mp-live"><div class="empty" style="padding:14px;font-size:12px">Loading live games…</div></div>
+</div>
+
+<style>
+@keyframes lgPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
+.mp-live-card { background: var(--surface-2); border:1px solid var(--border); border-radius: var(--r-xs); padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: border-color .15s, background .15s; }
+.mp-live-card:hover { border-color: var(--purple); background: rgba(176,124,255,0.06); }
+.mp-live-row { display:flex; align-items:center; gap:10px; }
+.mp-live-min { flex-shrink:0; min-width:42px; text-align:center; font-family:'SF Mono',monospace; font-size:11px; font-weight:800; color: var(--green); }
+.mp-live-teams { flex:1; min-width:0; font-size:13px; font-weight:700; line-height:1.3; overflow:hidden; }
+.mp-live-teams .away { color: var(--text-2); font-weight:600 }
+.mp-live-score { flex-shrink:0; font-family:'SF Mono',monospace; font-size:16px; font-weight:800; color: var(--text-1); padding: 0 8px; border-left:1px solid var(--border); border-right:1px solid var(--border) }
+.mp-live-odds { display:flex; gap:4px; flex-shrink:0 }
+.mp-live-odd { font-family:'SF Mono',monospace; font-size:10px; font-weight:700; padding:3px 6px; border-radius:3px; background: var(--surface-1); color: var(--text-2); min-width:34px; text-align:center }
+.mp-live-odd b { display:block; color: var(--text-3); font-weight:600; font-size:8px; letter-spacing:.5px }
+.mp-live-meta { font-size:10px; color: var(--text-3); margin-top:4px; padding-left:52px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+</style>
+
 </main>
 
 <!-- BOTTOM NAV — 4 tabs -->
@@ -1855,7 +1917,7 @@ function switchPage(name) {
   if (page) page.classList.add('active');
 
   // Highlight nav for main 4 tabs; sub-pages (generate, tools, history, arb) highlight "more"
-  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', live:'more', livegames:'more', promos:'more', sharp:'more' };
+  const navMap = { today:'today', codes:'codes', games:'games', more:'more', generate:'more', tools:'more', history:'more', arb:'more', live:'more', livegames:'more', promos:'more', sharp:'more', predictor:'more' };
   const navTarget = navMap[name] || name;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === navTarget));
   document.querySelectorAll('#desktop-tabs .chip').forEach(b => {
@@ -1872,6 +1934,7 @@ function switchPage(name) {
   if (name === 'livegames' && !lgLoaded) loadLiveGames();
   if (name === 'promos' && !promoLoaded) loadPromoEdges();
   if (name === 'sharp') loadSharp(sharpTab);
+  if (name === 'predictor') bindPredictorForm();
   if (name === 'more') {
     loadScraperHealth();
     startScraperHealthPoll();
@@ -7182,6 +7245,8 @@ function renderOuResult(d) {
     sourceBadge = '<span style="background:rgba(52,212,114,0.15);color:var(--green);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700" title="From ESPN public API (free)">ESPN · ' + esc(d.league || '') + '</span>';
   } else if (d.source === 'api-football') {
     sourceBadge = '<span style="background:rgba(176,124,255,0.15);color:var(--purple);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700" title="From API-Football">API-FOOTBALL · ' + esc(d.league || '') + '</span>';
+  } else if (d.source === 'flashscore') {
+    sourceBadge = '<span style="background:rgba(244,176,76,0.18);color:var(--amber);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700" title="Derived from flashscore.mobi 14-day rolling results — covers niche/women’s/youth leagues">FLASHSCORE · ' + esc(d.league || '') + '</span>';
   } else {
     sourceBadge = '<span style="background:var(--green-soft);color:var(--green);padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700">' + esc(d.league || '') + '</span>';
   }
@@ -7221,6 +7286,8 @@ function renderOuResult(d) {
   if (d.factors && d.factors.awayForm) html += renderFormBlock('Away', esc(d.awayNormalized), d.factors.awayForm, 'away');
   if (d.factors && d.factors.apiFootballHomeForm) html += renderApiFootballForm('Home', d.factors.apiFootballHomeForm);
   if (d.factors && d.factors.apiFootballAwayForm) html += renderApiFootballForm('Away', d.factors.apiFootballAwayForm);
+  if (d.factors && d.factors.flashscoreHomeForm) html += renderFlashscoreForm('Home', d.factors.flashscoreHomeForm);
+  if (d.factors && d.factors.flashscoreAwayForm) html += renderFlashscoreForm('Away', d.factors.flashscoreAwayForm);
   if (d.factors && d.factors.h2h) html += renderH2HBlock(d.factors.h2h, d.homeNormalized, d.awayNormalized);
   if (d.factors && d.factors.leagueAverages) {
     const la = d.factors.leagueAverages;
@@ -7288,6 +7355,25 @@ function renderApiFootballForm(label, f) {
     + '  <div style="font-size:10px;font-weight:700;color:var(--purple);margin-bottom:2px">' + label + ' · ' + esc(f.teamName) + ' <span style="font-weight:500;color:var(--text-3)">· API-Football · ' + esc(f.league) + ' (' + esc(f.country) + ')</span></div>'
     + '  <div style="font-size:10px;color:var(--text-3)">'
     + '    Season ' + f.season + ': ' + f.played + ' GP · ' + f.wins + 'W ' + f.draws + 'D ' + f.losses + 'L · ' + f.goalsFor + ' GF ' + f.goalsAgainst + ' GA · avg ' + (f.played > 0 ? (f.goalsFor / f.played).toFixed(2) : '–') + '–' + (f.played > 0 ? (f.goalsAgainst / f.played).toFixed(2) : '–')
+    + '  </div>'
+    + '  <div style="font-size:10px;color:var(--text-3)">'
+    + '    ' + (label === 'Home' ? 'At home' : 'Away') + ': ' + (split.played || 0) + ' GP · ' + (split.wins || 0) + 'W ' + (split.draws || 0) + 'D ' + (split.losses || 0) + 'L · avg goals ' + (label === 'Home' ? f.avgGoalsForHome.toFixed(2) + ' for / ' + f.avgGoalsAgainstHome.toFixed(2) + ' against' : f.avgGoalsForAway.toFixed(2) + ' for / ' + f.avgGoalsAgainstAway.toFixed(2) + ' against')
+    + '  </div>'
+    + (formStr ? '  <div style="font-size:10px;color:var(--text-3);margin-top:2px">Recent: ' + formStr + '</div>' : '')
+    + '</div>';
+}
+
+function renderFlashscoreForm(label, f) {
+  const formStr = (f.recentForm || []).map(r => {
+    const c = r === 'W' ? 'var(--green)' : r === 'L' ? 'var(--red)' : 'var(--text-3)';
+    return '<span style="display:inline-block;width:14px;height:14px;line-height:14px;text-align:center;background:' + c + ';color:white;border-radius:3px;font-size:9px;font-weight:700;margin-right:2px">' + r + '</span>';
+  }).join('');
+  const split = label === 'Home' ? f.homeSplit : f.awaySplit;
+  return ''
+    + '<div style="margin-bottom:6px">'
+    + '  <div style="font-size:10px;font-weight:700;color:var(--amber);margin-bottom:2px">' + label + ' · ' + esc(f.teamName) + ' <span style="font-weight:500;color:var(--text-3)">· flashscore.mobi · ' + esc(f.league || '') + (f.country ? ' (' + esc(f.country) + ')' : '') + '</span></div>'
+    + '  <div style="font-size:10px;color:var(--text-3)">'
+    + '    Last 14d: ' + f.played + ' GP · ' + f.wins + 'W ' + f.draws + 'D ' + f.losses + 'L · ' + f.goalsFor + ' GF ' + f.goalsAgainst + ' GA · avg ' + (f.played > 0 ? (f.goalsFor / f.played).toFixed(2) : '–') + '–' + (f.played > 0 ? (f.goalsAgainst / f.played).toFixed(2) : '–')
     + '  </div>'
     + '  <div style="font-size:10px;color:var(--text-3)">'
     + '    ' + (label === 'Home' ? 'At home' : 'Away') + ': ' + (split.played || 0) + ' GP · ' + (split.wins || 0) + 'W ' + (split.draws || 0) + 'D ' + (split.losses || 0) + 'L · avg goals ' + (label === 'Home' ? f.avgGoalsForHome.toFixed(2) + ' for / ' + f.avgGoalsAgainstHome.toFixed(2) + ' against' : f.avgGoalsForAway.toFixed(2) + ' for / ' + f.avgGoalsAgainstAway.toFixed(2) + ' against')
@@ -8321,6 +8407,297 @@ document.getElementById('lg-custom-go').onclick = () => {
   // Refresh live signals every 2 min (they change fast during matches)
   setInterval(fetchLiveSignals, 2 * 60 * 1000);
 })();
+
+// ============================================================
+// MATCH PREDICTOR — full match forecast UI.
+// ============================================================
+
+let _mpBound = false;
+
+function bindPredictorForm() {
+  if (_mpBound) return;
+  const goBtn = document.getElementById('mp-go');
+  if (!goBtn) return;
+  const home = document.getElementById('mp-home');
+  const away = document.getElementById('mp-away');
+  const league = document.getElementById('mp-league');
+  goBtn.onclick = runPredictor;
+  for (const el of [home, away, league]) {
+    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') runPredictor(); });
+  }
+  const refreshBtn = document.getElementById('mp-live-refresh');
+  if (refreshBtn) refreshBtn.onclick = () => loadPredictorLive(true);
+  _mpBound = true;
+  loadPredictorLive(false);
+  if (!_mpLiveTimer) {
+    _mpLiveTimer = setInterval(() => {
+      if (currentPage === 'predictor') loadPredictorLive(true);
+    }, 60000);
+  }
+}
+
+let _mpLiveTimer = null;
+let _mpLiveData = [];
+
+async function loadPredictorLive(forceRefresh) {
+  const out = document.getElementById('mp-live');
+  if (!out) return;
+  if (!forceRefresh && _mpLiveData.length) { renderPredictorLive(); return; }
+  if (!_mpLiveData.length) {
+    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px"><div class="spinner" style="width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 6px"></div>Loading live football…</div>';
+  }
+  try {
+    const res = await fetch('/predictions/live-games?sport=Football' + (forceRefresh ? '&refresh=1' : ''));
+    if (!res.ok) throw new Error('http ' + res.status);
+    const json = await res.json();
+    _mpLiveData = json.games || [];
+    renderPredictorLive();
+  } catch (e) {
+    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px;color:var(--red)">Failed to load live games. Tap Refresh to retry.</div>';
+  }
+}
+
+function renderPredictorLive() {
+  const out = document.getElementById('mp-live');
+  if (!out) return;
+  const games = _mpLiveData;
+  if (!games.length) {
+    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px">No live football games right now.</div>';
+    return;
+  }
+  const groups = new Map();
+  for (const g of games) {
+    const key = (g.country || '') + ' · ' + (g.league || '');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(g);
+  }
+  let html = '';
+  for (const [league, evs] of groups) {
+    html += '<div style="font-size:10px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin:10px 0 6px;padding:0 2px">' + esc(league) + ' · <span style="opacity:.7">' + evs.length + '</span></div>';
+    for (const g of evs) {
+      const scores = (g.score || '0:0').split(':');
+      const minute = g.minute || '';
+      const status = g.matchStatus || 'Live';
+      const minLabel = minute ? minute + '\'' : status;
+      const o = g.odds || {};
+      const oddCell = (label, val) => '<span class="mp-live-odd"><b>' + label + '</b>' + (val && val > 1 ? val.toFixed(2) : '–') + '</span>';
+      html += '<div class="mp-live-card" onclick="fillPredictorFromLive(' + JSON.stringify(g.eventId).replace(/"/g, '&quot;') + ')">'
+        + '<div class="mp-live-row">'
+        + '<div class="mp-live-min">' + esc(minLabel) + '</div>'
+        + '<div class="mp-live-teams"><div class="home">' + esc(g.homeTeamName) + '</div><div class="away">' + esc(g.awayTeamName) + '</div></div>'
+        + '<div class="mp-live-score">' + esc(scores[0] || '0') + '<br>' + esc(scores[1] || '0') + '</div>'
+        + '<div class="mp-live-odds">' + oddCell('1', o.home) + oddCell('X', o.draw) + oddCell('2', o.away) + '</div>'
+        + '</div>'
+        + '<div class="mp-live-meta">Tap to load into predictor · O2.5 ' + (o.over25 ? o.over25.toFixed(2) : '–') + ' / U2.5 ' + (o.under25 ? o.under25.toFixed(2) : '–') + ' · BTTS ' + (o.bttsYes ? o.bttsYes.toFixed(2) : '–') + ' / ' + (o.bttsNo ? o.bttsNo.toFixed(2) : '–') + '</div>'
+        + '</div>';
+    }
+  }
+  html += '<div style="text-align:center;padding:6px;font-size:10px;color:var(--text-3)">' + games.length + ' live · auto-refresh every 60s</div>';
+  out.innerHTML = html;
+}
+
+function fillPredictorFromLive(eventId) {
+  const g = _mpLiveData.find(x => x.eventId === eventId);
+  if (!g) return;
+  document.getElementById('mp-home').value = g.homeTeamName;
+  document.getElementById('mp-away').value = g.awayTeamName;
+  document.getElementById('mp-league').value = g.league || '';
+  document.getElementById('mp-home').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  runPredictor();
+}
+
+async function runPredictor() {
+  const home = (document.getElementById('mp-home').value || '').trim();
+  const away = (document.getElementById('mp-away').value || '').trim();
+  const league = (document.getElementById('mp-league').value || '').trim();
+  const out = document.getElementById('mp-result');
+  if (!home || !away) {
+    out.innerHTML = '<div class="card" style="padding:14px;color:var(--red);font-size:12px">Enter both teams.</div>';
+    return;
+  }
+  out.innerHTML = '<div class="card" style="padding:20px;text-align:center"><div class="spinner" style="width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 8px"></div><div style="font-size:12px;color:var(--text-3)">Computing… (Poisson + Elo + injuries)</div></div>';
+  try {
+    const url = '/predictions/match-predict?home=' + encodeURIComponent(home) + '&away=' + encodeURIComponent(away) + (league ? '&league=' + encodeURIComponent(league) : '');
+    const data = await api(url);
+    out.innerHTML = renderMatchPrediction(data);
+  } catch (err) {
+    out.innerHTML = '<div class="card" style="padding:14px;color:var(--red);font-size:12px">Prediction failed: ' + esc(err && err.message || 'unknown') + '</div>';
+  }
+}
+
+function renderMatchPrediction(d) {
+  if (!d) return '<div class="card" style="padding:14px;color:var(--red)">No response.</div>';
+  const b = d.base;
+  const v = d.verdict;
+  const adj = d.adjusted;
+  const adj1x2 = d.adjusted1x2;
+
+  // Source badge
+  let sourceBadge;
+  if (b.usedFallback) sourceBadge = '<span style="background:var(--amber-soft);color:var(--amber);padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">GENERIC PRIOR</span>';
+  else if (b.source === 'espn') sourceBadge = '<span style="background:rgba(52,212,114,0.15);color:var(--green);padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">ESPN · ' + esc(b.league || '') + '</span>';
+  else if (b.source === 'api-football') sourceBadge = '<span style="background:rgba(176,124,255,0.15);color:var(--purple);padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">API-FOOTBALL · ' + esc(b.league || '') + '</span>';
+  else if (b.source === 'flashscore') sourceBadge = '<span style="background:rgba(244,176,76,0.18);color:var(--amber);padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700" title="flashscore.mobi 14-day rolling form — niche/women’s/youth coverage">FLASHSCORE · ' + esc(b.league || '') + '</span>';
+  else sourceBadge = '<span style="background:var(--green-soft);color:var(--green);padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700">' + esc(b.league || 'csv-poisson') + '</span>';
+
+  // Verdict pick colour
+  const pickColor = v.pick === 'Home' ? 'var(--green)' : v.pick === 'Away' ? 'var(--blue)' : 'var(--amber)';
+  const confColor = v.confidence >= 70 ? 'var(--green)' : v.confidence >= 50 ? 'var(--amber)' : 'var(--red)';
+
+  // Top scores list
+  const topScoresHtml = (d.topScores || []).map((s, i) => {
+    const isFirst = i === 0;
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border);' + (isFirst ? 'background:var(--green-soft)' : '') + '">'
+      + '<div style="font-weight:' + (isFirst ? '800' : '600') + ';font-family:\'SF Mono\',monospace;font-size:' + (isFirst ? '15px' : '13px') + ';color:' + (isFirst ? 'var(--green)' : 'var(--text-1)') + '">' + s.home + ' – ' + s.away + '</div>'
+      + '<div style="font-size:12px;color:var(--text-2);font-weight:700">' + s.prob.toFixed(1) + '%</div>'
+      + '</div>';
+  }).join('');
+
+  // 1X2 rows (Poisson vs Elo vs Blended)
+  const elo = d.elo;
+  const cmpRow = (label, hPct, dPct, aPct, color) => {
+    const fmt = (x) => (x == null) ? '–' : x.toFixed(1) + '%';
+    return '<tr><td style="padding:6px 8px;font-size:11px;color:' + color + ';font-weight:700">' + label + '</td>'
+      + '<td style="padding:6px 8px;text-align:right;font-size:11px">' + fmt(hPct) + '</td>'
+      + '<td style="padding:6px 8px;text-align:right;font-size:11px">' + fmt(dPct) + '</td>'
+      + '<td style="padding:6px 8px;text-align:right;font-size:11px">' + fmt(aPct) + '</td></tr>';
+  };
+
+  // Asian handicap table
+  const ahRows = (d.asianHandicap || []).map(l => {
+    const hC = l.homePct >= 60 ? 'var(--green)' : l.homePct <= 40 ? 'var(--red)' : 'var(--text-1)';
+    const aC = l.awayPct >= 60 ? 'var(--green)' : l.awayPct <= 40 ? 'var(--red)' : 'var(--text-1)';
+    return '<tr><td style="padding:4px 8px;font-weight:700;font-family:\'SF Mono\',monospace">' + (l.line > 0 ? '+' : '') + l.line.toFixed(1) + '</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:' + hC + ';font-weight:700">' + l.homePct.toFixed(1) + '%</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:' + aC + ';font-weight:700">' + l.awayPct.toFixed(1) + '%</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:var(--text-3);font-size:10px">' + l.pushPct.toFixed(1) + '%</td></tr>';
+  }).join('');
+
+  // O/U table (from base)
+  const ouRows = (b.ou || []).map(l => {
+    const overC = l.overPct >= 60 ? 'var(--green)' : l.overPct <= 40 ? 'var(--red)' : 'var(--text-1)';
+    const underC = l.underPct >= 60 ? 'var(--green)' : l.underPct <= 40 ? 'var(--red)' : 'var(--text-1)';
+    return '<tr><td style="padding:4px 8px;font-weight:700">O/U ' + l.line.toFixed(1) + '</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:' + overC + ';font-weight:700">' + l.overPct.toFixed(1) + '%</td>'
+      + '<td style="padding:4px 8px;text-align:right;color:' + underC + ';font-weight:700">' + l.underPct.toFixed(1) + '%</td></tr>';
+  }).join('');
+
+  // HT/FT 3x3 grid
+  const lookup = {};
+  for (const c of (d.htft || [])) lookup[c.ht + c.ft] = c.pct;
+  const htCells = ['H','D','A'].map(ft => {
+    const cells = ['H','D','A'].map(ht => {
+      const p = lookup[ht + ft] || 0;
+      const bgIntensity = Math.min(p / 25, 1);
+      const bg = 'rgba(176,124,255,' + (0.1 + bgIntensity * 0.4) + ')';
+      return '<td style="padding:6px;text-align:center;font-size:11px;background:' + bg + ';border:1px solid var(--border)">' + p.toFixed(1) + '%</td>';
+    }).join('');
+    return '<tr><th style="padding:6px;font-size:10px;color:var(--text-3);text-align:right;background:var(--surface-2)">FT ' + ft + '</th>' + cells + '</tr>';
+  }).join('');
+  const htftTable = '<table style="width:100%;border-collapse:collapse;font-family:\'SF Mono\',monospace">'
+    + '<thead><tr><th></th><th style="padding:6px;font-size:10px;color:var(--text-3);background:var(--surface-2)">HT H</th><th style="padding:6px;font-size:10px;color:var(--text-3);background:var(--surface-2)">HT D</th><th style="padding:6px;font-size:10px;color:var(--text-3);background:var(--surface-2)">HT A</th></tr></thead>'
+    + '<tbody>' + htCells + '</tbody></table>';
+
+  // Lineups
+  let lineupsHtml = '';
+  if (d.lineups && d.lineups.available) {
+    const homeRep = d.lineups.home;
+    const awayRep = d.lineups.away;
+    const impact = d.lineups.impact;
+    const renderTeam = (label, name, rep) => {
+      if (!rep || rep.injured.length === 0) return '<div style="font-size:11px;color:var(--text-3)">' + label + ' (' + esc(name) + ') — no injury info</div>';
+      const items = rep.injured.slice(0, 8).map(p => {
+        const status = p.status === 'Suspended' ? '🟥' : '🚑';
+        const key = p.isKey ? '<span style="color:var(--red);font-weight:700">[KEY]</span> ' : '';
+        return '<li style="padding:2px 0;font-size:11px">' + status + ' ' + key + esc(p.name) + (p.position ? ' <span style="color:var(--text-3)">· ' + esc(p.position) + '</span>' : '') + (p.reason ? ' <span style="color:var(--text-3);font-style:italic">— ' + esc(p.reason) + '</span>' : '') + '</li>';
+      }).join('');
+      return '<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;margin-bottom:4px">' + label + ' · <span style="color:var(--text-2)">' + esc(name) + '</span> <span style="color:var(--text-3);font-size:10px">(' + rep.injured.length + ' out, ' + rep.keyOut + ' key · ' + esc(rep.source) + ')</span></div><ul style="margin:0;padding-left:14px">' + items + '</ul></div>';
+    };
+    const mult = impact && impact.homeLambdaMult !== 1 ? '<div style="font-size:10px;color:var(--text-3);margin-top:8px">λ adjustment: home ×' + impact.homeLambdaMult.toFixed(2) + ', away ×' + impact.awayLambdaMult.toFixed(2) + '</div>' : '';
+    lineupsHtml = '<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-3);padding:6px 0">Lineups & injuries ▾</summary><div style="padding:8px;background:var(--surface-2);border-radius:var(--r-xs)">'
+      + renderTeam('Home', b.homeNormalized, homeRep)
+      + renderTeam('Away', b.awayNormalized, awayRep)
+      + mult
+      + '</div></details>';
+  } else {
+    lineupsHtml = '<div style="font-size:10px;color:var(--text-3);margin-bottom:8px;padding:6px 0">Injury data not loaded — set FOOTBALL_API_KEY (free) or FOTMOB_XMAS env var to enable lineup adjustments.</div>';
+  }
+
+  // BTTS & clean sheets summary
+  const bttsSummary = '<span style="color:var(--text-3)">BTTS <b style="color:var(--text-1)">' + d.adjustedBtts.yesPct.toFixed(1) + '%</b> / ' + d.adjustedBtts.noPct.toFixed(1) + '%</span>';
+  const csSummary = '<span style="color:var(--text-3)">CS Home <b style="color:var(--text-1)">' + d.cleanSheet.homePct.toFixed(1) + '%</b> · CS Away <b style="color:var(--text-1)">' + d.cleanSheet.awayPct.toFixed(1) + '%</b></span>';
+
+  // Build the final HTML
+  let html = '';
+
+  // Verdict header
+  html += '<div class="card" style="padding:14px;margin-bottom:12px;border-color:rgba(176,124,255,0.3);background:linear-gradient(135deg,rgba(176,124,255,0.08),transparent)">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px">'
+    + '<div><div style="font-size:15px;font-weight:800">' + esc(b.homeNormalized) + ' <span style="color:var(--text-3);font-weight:500">vs</span> ' + esc(b.awayNormalized) + '</div>'
+    + '<div style="font-size:11px;color:var(--text-3);margin-top:2px">Predicted score · <b style="color:var(--green)">' + Math.round(adj.home) + ' – ' + Math.round(adj.away) + '</b> · λ ' + adj.home.toFixed(2) + ' – ' + adj.away.toFixed(2) + ' (total ' + adj.total.toFixed(2) + ')</div></div>'
+    + '<div style="text-align:right">' + sourceBadge + '</div>'
+    + '</div>'
+    + (b.reason ? '<div style="font-size:10px;color:var(--amber);margin-bottom:8px">⚠ ' + esc(b.reason) + '</div>' : '')
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 12px;background:var(--surface-2);border-radius:var(--r-xs)">'
+    + '  <div><div style="font-size:10px;color:var(--text-3)">Blended verdict</div><div style="font-size:18px;font-weight:800;color:' + pickColor + '">' + v.pick + ' · ' + (v.pick === 'Home' ? v.homePct.toFixed(1) : v.pick === 'Away' ? v.awayPct.toFixed(1) : v.drawPct.toFixed(1)) + '%</div></div>'
+    + '  <div style="text-align:right"><div style="font-size:10px;color:var(--text-3)">Confidence</div><div style="font-size:18px;font-weight:800;color:' + confColor + '">' + v.confidence + '/100</div></div>'
+    + '</div>'
+    + '<div style="font-size:10px;color:var(--text-3);margin-top:8px;display:flex;gap:14px;flex-wrap:wrap">' + bttsSummary + ' · ' + csSummary + '</div>'
+    + '</div>';
+
+  // 1X2 comparison table
+  html += '<div class="card" style="padding:12px;margin-bottom:10px">'
+    + '<div style="font-size:12px;font-weight:700;margin-bottom:6px">1X2 model comparison</div>'
+    + '<table style="width:100%;border-collapse:collapse"><thead><tr style="color:var(--text-3);font-size:9px;border-bottom:1px solid var(--border)">'
+    + '<th style="padding:4px 8px;text-align:left">Source</th><th style="padding:4px 8px;text-align:right">Home</th><th style="padding:4px 8px;text-align:right">Draw</th><th style="padding:4px 8px;text-align:right">Away</th></tr></thead><tbody>'
+    + cmpRow('Poisson', b.homePct, b.drawPct, b.awayPct, 'var(--green)')
+    + cmpRow('Poisson (adj)', adj1x2.homePct, adj1x2.drawPct, adj1x2.awayPct, 'var(--purple)')
+    + (elo && elo.confident ? cmpRow('Elo (n=' + elo.matchesSeen + ')', elo.homeWinPct, elo.drawPct, elo.awayWinPct, 'var(--blue)') : '<tr><td colspan="4" style="padding:4px 8px;font-size:10px;color:var(--text-3);font-style:italic">Elo: insufficient match history (need bootstrap)</td></tr>')
+    + cmpRow('Blended', v.homePct, v.drawPct, v.awayPct, 'var(--amber)')
+    + '</tbody></table></div>';
+
+  // Top scores
+  html += '<div class="card" style="padding:12px;margin-bottom:10px">'
+    + '<div style="font-size:12px;font-weight:700;margin-bottom:6px">Most likely scorelines (top 10)</div>'
+    + '<div style="border:1px solid var(--border);border-radius:var(--r-xs);overflow:hidden">' + topScoresHtml + '</div></div>';
+
+  // O/U + AH side-by-side
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+  html += '<div class="card" style="padding:12px"><div style="font-size:12px;font-weight:700;margin-bottom:6px">Over/Under</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="color:var(--text-3);font-size:9px;border-bottom:1px solid var(--border)">'
+    + '<th style="padding:4px 8px;text-align:left">Line</th><th style="padding:4px 8px;text-align:right">Over</th><th style="padding:4px 8px;text-align:right">Under</th></tr></thead>'
+    + '<tbody>' + ouRows + '</tbody></table></div>';
+  html += '<div class="card" style="padding:12px"><div style="font-size:12px;font-weight:700;margin-bottom:6px">Asian handicap (home line)</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="color:var(--text-3);font-size:9px;border-bottom:1px solid var(--border)">'
+    + '<th style="padding:4px 8px;text-align:left">Line</th><th style="padding:4px 8px;text-align:right">Home</th><th style="padding:4px 8px;text-align:right">Away</th><th style="padding:4px 8px;text-align:right">Push</th></tr></thead>'
+    + '<tbody>' + ahRows + '</tbody></table></div>';
+  html += '</div>';
+
+  // HT/FT
+  html += '<div class="card" style="padding:12px;margin-bottom:10px">'
+    + '<div style="font-size:12px;font-weight:700;margin-bottom:6px">HT / FT outcome matrix</div>'
+    + '<div style="overflow-x:auto">' + htftTable + '</div>'
+    + '<div style="font-size:9px;color:var(--text-3);margin-top:6px">Rows = full-time outcome · cols = half-time outcome. Heatmap darker = more likely.</div></div>';
+
+  // Lineups + factor breakdown
+  html += '<div class="card" style="padding:12px">' + lineupsHtml;
+
+  // Factor breakdown reused from OU result if present (form, H2H)
+  if (b.factors && (b.factors.homeForm || b.factors.awayForm || b.factors.h2h || b.factors.apiFootballHomeForm || b.factors.espnHomeForm || b.factors.flashscoreHomeForm)) {
+    html += '<details><summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-3);padding:6px 0">Form & H2H detail ▾</summary>';
+    if (b.factors.homeForm) html += renderFormBlock('Home', esc(b.homeNormalized), b.factors.homeForm, 'home');
+    if (b.factors.awayForm) html += renderFormBlock('Away', esc(b.awayNormalized), b.factors.awayForm, 'away');
+    if (b.factors.apiFootballHomeForm) html += renderApiFootballForm('Home', b.factors.apiFootballHomeForm);
+    if (b.factors.apiFootballAwayForm) html += renderApiFootballForm('Away', b.factors.apiFootballAwayForm);
+    if (b.factors.flashscoreHomeForm) html += renderFlashscoreForm('Home', b.factors.flashscoreHomeForm);
+    if (b.factors.flashscoreAwayForm) html += renderFlashscoreForm('Away', b.factors.flashscoreAwayForm);
+    if (b.factors.h2h) html += renderH2HBlock(b.factors.h2h, b.homeNormalized, b.awayNormalized);
+    html += '</details>';
+  }
+  html += '</div>';
+
+  return html;
+}
 </script>
 </body>
 </html>
