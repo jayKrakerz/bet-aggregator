@@ -300,18 +300,39 @@ function emptySplit() {
   return { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
 }
 
+// Exponential decay for ESPN season-long schedules. A 60-day-old match
+// weighs 1/e ≈ 0.37; a year-old match weighs ≈ 0.0025. The recency bias
+// is what we want — last week's form predicts next week better than
+// last September's.
+const ESPN_FORM_TAU_DAYS = 60;
+
+function decayWeight(date: string, now = Date.now()): number {
+  if (!date) return 0.5;
+  const t = Date.parse(date);
+  if (!Number.isFinite(t)) return 0.5;
+  const ageDays = Math.max(0, (now - t) / 86_400_000);
+  return Math.exp(-ageDays / ESPN_FORM_TAU_DAYS);
+}
+
 function buildForm(team: EspnTeamRef, events: EspnEventOutcome[]): EspnTeamForm {
   const home = emptySplit();
   const away = emptySplit();
+  const wHome = { gf: 0, ga: 0, weight: 0 };
+  const wAway = { gf: 0, ga: 0, weight: 0 };
   const recents: Array<{ result: 'W' | 'D' | 'L'; date: string }> = [];
+  const now = Date.now();
 
   for (const ev of events) {
+    const w = decayWeight(ev.date, now);
     if (ev.homeId === team.teamId) {
       home.played++;
       home.goalsFor += ev.homeGoals;
       home.goalsAgainst += ev.awayGoals;
       const r: 'W' | 'D' | 'L' = ev.homeGoals > ev.awayGoals ? 'W' : ev.homeGoals < ev.awayGoals ? 'L' : 'D';
       home[r === 'W' ? 'wins' : r === 'D' ? 'draws' : 'losses']++;
+      wHome.gf += ev.homeGoals * w;
+      wHome.ga += ev.awayGoals * w;
+      wHome.weight += w;
       recents.push({ result: r, date: ev.date });
     } else if (ev.awayId === team.teamId) {
       away.played++;
@@ -319,6 +340,9 @@ function buildForm(team: EspnTeamRef, events: EspnEventOutcome[]): EspnTeamForm 
       away.goalsAgainst += ev.homeGoals;
       const r: 'W' | 'D' | 'L' = ev.awayGoals > ev.homeGoals ? 'W' : ev.awayGoals < ev.homeGoals ? 'L' : 'D';
       away[r === 'W' ? 'wins' : r === 'D' ? 'draws' : 'losses']++;
+      wAway.gf += ev.awayGoals * w;
+      wAway.ga += ev.homeGoals * w;
+      wAway.weight += w;
       recents.push({ result: r, date: ev.date });
     }
   }
@@ -344,10 +368,10 @@ function buildForm(team: EspnTeamRef, events: EspnEventOutcome[]): EspnTeamForm 
     homeSplit: home,
     awaySplit: away,
     recentForm,
-    avgGoalsForHome: home.played > 0 ? home.goalsFor / home.played : 0,
-    avgGoalsAgainstHome: home.played > 0 ? home.goalsAgainst / home.played : 0,
-    avgGoalsForAway: away.played > 0 ? away.goalsFor / away.played : 0,
-    avgGoalsAgainstAway: away.played > 0 ? away.goalsAgainst / away.played : 0,
+    avgGoalsForHome: wHome.weight > 0 ? wHome.gf / wHome.weight : 0,
+    avgGoalsAgainstHome: wHome.weight > 0 ? wHome.ga / wHome.weight : 0,
+    avgGoalsForAway: wAway.weight > 0 ? wAway.gf / wAway.weight : 0,
+    avgGoalsAgainstAway: wAway.weight > 0 ? wAway.ga / wAway.weight : 0,
   };
 }
 

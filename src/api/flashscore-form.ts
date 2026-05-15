@@ -26,6 +26,12 @@ const INDEX_TTL = 60 * 60 * 1000;        // 1h
 const FETCH_TIMEOUT = 12_000;
 const GENERIC_HOME_LAMBDA = 1.55;
 const GENERIC_AWAY_LAMBDA = 1.20;
+// Time-decay weighting (xg_lambda pattern from bot-main FootStats):
+// matches in the last RECENT_DAYS count RECENT_WEIGHT× toward the goal-rate
+// average, older matches count 1×. Stops a 30-day-old result from anchoring
+// a team's lambda when their form has clearly shifted since.
+const RECENT_DAYS = 14;
+const RECENT_WEIGHT = 2.0;
 
 // ── Types ────────────────────────────────────────────────
 
@@ -340,17 +346,32 @@ function emptySplit() {
   return { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
 }
 
+/** Weight a match by how recent it is. Step function: ≤14 days = 2.0, else 1.0. */
+function matchWeight(matchDate: string, now = Date.now()): number {
+  if (!matchDate) return 1.0;
+  const t = Date.parse(matchDate);
+  if (!Number.isFinite(t)) return 1.0;
+  const ageDays = (now - t) / 86_400_000;
+  return ageDays <= RECENT_DAYS ? RECENT_WEIGHT : 1.0;
+}
+
 function buildForm(teamName: string, entry: TeamIndexEntry): FlashscoreTeamForm {
   const home = emptySplit();
   const away = emptySplit();
+  // Weighted sums used for goal-rate averages (lambda inputs). Counts above
+  // stay integer so the UI's "Last 30d: 6 GP · 9 GF" line remains honest.
+  const wHome = { gf: 0, ga: 0, weight: 0 };
+  const wAway = { gf: 0, ga: 0, weight: 0 };
   const recents: Array<{ result: 'W' | 'D' | 'L'; date: string }> = [];
   const leagueCounts = new Map<string, number>();
+  const now = Date.now();
 
   const tNorm = normName(teamName);
   for (const m of entry.matches) {
     const hNorm = normName(m.home);
     const isHome = hNorm === tNorm;
     leagueCounts.set(m.league, (leagueCounts.get(m.league) ?? 0) + 1);
+    const w = matchWeight(m.date, now);
 
     if (isHome) {
       home.played++;
@@ -358,6 +379,9 @@ function buildForm(teamName: string, entry: TeamIndexEntry): FlashscoreTeamForm 
       home.goalsAgainst += m.awayGoals;
       const r: 'W' | 'D' | 'L' = m.homeGoals > m.awayGoals ? 'W' : m.homeGoals < m.awayGoals ? 'L' : 'D';
       home[r === 'W' ? 'wins' : r === 'D' ? 'draws' : 'losses']++;
+      wHome.gf += m.homeGoals * w;
+      wHome.ga += m.awayGoals * w;
+      wHome.weight += w;
       recents.push({ result: r, date: m.date });
     } else {
       // Treat anything not exact-home-match as away.
@@ -366,6 +390,9 @@ function buildForm(teamName: string, entry: TeamIndexEntry): FlashscoreTeamForm 
       away.goalsAgainst += m.homeGoals;
       const r: 'W' | 'D' | 'L' = m.awayGoals > m.homeGoals ? 'W' : m.awayGoals < m.homeGoals ? 'L' : 'D';
       away[r === 'W' ? 'wins' : r === 'D' ? 'draws' : 'losses']++;
+      wAway.gf += m.awayGoals * w;
+      wAway.ga += m.homeGoals * w;
+      wAway.weight += w;
       recents.push({ result: r, date: m.date });
     }
   }
@@ -394,10 +421,10 @@ function buildForm(teamName: string, entry: TeamIndexEntry): FlashscoreTeamForm 
     homeSplit: home,
     awaySplit: away,
     recentForm,
-    avgGoalsForHome: home.played > 0 ? home.goalsFor / home.played : 0,
-    avgGoalsAgainstHome: home.played > 0 ? home.goalsAgainst / home.played : 0,
-    avgGoalsForAway: away.played > 0 ? away.goalsFor / away.played : 0,
-    avgGoalsAgainstAway: away.played > 0 ? away.goalsAgainst / away.played : 0,
+    avgGoalsForHome: wHome.weight > 0 ? wHome.gf / wHome.weight : 0,
+    avgGoalsAgainstHome: wHome.weight > 0 ? wHome.ga / wHome.weight : 0,
+    avgGoalsForAway: wAway.weight > 0 ? wAway.gf / wAway.weight : 0,
+    avgGoalsAgainstAway: wAway.weight > 0 ? wAway.ga / wAway.weight : 0,
   };
 }
 
