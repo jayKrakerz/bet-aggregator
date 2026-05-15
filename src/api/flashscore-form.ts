@@ -286,29 +286,54 @@ function findTeam(query: string): TeamIndexEntry | null {
   const exact = teamIndex.get(target);
   if (exact) return exact;
 
-  // Substring / token-overlap fallback. Same scoring rules as espn-form.ts.
-  const targetTokens = new Set(target.split(/\s+/).filter(t => t.length >= 3));
+  // Multi-strategy fuzzy match. South American teams often carry city
+  // suffixes ("12 de Junio de Villa Hayes" but flashscore indexes them
+  // as "12 de Junio"), so pure token-Jaccard against full strings misses.
+  const targetTokens = new Set(target.split(/\s+/).filter(t => t.length >= 3 || /^\d+$/.test(t)));
   let best: { key: string; entry: TeamIndexEntry; score: number } | null = null;
+
   for (const [key, entry] of teamIndex) {
     let score = 0;
-    if (key.includes(target) || target.includes(key)) {
+    const keyTokens = new Set(key.split(/\s+/).filter(t => t.length >= 3 || /^\d+$/.test(t)));
+
+    if (key === target) {
+      score = 100;
+    } else if (keyTokens.size >= 1 && targetTokens.size >= keyTokens.size && allIn(keyTokens, targetTokens)) {
+      // Every meaningful key token appears in the query — high confidence
+      // even when the query is much longer ("12 de junio" ⊂ "12 de junio
+      // de villa hayes"). Penalize lightly for the extra noise in query.
+      score = 78 - Math.min(targetTokens.size - keyTokens.size, 4) * 3;
+    } else if (targetTokens.size >= 1 && allIn(targetTokens, keyTokens)) {
+      // Reverse — every meaningful query token appears in the key.
+      score = 72 - Math.min(keyTokens.size - targetTokens.size, 4) * 3;
+    } else if (key.includes(target) || target.includes(key)) {
+      // Whole-string substring (handles single-token teams like "Paro").
       const shorter = Math.min(key.length, target.length);
       const longer = Math.max(key.length, target.length);
-      score = 60 * (shorter / longer);
-    } else {
-      const keyTokens = new Set(key.split(/\s+/).filter(t => t.length >= 3));
-      if (targetTokens.size === 0 || keyTokens.size === 0) continue;
+      score = 55 * (shorter / longer) + 25;
+    } else if (targetTokens.size > 0 && keyTokens.size > 0) {
       let inter = 0;
       for (const t of targetTokens) if (keyTokens.has(t)) inter++;
       if (inter === 0) continue;
       const union = targetTokens.size + keyTokens.size - inter;
       score = (inter / union) * 80;
+    } else {
+      continue;
     }
+
     // Tie-break: more matches indexed = more confident the team is real.
-    score += Math.min(entry.matches.length, 10) * 0.5;
-    if (score >= 45 && (!best || score > best.score)) best = { key, entry, score };
+    score += Math.min(entry.matches.length, 10) * 0.4;
+
+    if (score >= 50 && (!best || score > best.score)) {
+      best = { key, entry, score };
+    }
   }
   return best?.entry ?? null;
+}
+
+function allIn(needle: Set<string>, haystack: Set<string>): boolean {
+  for (const t of needle) if (!haystack.has(t)) return false;
+  return true;
 }
 
 function emptySplit() {
