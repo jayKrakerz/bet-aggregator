@@ -340,7 +340,9 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
         flashscoreHomeForm = fsResult.homeForm;
         flashscoreAwayForm = fsResult.awayForm;
         resolvedLeague = fsResult.league;
-        if (!fsResult.sameLeague) {
+        if (fsResult.partial !== 'none' && fsResult.partialReason) {
+          reason = fsResult.partialReason;
+        } else if (!fsResult.sameLeague) {
           reason = 'Teams indexed in different flashscore competitions — lambdas are best-effort across leagues, treat as approximate.';
         }
       }

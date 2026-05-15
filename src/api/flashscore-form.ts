@@ -21,9 +21,11 @@ import { logger } from '../utils/logger.js';
 
 const BASE = 'https://www.flashscore.mobi';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Mobile/15E148 Safari/604.1';
-const DAYS_BACK = 14;
+const DAYS_BACK = 30;
 const INDEX_TTL = 60 * 60 * 1000;        // 1h
 const FETCH_TIMEOUT = 12_000;
+const GENERIC_HOME_LAMBDA = 1.55;
+const GENERIC_AWAY_LAMBDA = 1.20;
 
 // ── Types ────────────────────────────────────────────────
 
@@ -57,12 +59,17 @@ export interface FlashscoreTeamForm {
 }
 
 export interface FlashscoreLookup {
-  homeForm: FlashscoreTeamForm;
-  awayForm: FlashscoreTeamForm;
+  /** Null when this side fell through to the league/generic prior. */
+  homeForm: FlashscoreTeamForm | null;
+  awayForm: FlashscoreTeamForm | null;
   sameLeague: boolean;
   league: string;
   expHomeGoals: number;
   expAwayGoals: number;
+  /** Which side was filled in from a prior, if any. */
+  partial: 'none' | 'home' | 'away';
+  /** Human-readable note when the result is partial. */
+  partialReason: string | null;
 }
 
 // ── HTTP ─────────────────────────────────────────────────
@@ -179,6 +186,9 @@ interface TeamIndexEntry {
 }
 
 const teamIndex = new Map<string, TeamIndexEntry>();
+/** Per-league avg goals — used as a prior when one side isn't found. */
+interface LeagueStats { matches: number; totalHomeGoals: number; totalAwayGoals: number }
+const leagueStats = new Map<string, LeagueStats>();
 let indexLoadedAt = 0;
 let indexInflight: Promise<void> | null = null;
 
@@ -205,6 +215,7 @@ export async function preloadFlashscore(force = false): Promise<{ days: number; 
 
   indexInflight = (async () => {
     teamIndex.clear();
+    leagueStats.clear();
     let totalMatches = 0;
     let loadedDays = 0;
     const offsets: number[] = [];
@@ -236,13 +247,19 @@ export async function preloadFlashscore(force = false): Promise<{ days: number; 
           awayGoals: ag!,
         };
         indexAddMatch(p.home, p.away, fs);
+        // Per-league goal averages (used as priors for one-sided lookups).
+        const ls = leagueStats.get(p.league) ?? { matches: 0, totalHomeGoals: 0, totalAwayGoals: 0 };
+        ls.matches++;
+        ls.totalHomeGoals += hg!;
+        ls.totalAwayGoals += ag!;
+        leagueStats.set(p.league, ls);
         totalMatches++;
       }
     }
 
     indexLoadedAt = Date.now();
     logger.info(
-      { loadedDays, totalMatches, indexedTeams: teamIndex.size },
+      { loadedDays, totalMatches, indexedTeams: teamIndex.size, indexedLeagues: leagueStats.size },
       'flashscore.mobi index loaded',
     );
   })();
@@ -370,45 +387,108 @@ function splitLeagueHeader(header: string): [country: string, league: string] {
 
 // ── Public API ───────────────────────────────────────────
 
+/** Recover league avgs for the "missing side" of a one-sided lookup. Falls
+ *  back to the generic football prior if the matched team's league is empty. */
+function leagueAvgFor(leagueHeader: string | null | undefined): { homeAvg: number; awayAvg: number; from: 'league' | 'generic'; league: string | null } {
+  if (leagueHeader) {
+    // Try the exact dominant league first, then any with the same country prefix.
+    const exact = leagueStats.get(leagueHeader);
+    if (exact && exact.matches >= 3) {
+      return {
+        homeAvg: exact.totalHomeGoals / exact.matches,
+        awayAvg: exact.totalAwayGoals / exact.matches,
+        from: 'league',
+        league: leagueHeader,
+      };
+    }
+  }
+  return { homeAvg: GENERIC_HOME_LAMBDA, awayAvg: GENERIC_AWAY_LAMBDA, from: 'generic', league: null };
+}
+
 export async function lookupViaFlashscore(home: string, away: string): Promise<FlashscoreLookup | null> {
   await preloadFlashscore();
 
   const hEntry = findTeam(home);
   const aEntry = findTeam(away);
-  if (!hEntry || !aEntry) {
-    logger.info({ home, away, hHit: !!hEntry, aHit: !!aEntry }, 'flashscore.mobi: team not found');
+  if (!hEntry && !aEntry) {
+    logger.info({ home, away }, 'flashscore.mobi: neither team found');
     return null;
   }
 
-  // Need at least a couple of finished matches per side for a useful lambda.
-  if (hEntry.matches.length === 0 || aEntry.matches.length === 0) return null;
+  const homeForm = hEntry && hEntry.matches.length > 0 ? buildForm(home, hEntry) : null;
+  const awayForm = aEntry && aEntry.matches.length > 0 ? buildForm(away, aEntry) : null;
 
-  const homeForm = buildForm(home, hEntry);
-  const awayForm = buildForm(away, aEntry);
+  // Both null after build (entries existed but had no usable matches).
+  if (!homeForm && !awayForm) return null;
 
-  // Same dominant league?
-  const sameLeague = !!homeForm.league && homeForm.league === awayForm.league && homeForm.country === awayForm.country;
+  // Decide partial flag.
+  const partial: 'none' | 'home' | 'away' =
+    homeForm && awayForm ? 'none' : !homeForm ? 'home' : 'away';
 
-  // Poisson lambdas: geom mean of home-scoring × away-conceding, capped at
-  // 0.15..5 goals.
-  const homeScoring = homeForm.avgGoalsForHome || (homeForm.played > 0 ? homeForm.goalsFor / homeForm.played : 1.4);
-  const awayConceding = awayForm.avgGoalsAgainstAway || (awayForm.played > 0 ? awayForm.goalsAgainst / awayForm.played : 1.3);
-  const awayScoring = awayForm.avgGoalsForAway || (awayForm.played > 0 ? awayForm.goalsFor / awayForm.played : 1.1);
-  const homeConceding = homeForm.avgGoalsAgainstHome || (homeForm.played > 0 ? homeForm.goalsAgainst / homeForm.played : 1.1);
+  // Pick the dominant league: prefer the matched team's; if both matched and
+  // they share, that's a clean same-league result.
+  const matchedLeagueHeader =
+    (homeForm && awayForm && headerFromForm(homeForm) === headerFromForm(awayForm))
+      ? headerFromForm(homeForm)
+      : (homeForm ? headerFromForm(homeForm) : awayForm ? headerFromForm(awayForm) : null);
+
+  // For each side, derive scoring + conceding rates. Missing side uses the
+  // matched team's league average.
+  const prior = leagueAvgFor(matchedLeagueHeader);
+
+  const homeScoring = homeForm
+    ? (homeForm.avgGoalsForHome || (homeForm.played > 0 ? homeForm.goalsFor / homeForm.played : prior.homeAvg))
+    : prior.homeAvg;
+  const homeConceding = homeForm
+    ? (homeForm.avgGoalsAgainstHome || (homeForm.played > 0 ? homeForm.goalsAgainst / homeForm.played : prior.awayAvg))
+    : prior.awayAvg;
+  const awayScoring = awayForm
+    ? (awayForm.avgGoalsForAway || (awayForm.played > 0 ? awayForm.goalsFor / awayForm.played : prior.awayAvg))
+    : prior.awayAvg;
+  const awayConceding = awayForm
+    ? (awayForm.avgGoalsAgainstAway || (awayForm.played > 0 ? awayForm.goalsAgainst / awayForm.played : prior.homeAvg))
+    : prior.homeAvg;
 
   const expHomeGoals = Math.max(0.15, Math.min(5, Math.sqrt(homeScoring * awayConceding)));
   const expAwayGoals = Math.max(0.15, Math.min(5, Math.sqrt(awayScoring * homeConceding)));
+
+  // Same-league flag is only meaningful when both sides matched.
+  const sameLeague = !!(homeForm && awayForm && homeForm.league === awayForm.league && homeForm.country === awayForm.country);
+
+  let leagueLabel: string;
+  if (homeForm && awayForm) {
+    leagueLabel = sameLeague
+      ? `${homeForm.country} · ${homeForm.league}`
+      : `${homeForm.country} · ${homeForm.league} / ${awayForm.country} · ${awayForm.league}`;
+  } else if (homeForm) {
+    leagueLabel = `${homeForm.country} · ${homeForm.league}`;
+  } else if (awayForm) {
+    leagueLabel = `${awayForm.country} · ${awayForm.league}`;
+  } else {
+    leagueLabel = '';
+  }
+
+  let partialReason: string | null = null;
+  if (partial === 'home') {
+    partialReason = `Home team not found in flashscore window — used ${prior.from === 'league' ? prior.league + ' average' : 'generic football prior'} for the home side.`;
+  } else if (partial === 'away') {
+    partialReason = `Away team not found in flashscore window — used ${prior.from === 'league' ? prior.league + ' average' : 'generic football prior'} for the away side.`;
+  }
 
   return {
     homeForm,
     awayForm,
     sameLeague,
-    league: sameLeague
-      ? `${homeForm.country} · ${homeForm.league}`
-      : `${homeForm.country} · ${homeForm.league} / ${awayForm.country} · ${awayForm.league}`,
+    league: leagueLabel,
     expHomeGoals,
     expAwayGoals,
+    partial,
+    partialReason,
   };
+}
+
+function headerFromForm(f: FlashscoreTeamForm): string {
+  return f.country ? `${f.country}: ${f.league}` : f.league;
 }
 
 export function getFlashscoreIndexStats(): { daysWindow: number; teamsIndexed: number; matchesIndexed: number; loadedAtIso: string | null } {
