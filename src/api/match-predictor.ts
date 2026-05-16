@@ -21,6 +21,9 @@ import { lookupOU, type OuLookupResult } from './ou-lookup.js';
 import { predictElo, type EloPrediction } from './elo-predictor.js';
 import { getInjuryReport, hasInjurySource, type TeamInjuryReport } from './injury-fetcher.js';
 import { logPrediction, getCachedConfidenceMult } from './predict-tracker.js';
+import { analyzeFatigue, type FatigueReport } from './fatigue.js';
+import { analyzeH2HPatterns, type H2HPatterns } from './h2h-patterns.js';
+import { getLambdaCalibration, type CalibrationFactors } from './lambda-calibration.js';
 
 // ── Tunables ────────────────────────────────────────────
 
@@ -79,11 +82,13 @@ export interface LineupImpact {
   awayLambdaMult: number;   // multiplier applied to away λ
 }
 
-/** Contextual modifiers beyond injuries — fortress + form momentum. */
+/** Contextual modifiers beyond injuries — fortress + momentum + fatigue + H2H patterns. */
 export interface ContextImpact {
   fortress: { active: boolean; homeUnbeatenStreak: number; awayLambdaMult: number };
   homeMomentum: { streak: number; type: 'hot' | 'cold' | 'neutral'; lambdaMult: number };
   awayMomentum: { streak: number; type: 'hot' | 'cold' | 'neutral'; lambdaMult: number };
+  fatigue: FatigueReport;
+  h2hPatterns: H2HPatterns;
 }
 
 export interface BlendedVerdict {
@@ -104,6 +109,9 @@ export interface BlendedVerdict {
 export interface MatchPrediction {
   // Carry-through from OU lookup so the UI doesn't need two requests.
   base: OuLookupResult;
+
+  /** Walk-forward λ calibration factors applied before context modifiers. */
+  calibration: CalibrationFactors;
 
   // Adjusted lambdas (post-injury).
   adjusted: {
@@ -356,8 +364,10 @@ export async function predictMatchFull(
   away: string,
   leagueHint?: string,
 ): Promise<MatchPrediction> {
-  // Base lookup + injuries + Elo in parallel — none depend on each other.
-  const [base, homeInj, awayInj, eloRes] = await Promise.all([
+  // Base lookup + injuries + Elo + fatigue + calibration in parallel —
+  // none depend on each other. H2H patterns are computed off base.factors.h2h
+  // after the base resolves (no extra network call).
+  const [base, homeInj, awayInj, eloRes, fatigue, calibration] = await Promise.all([
     lookupOU(home, away, leagueHint),
     hasInjurySource() ? getInjuryReport(home).catch(err => {
       logger.warn({ err, team: home }, 'home injury fetch failed');
@@ -368,13 +378,20 @@ export async function predictMatchFull(
       return null;
     }) : Promise.resolve(null),
     Promise.resolve(safeElo(home, away)),
+    analyzeFatigue(home, away).catch(err => {
+      logger.warn({ err, home, away }, 'fatigue analysis failed');
+      return null;
+    }),
+    getLambdaCalibration(),
   ]);
 
-  const baseH = base.expected.home;
-  const baseA = base.expected.away;
+  const h2hPatterns = analyzeH2HPatterns(base.factors.h2h, base.homeNormalized, base.awayNormalized);
+  // Walk-forward λ correction applied before any contextual modifier fires.
+  const baseH = base.expected.home * calibration.factorHome;
+  const baseA = base.expected.away * calibration.factorAway;
 
   const { adjustedH: linH, adjustedA: linA, impact } = applyLineupImpact(baseH, baseA, homeInj, awayInj);
-  const { adjustedH, adjustedA, context } = applyContextImpact(linH, linA, base);
+  const { adjustedH, adjustedA, context } = applyContextImpact(linH, linA, base, fatigue, h2hPatterns);
   const matrix = buildMatrix(adjustedH, adjustedA);
 
   const adjusted1x2 = oneXtwoFromMatrix(matrix);
@@ -400,6 +417,7 @@ export async function predictMatchFull(
 
   return {
     base,
+    calibration,
     adjusted: {
       home: r2(adjustedH),
       away: r2(adjustedA),
@@ -448,6 +466,8 @@ function applyContextImpact(
   baseH: number,
   baseA: number,
   base: OuLookupResult,
+  fatigueRes: FatigueReport | null,
+  h2h: H2HPatterns,
 ): { adjustedH: number; adjustedA: number; context: ContextImpact } {
   const sig = readContextSignals(base);
 
@@ -464,9 +484,29 @@ function applyContextImpact(
   const homeM = momentumMult(sig.homeMomentum);
   const awayM = momentumMult(sig.awayMomentum);
 
+  // Fatigue: own attack drops with rotation, opponent's λ rises when our
+  // defense is tired (divide own λ by opp.defenseMult — same algebra as
+  // bot-main's `/heurystyka_a["mnoznik_obr"]`).
+  const fatigue: FatigueReport = fatigueRes ?? {
+    home: { tired: false, rotation: false, hoursSinceLast: null, gamesInWindow: 0, attackMult: 1, defenseMult: 1, reason: 'No fatigue data' },
+    away: { tired: false, rotation: false, hoursSinceLast: null, gamesInWindow: 0, attackMult: 1, defenseMult: 1, reason: 'No fatigue data' },
+    noData: true,
+  };
+  const homeAttackFatigue = fatigue.home.attackMult / fatigue.away.defenseMult;
+  const awayAttackFatigue = fatigue.away.attackMult / fatigue.home.defenseMult;
+
+  // H2H Patent shifts the goal expectation slightly in the dominant side's
+  // favour. Revenge boosts the losing-side's attack. Both are applied as
+  // straight multiplicative factors on the attacking λ.
+  const homeH2H = h2h.homeAttackMult * h2h.homeOddsMult;
+  const awayH2H = h2h.awayAttackMult * h2h.awayOddsMult;
+
+  const adjustedH = baseH * homeM.mult * homeAttackFatigue * homeH2H;
+  const adjustedA = baseA * fortressMult * awayM.mult * awayAttackFatigue * awayH2H;
+
   return {
-    adjustedH: baseH * homeM.mult,
-    adjustedA: baseA * fortressMult * awayM.mult,
+    adjustedH,
+    adjustedA,
     context: {
       fortress: {
         active: fortressActive,
@@ -475,6 +515,8 @@ function applyContextImpact(
       },
       homeMomentum: { streak: sig.homeMomentum, type: homeM.type, lambdaMult: r3(homeM.mult) },
       awayMomentum: { streak: sig.awayMomentum, type: awayM.type, lambdaMult: r3(awayM.mult) },
+      fatigue,
+      h2hPatterns: h2h,
     },
   };
 }

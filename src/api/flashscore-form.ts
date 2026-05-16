@@ -611,3 +611,30 @@ export function getFlashscoreIndexStats(): { daysWindow: number; teamsIndexed: n
     loadedAtIso: indexLoadedAt > 0 ? new Date(indexLoadedAt).toISOString() : null,
   };
 }
+
+/**
+ * Recent finished matches for a team, newest first. Consumed by the
+ * fatigue heuristic, which only needs dates — the rest is included for
+ * future callers (e.g. xG-from-form). Returns null when the team isn't
+ * in the rolling 30-day index. Assumes the caller already triggered
+ * preloadFlashscore via a prior lookupViaFlashscore call.
+ */
+export function getFlashscoreRecentMatches(
+  team: string,
+  limit = 10,
+): Array<{ date: string; isHome: boolean; opponent: string; goalsFor: number; goalsAgainst: number }> | null {
+  const entry = findTeam(team);
+  if (!entry || entry.matches.length === 0) return null;
+  const sorted = [...entry.matches].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const out = sorted.slice(0, limit).map(m => {
+    const isHome = normName(m.home) === normName(entry.name);
+    return {
+      date: m.date,
+      isHome,
+      opponent: isHome ? m.away : m.home,
+      goalsFor: isHome ? m.homeGoals : m.awayGoals,
+      goalsAgainst: isHome ? m.awayGoals : m.homeGoals,
+    };
+  });
+  return out;
+}

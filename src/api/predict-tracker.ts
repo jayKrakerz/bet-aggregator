@@ -234,6 +234,16 @@ export async function getCalibration(): Promise<{
   };
 }
 
+/** Read settled predictions with both expected and actual scores recorded —
+ *  used by walk-forward λ calibration to compute per-side goal-volume bias. */
+export async function getSettledHistory(limit = 200): Promise<PredictionLog[]> {
+  await ensureLoaded();
+  const settled = entries.filter(
+    e => (e.status === 'won' || e.status === 'lost') && e.actualScore !== null,
+  );
+  return settled.slice(-limit);
+}
+
 /** Synchronous read of last-known calibration multiplier — used in the hot
  *  path so we don't block /match-predict on a settle pass. */
 let cachedMult = 1;

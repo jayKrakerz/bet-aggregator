@@ -486,3 +486,39 @@ export function getEspnIndexStats(): { leaguesConfigured: number; teamsIndexed: 
     loadedAtIso: indexLoadedAt > 0 ? new Date(indexLoadedAt).toISOString() : null,
   };
 }
+
+/**
+ * Recent finished matches for a team across all indexed ESPN leagues,
+ * newest first. Used by the fatigue heuristic to find hours-since-last
+ * match. Pulls current + previous season schedules. Returns null when
+ * the team can't be resolved or has no finished events.
+ */
+export async function getEspnRecentMatches(
+  team: string,
+  limit = 10,
+): Promise<Array<{ date: string; isHome: boolean; opponent: string; goalsFor: number; goalsAgainst: number }> | null> {
+  await preloadEspnTeams();
+  const refs = findTeamCandidates(team);
+  if (refs.length === 0) return null;
+
+  const ref = refs[0]!;
+  const yearNow = currentSeasonForLeague(ref.leagueSlug);
+  const [cur, prev] = await Promise.all([
+    fetchTeamSchedule(ref.teamId, ref.leagueSlug, yearNow),
+    fetchTeamSchedule(ref.teamId, ref.leagueSlug, yearNow - 1),
+  ]);
+  const events = [...cur, ...prev];
+  if (events.length === 0) return null;
+
+  const sorted = [...events].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  return sorted.slice(0, limit).map(ev => {
+    const isHome = ev.homeId === ref.teamId;
+    return {
+      date: ev.date,
+      isHome,
+      opponent: isHome ? ev.awayName : ev.homeName,
+      goalsFor: isHome ? ev.homeGoals : ev.awayGoals,
+      goalsAgainst: isHome ? ev.awayGoals : ev.homeGoals,
+    };
+  });
+}

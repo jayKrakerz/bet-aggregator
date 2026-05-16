@@ -32,6 +32,8 @@ import { computeCalibration } from '../srl-evaluator.js';
 import { lookupOU } from '../ou-lookup.js';
 import { predictMatchFull } from '../match-predictor.js';
 import { getCalibration as getMatchPredictCalibration } from '../predict-tracker.js';
+import { scoreCandidate } from '../decision-score.js';
+import { kellyStake, evNet } from '../kelly.js';
 import { preloadEspnTeams, getEspnIndexStats } from '../espn-form.js';
 // Lazy-loaded to avoid crashing when puppeteer is unavailable (e.g. Vercel)
 const liveMonitor = () => import('../live-monitor.js');
@@ -1169,18 +1171,55 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     return result;
   });
 
-  // GET /predictions/match-predict?home=X&away=Y&league=Z — full match
-  //   forecast: top-10 scorelines, Asian handicap, HT/FT, clean sheets,
-  //   injury-adjusted lambdas, plus an Elo + Poisson blended verdict.
+  // GET /predictions/match-predict?home=X&away=Y&league=Z&odds=N&bankroll=N&tax=N
+  //   — full match forecast: top-10 scorelines, Asian handicap, HT/FT,
+  //   clean sheets, injury-adjusted lambdas, plus an Elo + Poisson blended
+  //   verdict. When `odds` is supplied, also returns Decision Score, net EV
+  //   and a fractional-Kelly stake recommendation. `bankroll` defaults to
+  //   100 units; `tax` is a 0–1 payout-tax rate (e.g. 0.12 for Poland).
   app.get('/match-predict', async (request, reply) => {
-    const q = request.query as { home?: string; away?: string; league?: string };
+    const q = request.query as {
+      home?: string; away?: string; league?: string;
+      odds?: string; bankroll?: string; tax?: string;
+    };
     if (!q.home || !q.away) return reply.status(400).send({ error: 'Provide home and away team names' });
     if (q.home.length > 80 || q.away.length > 80 || (q.league && q.league.length > 80)) {
       return reply.status(400).send({ error: 'Team or league name too long' });
     }
     const result = await predictMatchFull(q.home, q.away, q.league);
+
+    const odds = q.odds ? Number(q.odds) : undefined;
+    const bankroll = q.bankroll ? Number(q.bankroll) : 100;
+    const tax = q.tax ? Math.max(0, Math.min(1, Number(q.tax))) : 0;
+    const validOdds = typeof odds === 'number' && Number.isFinite(odds) && odds > 1.01;
+
+    const calibration = await getMatchPredictCalibration();
+    const hitRate = Number.isFinite(calibration.hitRate) ? calibration.hitRate : undefined;
+
+    const pickPct =
+      result.verdict.pick === 'Home' ? result.verdict.homePct
+      : result.verdict.pick === 'Away' ? result.verdict.awayPct
+      : result.verdict.drawPct;
+    const pickProb = pickPct / 100;
+
+    const decision = scoreCandidate({
+      prediction: result,
+      odds: validOdds ? odds : undefined,
+      hitRate,
+    });
+
+    const stake = validOdds && Number.isFinite(bankroll) && bankroll > 0
+      ? {
+          ...kellyStake(pickProb, odds!, bankroll),
+          ev: evNet(pickProb, odds!, tax),
+          odds,
+          bankroll,
+          tax,
+        }
+      : null;
+
     void reply.header('Cache-Control', 'public, max-age=300');
-    return result;
+    return { ...result, decision, stake };
   });
 
   // GET /predictions/match-predict/calibration — recent hit-rate and the
