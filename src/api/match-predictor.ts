@@ -24,6 +24,8 @@ import { logPrediction, getCachedConfidenceMult } from './predict-tracker.js';
 import { analyzeFatigue, type FatigueReport } from './fatigue.js';
 import { analyzeH2HPatterns, type H2HPatterns } from './h2h-patterns.js';
 import { getLambdaCalibration, type CalibrationFactors } from './lambda-calibration.js';
+import { analyzeImportancePair, type ImportanceReport } from './importance-index.js';
+import { analyzeReferee, type RefereeAnalysis } from './referee-bias.js';
 
 // ── Tunables ────────────────────────────────────────────
 
@@ -82,13 +84,15 @@ export interface LineupImpact {
   awayLambdaMult: number;   // multiplier applied to away λ
 }
 
-/** Contextual modifiers beyond injuries — fortress + momentum + fatigue + H2H patterns. */
+/** Contextual modifiers beyond injuries — fortress + momentum + fatigue + H2H + importance + referee. */
 export interface ContextImpact {
   fortress: { active: boolean; homeUnbeatenStreak: number; awayLambdaMult: number };
   homeMomentum: { streak: number; type: 'hot' | 'cold' | 'neutral'; lambdaMult: number };
   awayMomentum: { streak: number; type: 'hot' | 'cold' | 'neutral'; lambdaMult: number };
   fatigue: FatigueReport;
   h2hPatterns: H2HPatterns;
+  importance: ImportanceReport;
+  referee: RefereeAnalysis;
 }
 
 export interface BlendedVerdict {
@@ -363,11 +367,12 @@ export async function predictMatchFull(
   home: string,
   away: string,
   leagueHint?: string,
+  referee?: string,
 ): Promise<MatchPrediction> {
-  // Base lookup + injuries + Elo + fatigue + calibration in parallel —
-  // none depend on each other. H2H patterns are computed off base.factors.h2h
-  // after the base resolves (no extra network call).
-  const [base, homeInj, awayInj, eloRes, fatigue, calibration] = await Promise.all([
+  // Base lookup + injuries + Elo + fatigue + calibration + importance + referee
+  // in parallel — none depend on each other. H2H patterns are computed off
+  // base.factors.h2h after the base resolves (no extra network call).
+  const [base, homeInj, awayInj, eloRes, fatigue, calibration, importance, refereeAnalysis] = await Promise.all([
     lookupOU(home, away, leagueHint),
     hasInjurySource() ? getInjuryReport(home).catch(err => {
       logger.warn({ err, team: home }, 'home injury fetch failed');
@@ -383,6 +388,14 @@ export async function predictMatchFull(
       return null;
     }),
     getLambdaCalibration(),
+    analyzeImportancePair(home, away).catch(err => {
+      logger.warn({ err, home, away }, 'importance analysis failed');
+      return null;
+    }),
+    analyzeReferee(referee).catch(err => {
+      logger.warn({ err, referee }, 'referee analysis failed');
+      return null;
+    }),
   ]);
 
   const h2hPatterns = analyzeH2HPatterns(base.factors.h2h, base.homeNormalized, base.awayNormalized);
@@ -391,7 +404,9 @@ export async function predictMatchFull(
   const baseA = base.expected.away * calibration.factorAway;
 
   const { adjustedH: linH, adjustedA: linA, impact } = applyLineupImpact(baseH, baseA, homeInj, awayInj);
-  const { adjustedH, adjustedA, context } = applyContextImpact(linH, linA, base, fatigue, h2hPatterns);
+  const { adjustedH, adjustedA, context } = applyContextImpact(
+    linH, linA, base, fatigue, h2hPatterns, importance, refereeAnalysis,
+  );
   const matrix = buildMatrix(adjustedH, adjustedA);
 
   const adjusted1x2 = oneXtwoFromMatrix(matrix);
@@ -462,12 +477,26 @@ function readContextSignals(base: OuLookupResult): {
   };
 }
 
+const NEUTRAL_IMPORTANCE: ImportanceReport = {
+  home: { status: 'NORMAL', label: 'Normal', attackMult: 1, reason: 'No importance data', standing: null },
+  away: { status: 'NORMAL', label: 'Normal', attackMult: 1, reason: 'No importance data', standing: null },
+};
+
+const NEUTRAL_REFEREE: RefereeAnalysis = {
+  signal: 'unknown',
+  lambdaMult: 1,
+  reason: 'No referee analysis',
+  stats: null,
+};
+
 function applyContextImpact(
   baseH: number,
   baseA: number,
   base: OuLookupResult,
   fatigueRes: FatigueReport | null,
   h2h: H2HPatterns,
+  importanceRes: ImportanceReport | null,
+  refereeRes: RefereeAnalysis | null,
 ): { adjustedH: number; adjustedA: number; context: ContextImpact } {
   const sig = readContextSignals(base);
 
@@ -501,8 +530,20 @@ function applyContextImpact(
   const homeH2H = h2h.homeAttackMult * h2h.homeOddsMult;
   const awayH2H = h2h.awayAttackMult * h2h.awayOddsMult;
 
-  const adjustedH = baseH * homeM.mult * homeAttackFatigue * homeH2H;
-  const adjustedA = baseA * fortressMult * awayM.mult * awayAttackFatigue * awayH2H;
+  // Importance Index: late-season motivation per side. Pure attack
+  // multiplier — defense stays untouched (the original FootStats model
+  // assumes title/relegation chases are about scoring, not defending).
+  const importance = importanceRes ?? NEUTRAL_IMPORTANCE;
+  const homeImp = importance.home.attackMult;
+  const awayImp = importance.away.attackMult;
+
+  // Referee bias: symmetric on both sides — cards-heavy refs suppress
+  // total goals, goals-heavy refs inflate them.
+  const referee = refereeRes ?? NEUTRAL_REFEREE;
+  const refMult = referee.lambdaMult;
+
+  const adjustedH = baseH * homeM.mult * homeAttackFatigue * homeH2H * homeImp * refMult;
+  const adjustedA = baseA * fortressMult * awayM.mult * awayAttackFatigue * awayH2H * awayImp * refMult;
 
   return {
     adjustedH,
@@ -517,6 +558,8 @@ function applyContextImpact(
       awayMomentum: { streak: sig.awayMomentum, type: awayM.type, lambdaMult: r3(awayM.mult) },
       fatigue,
       h2hPatterns: h2h,
+      importance,
+      referee,
     },
   };
 }

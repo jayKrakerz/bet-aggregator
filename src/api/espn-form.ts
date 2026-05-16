@@ -31,6 +31,20 @@ const SCHEDULE_TTL = 6 * 60 * 60 * 1000;
 interface EspnLeague { slug: string; name: string; country: string }
 
 const ESPN_LEAGUES: EspnLeague[] = [
+  // Europe top flights — domestic standings used by Importance Index.
+  // (Listed first so domestic-league lookups beat cup-competition entries
+  // when a team appears in both, e.g. Arsenal in eng.1 + uefa.champions.)
+  { slug: 'eng.1', name: 'Premier League', country: 'England' },
+  { slug: 'esp.1', name: 'La Liga', country: 'Spain' },
+  { slug: 'ger.1', name: 'Bundesliga', country: 'Germany' },
+  { slug: 'ita.1', name: 'Serie A', country: 'Italy' },
+  { slug: 'fra.1', name: 'Ligue 1', country: 'France' },
+  { slug: 'ned.1', name: 'Eredivisie', country: 'Netherlands' },
+  { slug: 'por.1', name: 'Liga Portugal', country: 'Portugal' },
+  { slug: 'tur.1', name: 'Super Lig', country: 'Turkey' },
+  { slug: 'bel.1', name: 'Pro League', country: 'Belgium' },
+  { slug: 'sco.1', name: 'Premiership', country: 'Scotland' },
+  { slug: 'gre.1', name: 'Super League', country: 'Greece' },
   // South America (mostly NOT covered by football-data.co.uk)
   { slug: 'hon.1', name: 'Liga Nacional', country: 'Honduras' },
   { slug: 'bol.1', name: 'División Profesional', country: 'Bolivia' },
@@ -201,6 +215,10 @@ export async function preloadEspnTeams(force = false): Promise<{ leagues: number
   await indexInflight;
   indexInflight = null;
   return { leagues: ESPN_LEAGUES.length, teams: teamIndex.size };
+}
+
+export function findEspnTeamCandidates(query: string): EspnTeamRef[] {
+  return findTeamCandidates(query);
 }
 
 function findTeamCandidates(query: string): EspnTeamRef[] {

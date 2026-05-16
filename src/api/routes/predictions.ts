@@ -1171,22 +1171,24 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     return result;
   });
 
-  // GET /predictions/match-predict?home=X&away=Y&league=Z&odds=N&bankroll=N&tax=N
+  // GET /predictions/match-predict?home=X&away=Y&league=Z&ref=R&odds=N&bankroll=N&tax=N
   //   — full match forecast: top-10 scorelines, Asian handicap, HT/FT,
   //   clean sheets, injury-adjusted lambdas, plus an Elo + Poisson blended
   //   verdict. When `odds` is supplied, also returns Decision Score, net EV
   //   and a fractional-Kelly stake recommendation. `bankroll` defaults to
   //   100 units; `tax` is a 0–1 payout-tax rate (e.g. 0.12 for Poland).
+  //   When `ref` is supplied, applies a referee λ multiplier
+  //   (cards-heavy → ×0.95, goals-heavy → ×1.05).
   app.get('/match-predict', async (request, reply) => {
     const q = request.query as {
-      home?: string; away?: string; league?: string;
+      home?: string; away?: string; league?: string; ref?: string;
       odds?: string; bankroll?: string; tax?: string;
     };
     if (!q.home || !q.away) return reply.status(400).send({ error: 'Provide home and away team names' });
-    if (q.home.length > 80 || q.away.length > 80 || (q.league && q.league.length > 80)) {
-      return reply.status(400).send({ error: 'Team or league name too long' });
+    if (q.home.length > 80 || q.away.length > 80 || (q.league && q.league.length > 80) || (q.ref && q.ref.length > 80)) {
+      return reply.status(400).send({ error: 'Team, league, or referee name too long' });
     }
-    const result = await predictMatchFull(q.home, q.away, q.league);
+    const result = await predictMatchFull(q.home, q.away, q.league, q.ref);
 
     const odds = q.odds ? Number(q.odds) : undefined;
     const bankroll = q.bankroll ? Number(q.bankroll) : 100;
