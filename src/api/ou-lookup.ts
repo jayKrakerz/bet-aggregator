@@ -36,6 +36,32 @@ export interface OuLine {
   underPct: number;
 }
 
+/**
+ * Trust grading attached to every lookup so callers (and the UI) can tell
+ * when the predicted lambdas come from solid data vs a junk fuzzy match.
+ *
+ *   solid       — both teams matched in the same league; league hint (if
+ *                 supplied) aligns. Trust the prediction.
+ *   partial     — both teams matched but in different leagues or league
+ *                 hint mismatched. Treat with mild caution.
+ *   weak        — only one side matched, or matched via a low-confidence
+ *                 source. Useful as a sanity check, not for staking.
+ *   unreliable  — generic-prior fallback fired. Lambdas are just league
+ *                 averages with no team specificity. Don't bet on this.
+ */
+export type PredictionQuality = 'solid' | 'partial' | 'weak' | 'unreliable';
+
+export interface QualityAssessment {
+  grade: PredictionQuality;
+  /** Internal 0–100 score driving the grade — exposed for debugging. */
+  score: number;
+  /** Bullet-style reasons that contributed (always non-empty). */
+  reasons: string[];
+  /** True when the UI should display a prominent warning and de-emphasise
+   *  verdict / Decision Score / Kelly stake. */
+  warn: boolean;
+}
+
 export interface OuLookupResult {
   homeInput: string;
   awayInput: string;
@@ -80,6 +106,7 @@ export interface OuLookupResult {
     quotaUsed: number;
     quotaCap: number;
   };
+  quality: QualityAssessment;
 }
 
 // ── Poisson math (kept local so we can hit any line, not just the few
@@ -330,7 +357,7 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
   // Cold cost: 15 page fetches (~3MB total) once per hour, cached for 1h.
   if (!matched) {
     try {
-      const fsResult = await lookupViaFlashscore(home, away);
+      const fsResult = await lookupViaFlashscore(home, away, league ?? undefined);
       if (fsResult) {
         expHome = fsResult.expHomeGoals;
         expAway = fsResult.expAwayGoals;
@@ -414,6 +441,22 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
   }
 
   const quota = getApiFootballQuota();
+  const quality = assessQuality({
+    usedFallback,
+    source,
+    matched,
+    leagueHint: league,
+    resolvedLeague,
+    apiFootballHomeForm,
+    apiFootballAwayForm,
+    espnHomeForm,
+    espnAwayForm,
+    flashscoreHomeForm,
+    flashscoreAwayForm,
+    homeForm,
+    awayForm,
+  });
+
   return {
     homeInput: homeIn,
     awayInput: awayIn,
@@ -453,5 +496,129 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
       quotaUsed: quota.used,
       quotaCap: quota.cap,
     },
+    quality,
   };
+}
+
+// ── Quality assessment ─────────────────────────────────
+
+// Only truly generic structural words. Words like "Premier" / "Primera"
+// MUST stay — they're the distinguishing token in "Premier League" vs
+// "Championship", "Primera División" vs "Segunda División".
+const LEAGUE_HINT_STOP = new Set([
+  'league','leagues','division','divisions','div','liga','ligue','serie',
+  'football','soccer','fc','de','del','of','the','and',
+]);
+
+function leagueTokens(s: string | null | undefined): Set<string> {
+  if (!s) return new Set();
+  const tokens = s.toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length >= 3 && !LEAGUE_HINT_STOP.has(t));
+  return new Set(tokens);
+}
+
+interface QualityInputs {
+  usedFallback: boolean;
+  source: OuLookupResult['source'];
+  matched: boolean;
+  leagueHint: string | null;
+  resolvedLeague: string | null;
+  apiFootballHomeForm: ApiFootballForm | null;
+  apiFootballAwayForm: ApiFootballForm | null;
+  espnHomeForm: EspnTeamForm | null;
+  espnAwayForm: EspnTeamForm | null;
+  flashscoreHomeForm: FlashscoreTeamForm | null;
+  flashscoreAwayForm: FlashscoreTeamForm | null;
+  homeForm: TeamFormDetail | null;
+  awayForm: TeamFormDetail | null;
+}
+
+function assessQuality(q: QualityInputs): QualityAssessment {
+  const reasons: string[] = [];
+  let score = 100;
+
+  // Generic-prior is the catastrophic case — no team data at all.
+  if (!q.matched || q.usedFallback || q.source === 'generic') {
+    reasons.push('No team-specific data — used a generic football prior. Lambdas are league-average guesses.');
+    return { grade: 'unreliable', score: 0, reasons, warn: true };
+  }
+
+  // Source-confidence baseline. csv-poisson is the gold standard (full
+  // season tables); api-football and espn are solid one-off lookups;
+  // flashscore is a rolling 30-day fuzzy index — risky on niche leagues.
+  if (q.source === 'csv-poisson') {
+    reasons.push('Matched via football-data.co.uk seasonal CSVs (high confidence).');
+  } else if (q.source === 'api-football') {
+    reasons.push('Matched via API-Football (good confidence).');
+  } else if (q.source === 'espn') {
+    reasons.push('Matched via ESPN (good confidence).');
+  } else if (q.source === 'flashscore') {
+    reasons.push('Matched via flashscore.mobi rolling-30d index (lower confidence — fuzzy name matching).');
+    score -= 15;
+  }
+
+  // Same-league signal across the lookup sources we used.
+  const af = q.apiFootballHomeForm && q.apiFootballAwayForm;
+  const afSame = af && q.apiFootballHomeForm!.league === q.apiFootballAwayForm!.league;
+  const espn = q.espnHomeForm && q.espnAwayForm;
+  const espnSame = espn && q.espnHomeForm!.league === q.espnAwayForm!.league && q.espnHomeForm!.country === q.espnAwayForm!.country;
+  const fs = q.flashscoreHomeForm && q.flashscoreAwayForm;
+  const fsSame = fs && q.flashscoreHomeForm!.league === q.flashscoreAwayForm!.league && q.flashscoreHomeForm!.country === q.flashscoreAwayForm!.country;
+
+  if (q.source === 'api-football' && af && !afSame) {
+    reasons.push('Teams matched in DIFFERENT API-Football leagues — cross-league lambdas, treat as approximate.');
+    score -= 30;
+  } else if (q.source === 'espn' && espn && !espnSame) {
+    reasons.push('Teams matched in DIFFERENT ESPN leagues — cross-league lambdas, treat as approximate.');
+    score -= 30;
+  } else if (q.source === 'flashscore' && fs && !fsSame) {
+    reasons.push('Teams matched in DIFFERENT flashscore competitions — cross-league lambdas, very unreliable.');
+    score -= 35;
+  }
+
+  // One-sided match: only one team actually resolved. The other is filled
+  // from a league prior, so the asymmetric lambda is partly a guess.
+  if (q.source === 'flashscore' && fs == null && (q.flashscoreHomeForm || q.flashscoreAwayForm)) {
+    const which = q.flashscoreHomeForm ? 'away' : 'home';
+    reasons.push(`Only the ${which === 'away' ? 'home' : 'away'} side resolved on flashscore — the ${which} side is a league-average guess.`);
+    score -= 25;
+  }
+
+  // League-hint alignment: when the user typed a hint, verify it shares at
+  // least one meaningful token with the league we actually resolved.
+  if (q.leagueHint && q.leagueHint.trim()) {
+    const hintTokens = leagueTokens(q.leagueHint);
+    const resolvedTokens = leagueTokens(q.resolvedLeague);
+    if (hintTokens.size > 0 && resolvedTokens.size > 0) {
+      let overlap = 0;
+      for (const t of hintTokens) if (resolvedTokens.has(t)) overlap++;
+      if (overlap === 0) {
+        reasons.push(`League hint "${q.leagueHint}" doesn't match the resolved league "${q.resolvedLeague}" — wrong fixture matched.`);
+        score -= 35;
+      }
+    }
+  }
+
+  // CSV form available is a big tiebreaker — means we have a real seasonal
+  // record for at least one side that the predictor can use for H2H, form
+  // splits, and league averages.
+  if (q.source !== 'csv-poisson' && !q.homeForm && !q.awayForm) {
+    reasons.push('No seasonal CSV form available for either side — no rich context.');
+    score -= 5;
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  let grade: PredictionQuality;
+  if (score >= 80) grade = 'solid';
+  else if (score >= 55) grade = 'partial';
+  else if (score >= 30) grade = 'weak';
+  else grade = 'unreliable';
+
+  // Warn loudly for weak and unreliable so the UI flags the prediction.
+  const warn = grade === 'weak' || grade === 'unreliable';
+  return { grade, score, reasons, warn };
 }

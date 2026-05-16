@@ -8550,6 +8550,39 @@ async function runPredictor() {
   }
 }
 
+function renderQualityBanner(d) {
+  const q = (d && d.base && d.base.quality) || null;
+  if (!q) return '';
+  const grade = q.grade || 'partial';
+  const reasons = q.reasons || [];
+  // Colour scheme: green/blue/amber/red mapped to existing tokens.
+  const cfg = {
+    solid:      { color: 'var(--green)',  bg: 'var(--green-soft)',          icon: '✅', title: 'Solid prediction',     subtitle: 'Both teams resolved cleanly in matching data sources.' },
+    partial:    { color: 'var(--blue)',   bg: 'rgba(78,148,255,0.10)',      icon: 'ℹ️', title: 'Partial confidence',    subtitle: 'Cross-source or one-sided data — treat with mild caution.' },
+    weak:       { color: 'var(--amber)',  bg: 'var(--amber-soft)',          icon: '⚠️', title: 'Weak match',            subtitle: 'Fuzzy / cross-league match — sanity-check before staking.' },
+    unreliable: { color: 'var(--red)',    bg: 'rgba(240,96,96,0.10)',       icon: '🛑', title: 'Unreliable prediction', subtitle: 'Lambdas come from cross-league fuzzy match or generic prior — DO NOT bet this.' },
+  }[grade] || { color: 'var(--text-3)', bg: 'var(--surface-2)', icon: '·', title: 'Unknown', subtitle: '' };
+  // Solid predictions get a slim badge; everything else gets the full banner.
+  if (grade === 'solid') {
+    return '<div style="display:flex;align-items:center;gap:6px;margin:-2px 0 10px;font-size:11px;color:' + cfg.color + ';font-weight:700">'
+      + cfg.icon + ' ' + cfg.title
+      + '<span style="color:var(--text-3);font-weight:500">· ' + esc(cfg.subtitle) + '</span>'
+      + '</div>';
+  }
+  const list = reasons.length > 0
+    ? '<ul style="margin:6px 0 0;padding-left:18px;font-size:11px;color:var(--text-2);line-height:1.5">'
+      + reasons.map(r => '<li style="padding:1px 0">' + esc(r) + '</li>').join('')
+      + '</ul>'
+    : '';
+  return '<div class="card" style="padding:12px;margin-bottom:10px;border-color:' + cfg.color + ';border-left-width:4px;background:' + cfg.bg + '">'
+    + '<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:' + cfg.color + '">'
+    + '<span style="font-size:18px">' + cfg.icon + '</span>' + cfg.title + ' · ' + (q.score != null ? q.score + '/100' : '')
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--text-2);margin-top:4px">' + esc(cfg.subtitle) + '</div>'
+    + list
+    + '</div>';
+}
+
 function renderContextModifiers(d) {
   const ctx = d.context || {};
   const cal = d.calibration || {};
@@ -8672,6 +8705,16 @@ function renderDecisionAndStake(d) {
   const dec = d.decision;
   const stake = d.stake;
   if (!dec && !stake) return '';
+
+  // Suppress entirely when the lookup quality is unreliable — the
+  // underlying λ is junk so EV / Kelly / Decision Score amplify noise.
+  const q = (d.base && d.base.quality) || null;
+  if (q && q.grade === 'unreliable') {
+    return '<div class="card" style="padding:12px;margin-bottom:10px;border-color:var(--red);background:rgba(240,96,96,0.06)">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px">Decision Score & Kelly stake suppressed</div>'
+      + '<div style="font-size:11px;color:var(--text-2)">The underlying lookup quality is too low for EV / Kelly math to mean anything. Fix the league match first.</div>'
+      + '</div>';
+  }
 
   let html = '<div class="card" style="padding:12px;margin-bottom:10px">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">'
@@ -8817,6 +8860,10 @@ function renderMatchPrediction(d) {
 
   // Build the final HTML
   let html = '';
+
+  // Quality banner — first thing the user sees so junk predictions can't
+  // masquerade as confident verdicts.
+  html += renderQualityBanner(d);
 
   // Verdict header
   html += '<div class="card" style="padding:14px;margin-bottom:12px;border-color:rgba(176,124,255,0.3);background:linear-gradient(135deg,rgba(176,124,255,0.08),transparent)">'

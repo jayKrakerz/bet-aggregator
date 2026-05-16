@@ -349,6 +349,31 @@ function allIn(needle: Set<string>, haystack: Set<string>): boolean {
   return true;
 }
 
+// Small noise-token set used when comparing a user-supplied league hint
+// against a flashscore-resolved league header. Only truly structural
+// words — keep "premier", "primera" etc. since they're the distinguishing
+// token in many league names.
+const LEAGUE_STOP = new Set([
+  'league','leagues','division','divisions','div','liga','ligue','serie',
+  'football','soccer','fc','de','del','of','the','and',
+]);
+
+function tokenise(s: string): Set<string> {
+  const tokens = (s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length >= 3 && !LEAGUE_STOP.has(t));
+  return new Set(tokens);
+}
+
+function hasTokenOverlap(a: Set<string>, b: Set<string>): boolean {
+  for (const t of a) if (b.has(t)) return true;
+  return false;
+}
+
 function emptySplit() {
   return { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0 };
 }
@@ -489,7 +514,7 @@ function leagueAvgFor(leagueHeader: string | null | undefined): { homeAvg: numbe
   return { homeAvg: GENERIC_HOME_LAMBDA, awayAvg: GENERIC_AWAY_LAMBDA, from: 'generic', league: null };
 }
 
-export async function lookupViaFlashscore(home: string, away: string): Promise<FlashscoreLookup | null> {
+export async function lookupViaFlashscore(home: string, away: string, leagueHint?: string): Promise<FlashscoreLookup | null> {
   await preloadFlashscore();
 
   const hEntry = findTeam(home);
@@ -504,6 +529,26 @@ export async function lookupViaFlashscore(home: string, away: string): Promise<F
 
   // Both null after build (entries existed but had no usable matches).
   if (!homeForm && !awayForm) return null;
+
+  // League-hint gate: when a hint is supplied, refuse to return a result
+  // when neither matched team's resolved league shares a token with the
+  // hint. Stops the matcher from confidently returning (UAE Div 1 vs
+  // Canadian NSL Women) when the user asked for MLS Next Pro — far better
+  // to fall through to the generic prior with a clear "not found" flag.
+  if (leagueHint && leagueHint.trim()) {
+    const hintTokens = tokenise(leagueHint);
+    const homeLeagueTokens = homeForm ? tokenise(`${homeForm.country} ${homeForm.league}`) : new Set<string>();
+    const awayLeagueTokens = awayForm ? tokenise(`${awayForm.country} ${awayForm.league}`) : new Set<string>();
+    const homeAligns = hasTokenOverlap(hintTokens, homeLeagueTokens);
+    const awayAligns = hasTokenOverlap(hintTokens, awayLeagueTokens);
+    if (!homeAligns && !awayAligns) {
+      logger.info(
+        { home, away, leagueHint, homeMatchedLeague: homeForm?.league, awayMatchedLeague: awayForm?.league },
+        'flashscore.mobi: league-hint gate rejected cross-league match',
+      );
+      return null;
+    }
+  }
 
   // Decide partial flag.
   const partial: 'none' | 'home' | 'away' =
