@@ -29,6 +29,7 @@ import { computeLeaguePriors, computeTeamForm, type LeaguePrior, type TeamForm }
 import { lookupViaApiFootball, hasApiFootballKey, getApiFootballQuota, type ApiFootballForm } from './api-football-form.js';
 import { lookupViaEspn, preloadEspnTeams, type EspnTeamForm } from './espn-form.js';
 import { lookupViaFlashscore, type FlashscoreTeamForm } from './flashscore-form.js';
+import { lookupViaOnefootball, type OnefootballTeamForm } from './onefootball-form.js';
 
 export interface OuLine {
   line: number;
@@ -72,7 +73,7 @@ export interface OuLookupResult {
   /** True when neither CSV-Poisson nor API-Football could resolve both teams. */
   usedFallback: boolean;
   /** Which data source produced the prediction: */
-  source: 'csv-poisson' | 'espn' | 'api-football' | 'flashscore' | 'generic';
+  source: 'csv-poisson' | 'espn' | 'api-football' | 'onefootball' | 'flashscore' | 'generic';
   reason: string | null;
   expected: { home: number; away: number; total: number };
   ou: OuLine[];
@@ -92,6 +93,9 @@ export interface OuLookupResult {
     /** Populated when source='espn'. Same fields as ApiFootballForm, different source. */
     espnHomeForm: EspnTeamForm | null;
     espnAwayForm: EspnTeamForm | null;
+    /** Populated when source='onefootball'. Last 12 results scraped from onefootball.com SSR data. */
+    onefootballHomeForm: OnefootballTeamForm | null;
+    onefootballAwayForm: OnefootballTeamForm | null;
     /** Populated when source='flashscore'. Derived from flashscore.mobi's 60-day rolling results. */
     flashscoreHomeForm: FlashscoreTeamForm | null;
     flashscoreAwayForm: FlashscoreTeamForm | null;
@@ -274,7 +278,7 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
   let expAway = GENERIC_AVG_AWAY_GOALS;
   let usedFallback = true;
   let matched = false;
-  let source: 'csv-poisson' | 'espn' | 'api-football' | 'flashscore' | 'generic' = 'generic';
+  let source: OuLookupResult['source'] = 'generic';
   let reason: string | null = null;
   let resolvedLeague: string | null = league;
   let pre: PoissonPrediction | null = null;
@@ -284,6 +288,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
   let espnAwayForm: EspnTeamForm | null = null;
   let flashscoreHomeForm: FlashscoreTeamForm | null = null;
   let flashscoreAwayForm: FlashscoreTeamForm | null = null;
+  let onefootballHomeForm: OnefootballTeamForm | null = null;
+  let onefootballAwayForm: OnefootballTeamForm | null = null;
 
   try {
     pre = await predictMatch(home, away, league || undefined);
@@ -350,11 +356,35 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
     }
   }
 
-  // Fallback 3 (free): flashscore.mobi 14-day rolling results. Catches the
-  // niche leagues none of the above cover — Chilean Primera División Women,
-  // Argentine Primera A Women, Bhutan Premier, Australian state leagues,
-  // Eastern European 2nd divisions, etc. Plain HTTP, no Cloudflare, no key.
-  // Cold cost: 15 page fetches (~3MB total) once per hour, cached for 1h.
+  // Fallback 3 (free): onefootball.com SSR pages. Broader coverage than
+  // ESPN (mid-tier African / Asian / South American leagues that ESPN
+  // misses) and the data is structured JSON, not HTML soup. No auth, no
+  // Cloudflare. 2 HTTP fetches per prediction; cached 6h per team.
+  if (!matched) {
+    try {
+      const ofResult = await lookupViaOnefootball(home, away, league ?? undefined);
+      if (ofResult) {
+        expHome = ofResult.expHomeGoals;
+        expAway = ofResult.expAwayGoals;
+        usedFallback = false;
+        matched = true;
+        source = 'onefootball';
+        onefootballHomeForm = ofResult.homeForm;
+        onefootballAwayForm = ofResult.awayForm;
+        resolvedLeague = ofResult.league;
+        if (!ofResult.sameLeague) {
+          reason = 'Teams indexed in different Onefootball competitions — lambdas are best-effort across leagues, treat as approximate.';
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, 'OU lookup: Onefootball fallback failed');
+    }
+  }
+
+  // Fallback 4 (free): flashscore.mobi 60-day rolling results. Catches
+  // the very niche leagues none of the above cover — women's regional
+  // comps, Bhutan Premier, Australian state leagues, etc. Plain HTTP, no
+  // Cloudflare, no key. Cold cost: ~30 page fetches once per hour.
   if (!matched) {
     try {
       const fsResult = await lookupViaFlashscore(home, away, league ?? undefined);
@@ -451,6 +481,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
     apiFootballAwayForm,
     espnHomeForm,
     espnAwayForm,
+    onefootballHomeForm,
+    onefootballAwayForm,
     flashscoreHomeForm,
     flashscoreAwayForm,
     homeForm,
@@ -483,6 +515,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
       apiFootballAwayForm,
       espnHomeForm,
       espnAwayForm,
+      onefootballHomeForm,
+      onefootballAwayForm,
       flashscoreHomeForm,
       flashscoreAwayForm,
     },
@@ -531,6 +565,8 @@ interface QualityInputs {
   apiFootballAwayForm: ApiFootballForm | null;
   espnHomeForm: EspnTeamForm | null;
   espnAwayForm: EspnTeamForm | null;
+  onefootballHomeForm: OnefootballTeamForm | null;
+  onefootballAwayForm: OnefootballTeamForm | null;
   flashscoreHomeForm: FlashscoreTeamForm | null;
   flashscoreAwayForm: FlashscoreTeamForm | null;
   homeForm: TeamFormDetail | null;
@@ -556,8 +592,11 @@ function assessQuality(q: QualityInputs): QualityAssessment {
     reasons.push('Matched via API-Football (good confidence).');
   } else if (q.source === 'espn') {
     reasons.push('Matched via ESPN (good confidence).');
+  } else if (q.source === 'onefootball') {
+    reasons.push('Matched via Onefootball SSR data (good confidence — structured JSON).');
+    score -= 5;
   } else if (q.source === 'flashscore') {
-    reasons.push('Matched via flashscore.mobi rolling-30d index (lower confidence — fuzzy name matching).');
+    reasons.push('Matched via flashscore.mobi rolling-60d index (lower confidence — fuzzy name matching).');
     score -= 15;
   }
 
@@ -566,6 +605,8 @@ function assessQuality(q: QualityInputs): QualityAssessment {
   const afSame = af && q.apiFootballHomeForm!.league === q.apiFootballAwayForm!.league;
   const espn = q.espnHomeForm && q.espnAwayForm;
   const espnSame = espn && q.espnHomeForm!.league === q.espnAwayForm!.league && q.espnHomeForm!.country === q.espnAwayForm!.country;
+  const of = q.onefootballHomeForm && q.onefootballAwayForm;
+  const ofSame = of && q.onefootballHomeForm!.league === q.onefootballAwayForm!.league && q.onefootballHomeForm!.country === q.onefootballAwayForm!.country;
   const fs = q.flashscoreHomeForm && q.flashscoreAwayForm;
   const fsSame = fs && q.flashscoreHomeForm!.league === q.flashscoreAwayForm!.league && q.flashscoreHomeForm!.country === q.flashscoreAwayForm!.country;
 
@@ -574,6 +615,9 @@ function assessQuality(q: QualityInputs): QualityAssessment {
     score -= 30;
   } else if (q.source === 'espn' && espn && !espnSame) {
     reasons.push('Teams matched in DIFFERENT ESPN leagues — cross-league lambdas, treat as approximate.');
+    score -= 30;
+  } else if (q.source === 'onefootball' && of && !ofSame) {
+    reasons.push('Teams matched in DIFFERENT Onefootball competitions — cross-league lambdas, treat as approximate.');
     score -= 30;
   } else if (q.source === 'flashscore' && fs && !fsSame) {
     reasons.push('Teams matched in DIFFERENT flashscore competitions — cross-league lambdas, very unreliable.');
