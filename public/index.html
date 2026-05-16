@@ -1664,10 +1664,21 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
       <input id="mp-home" type="text" class="input-sm" placeholder="Home team (e.g. Arsenal)" style="flex:1 1 160px;min-width:0">
       <input id="mp-away" type="text" class="input-sm" placeholder="Away team (e.g. Chelsea)" style="flex:1 1 160px;min-width:0">
     </div>
-    <div style="display:flex;gap:8px;align-items:stretch">
+    <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px">
       <input id="mp-league" type="text" class="input-sm" placeholder="League hint (optional, e.g. La Liga)" style="flex:2;min-width:0">
       <button id="mp-go" class="btn btn-green btn-sm" style="flex-shrink:0;min-width:90px;font-weight:700">Predict</button>
     </div>
+    <details style="margin-top:4px">
+      <summary style="cursor:pointer;font-size:11px;color:var(--text-3);font-weight:700;padding:4px 0">Advanced (referee, knockout 2nd leg, value bet) ▾</summary>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+        <input id="mp-ref" type="text" class="input-sm" placeholder="Referee name (e.g. M Oliver)" title="Cards-heavy refs suppress λ, goals-heavy refs inflate it">
+        <input id="mp-odds" type="number" step="0.01" min="1.01" class="input-sm" placeholder="Bookie odds (for EV + Kelly)" title="Decimal odds for the predictor's pick — unlocks Decision Score, EV, Kelly stake">
+        <input id="mp-fl-home" type="number" min="0" step="1" class="input-sm" placeholder="1st leg: home agg goals" title="Goals scored by the CURRENT home team in the first leg">
+        <input id="mp-fl-away" type="number" min="0" step="1" class="input-sm" placeholder="1st leg: away agg goals" title="Goals scored by the CURRENT away team in the first leg">
+        <input id="mp-bankroll" type="number" min="1" step="1" class="input-sm" placeholder="Bankroll (default 100)" title="Used to size the Kelly stake — defaults to 100 units">
+        <input id="mp-tax" type="number" min="0" max="1" step="0.01" class="input-sm" placeholder="Payout tax (0..1, default 0)" title="e.g. 0.12 for Polish betting tax. Default 0.">
+      </div>
+    </details>
   </div>
 
   <div id="mp-result"></div>
@@ -8510,6 +8521,12 @@ async function runPredictor() {
   const home = (document.getElementById('mp-home').value || '').trim();
   const away = (document.getElementById('mp-away').value || '').trim();
   const league = (document.getElementById('mp-league').value || '').trim();
+  const ref = (document.getElementById('mp-ref') && document.getElementById('mp-ref').value || '').trim();
+  const odds = (document.getElementById('mp-odds') && document.getElementById('mp-odds').value || '').trim();
+  const flHome = (document.getElementById('mp-fl-home') && document.getElementById('mp-fl-home').value || '').trim();
+  const flAway = (document.getElementById('mp-fl-away') && document.getElementById('mp-fl-away').value || '').trim();
+  const bankroll = (document.getElementById('mp-bankroll') && document.getElementById('mp-bankroll').value || '').trim();
+  const tax = (document.getElementById('mp-tax') && document.getElementById('mp-tax').value || '').trim();
   const out = document.getElementById('mp-result');
   if (!home || !away) {
     out.innerHTML = '<div class="card" style="padding:14px;color:var(--red);font-size:12px">Enter both teams.</div>';
@@ -8517,12 +8534,183 @@ async function runPredictor() {
   }
   out.innerHTML = '<div class="card" style="padding:20px;text-align:center"><div class="spinner" style="width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 8px"></div><div style="font-size:12px;color:var(--text-3)">Computing… (Poisson + Elo + injuries)</div></div>';
   try {
-    const url = '/predictions/match-predict?home=' + encodeURIComponent(home) + '&away=' + encodeURIComponent(away) + (league ? '&league=' + encodeURIComponent(league) : '');
+    const params = ['home=' + encodeURIComponent(home), 'away=' + encodeURIComponent(away)];
+    if (league)   params.push('league=' + encodeURIComponent(league));
+    if (ref)      params.push('ref=' + encodeURIComponent(ref));
+    if (odds)     params.push('odds=' + encodeURIComponent(odds));
+    if (flHome !== '') params.push('firstLegHome=' + encodeURIComponent(flHome));
+    if (flAway !== '') params.push('firstLegAway=' + encodeURIComponent(flAway));
+    if (bankroll) params.push('bankroll=' + encodeURIComponent(bankroll));
+    if (tax)      params.push('tax=' + encodeURIComponent(tax));
+    const url = '/predictions/match-predict?' + params.join('&');
     const data = await api(url);
     out.innerHTML = renderMatchPrediction(data);
   } catch (err) {
     out.innerHTML = '<div class="card" style="padding:14px;color:var(--red);font-size:12px">Prediction failed: ' + esc(err && err.message || 'unknown') + '</div>';
   }
+}
+
+function renderContextModifiers(d) {
+  const ctx = d.context || {};
+  const cal = d.calibration || {};
+  const pills = [];
+  const sections = [];
+  const homeName = (d.base && d.base.homeNormalized) || 'Home';
+  const awayName = (d.base && d.base.awayNormalized) || 'Away';
+  const pill = (label, color, bg, title) =>
+    '<span title="' + (title ? esc(title) : '') + '" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:10px;background:' + bg + ';color:' + color + ';font-size:10px;font-weight:700;border:1px solid ' + color + '40">' + label + '</span>';
+
+  // Fortress (home)
+  if (ctx.fortress && ctx.fortress.active) {
+    pills.push(pill('🏰 Fortress ×' + ctx.fortress.awayLambdaMult.toFixed(2), 'var(--blue)', 'rgba(78,165,255,0.10)',
+      homeName + ' unbeaten at home (' + ctx.fortress.homeUnbeatenStreak + ' games) → away λ ' + ctx.fortress.awayLambdaMult));
+  }
+  // Momentum (both sides)
+  const momentumPill = (side, name, m) => {
+    if (!m || m.type === 'neutral') return null;
+    const c = m.type === 'hot' ? 'var(--green)' : 'var(--red)';
+    const bg = m.type === 'hot' ? 'var(--green-soft)' : 'rgba(232,80,80,0.12)';
+    const icon = m.type === 'hot' ? '🔥' : '🧊';
+    return pill(icon + ' ' + side + ' ' + (m.type === 'hot' ? 'streak ' : 'cold ') + Math.abs(m.streak), c, bg,
+      name + ': ' + Math.abs(m.streak) + ' consecutive ' + (m.type === 'hot' ? 'wins' : 'losses') + ' → λ ×' + m.lambdaMult);
+  };
+  const mh = momentumPill('H', homeName, ctx.homeMomentum); if (mh) pills.push(mh);
+  const ma = momentumPill('A', awayName, ctx.awayMomentum); if (ma) pills.push(ma);
+
+  // Fatigue (per side)
+  const fat = ctx.fatigue;
+  if (fat) {
+    const sidePill = (label, name, s) => {
+      const out = [];
+      if (s.tired) out.push(pill('😫 ' + label + ' tired', 'var(--red)', 'rgba(232,80,80,0.10)',
+        name + ': played ' + (s.hoursSinceLast || 0).toFixed(0) + 'h ago → def ×' + s.defenseMult));
+      if (s.rotation) out.push(pill('🔄 ' + label + ' rotation', 'var(--amber)', 'var(--amber-soft)',
+        name + ': ' + s.gamesInWindow + ' games in 7d → atk ×' + s.attackMult));
+      return out;
+    };
+    sidePill('H', homeName, fat.home).forEach(p => pills.push(p));
+    sidePill('A', awayName, fat.away).forEach(p => pills.push(p));
+  }
+
+  // H2H patterns
+  const h2h = ctx.h2hPatterns;
+  if (h2h) {
+    if (h2h.homePatent) pills.push(pill('🏅 H Patent +' + Math.round((h2h.homeOddsMult - 1) * 100) + '% odds', 'var(--purple)', 'rgba(176,124,255,0.12)',
+      homeName + ' won all ' + h2h.meetings + ' recent H2H meetings'));
+    if (h2h.awayPatent) pills.push(pill('🏅 A Patent +' + Math.round((h2h.awayOddsMult - 1) * 100) + '% odds', 'var(--purple)', 'rgba(176,124,255,0.12)',
+      awayName + ' won all ' + h2h.meetings + ' recent H2H meetings'));
+    if (h2h.homeRevenge) pills.push(pill('⚔️ H Revenge +' + Math.round((h2h.homeAttackMult - 1) * 100) + '% atk', 'var(--amber)', 'var(--amber-soft)',
+      homeName + ' lost the last H2H by 3+'));
+    if (h2h.awayRevenge) pills.push(pill('⚔️ A Revenge +' + Math.round((h2h.awayAttackMult - 1) * 100) + '% atk', 'var(--amber)', 'var(--amber-soft)',
+      awayName + ' lost the last H2H by 3+'));
+  }
+
+  // Importance (per side, only when not NORMAL)
+  const imp = ctx.importance;
+  if (imp) {
+    const impPill = (side, name, i) => {
+      if (!i || i.status === 'NORMAL') return null;
+      const status = i.status;
+      const c = status.includes('TOP') || status.includes('HIGH_STAKES_TOP') ? 'var(--green)'
+        : status.includes('RELEGATION') || status.includes('BOTTOM') ? 'var(--red)'
+        : status === 'VACATION' || status === 'COMFORT' ? 'var(--text-3)'
+        : 'var(--amber)';
+      const bg = status.includes('TOP') || status === 'HIGH_STAKES_TOP' ? 'var(--green-soft)'
+        : status.includes('RELEGATION') || status.includes('BOTTOM') ? 'rgba(232,80,80,0.10)'
+        : status === 'VACATION' || status === 'COMFORT' ? 'var(--surface-2)'
+        : 'var(--amber-soft)';
+      const delta = i.attackMult === 1 ? '' : (i.attackMult > 1 ? ' +' : ' ') + Math.round((i.attackMult - 1) * 100) + '%';
+      return pill('📊 ' + side + ' ' + i.label + delta, c, bg, name + ' — ' + i.reason);
+    };
+    const ih = impPill('H', homeName, imp.home); if (ih) pills.push(ih);
+    const ia = impPill('A', awayName, imp.away); if (ia) pills.push(ia);
+  }
+
+  // Referee (only when signal is informative)
+  const ref = ctx.referee;
+  if (ref && ref.signal && ref.signal !== 'unknown') {
+    if (ref.signal === 'cards-heavy') pills.push(pill('🟨 ' + (ref.stats && ref.stats.name || 'Ref') + ' cards-heavy λ ×' + ref.lambdaMult, 'var(--amber)', 'var(--amber-soft)', ref.reason));
+    else if (ref.signal === 'goals-heavy') pills.push(pill('⚽ ' + (ref.stats && ref.stats.name || 'Ref') + ' goals-heavy λ ×' + ref.lambdaMult, 'var(--green)', 'var(--green-soft)', ref.reason));
+    else if (ref.stats) pills.push(pill('🟢 ' + ref.stats.name + ' neutral', 'var(--text-3)', 'var(--surface-2)', ref.reason));
+  }
+
+  // Knockout
+  const ko = ctx.knockout;
+  if (ko && ko.applied) {
+    let label = 'Knockout';
+    if (ko.scenario === 'HOME_LEAD_COMFORT') label = '🚌 Home parks the bus (lead +' + ko.aggDiff + ')';
+    else if (ko.scenario === 'AWAY_LEAD_COMFORT') label = '🚌 Away parks the bus (lead ' + (-ko.aggDiff) + ')';
+    else if (ko.scenario === 'NARROW_LEAD') label = '⚡ Tight tie (' + ko.aggHome + ':' + ko.aggAway + ')';
+    else if (ko.scenario === 'STALEMATE') label = '⚡ 0:0 — both must attack';
+    pills.push(pill(label, 'var(--purple)', 'rgba(176,124,255,0.12)', ko.reason));
+  }
+
+  // Calibration footer (always shown so users know the model has a
+  // walk-forward correction in the loop, even when it's still neutral).
+  let calFooter = '';
+  if (cal && (cal.factorHome != null || cal.factorAway != null)) {
+    const fh = (cal.factorHome != null ? cal.factorHome : 1).toFixed(3);
+    const fa = (cal.factorAway != null ? cal.factorAway : 1).toFixed(3);
+    const n = cal.nMatches || 0;
+    const under = cal.underSampled ? ' (under-sampled, n<30 — neutral)' : '';
+    calFooter = '<div style="font-size:10px;color:var(--text-3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">Walk-forward λ calibration · home ×<b style="color:var(--text-2)">' + fh + '</b> · away ×<b style="color:var(--text-2)">' + fa + '</b> · n=' + n + under + '</div>';
+  }
+
+  if (pills.length === 0 && !calFooter) return '';
+
+  const body = pills.length > 0
+    ? '<div style="display:flex;flex-wrap:wrap;gap:6px">' + pills.join('') + '</div>'
+    : '<div style="font-size:11px;color:var(--text-3);font-style:italic">All contextual modifiers neutral — base Poisson + Elo only.</div>';
+  return '<div class="card" style="padding:12px;margin-bottom:10px">'
+    + '<div style="font-size:12px;font-weight:700;margin-bottom:8px">Context modifiers</div>'
+    + body
+    + calFooter
+    + '</div>';
+}
+
+function renderDecisionAndStake(d) {
+  const dec = d.decision;
+  const stake = d.stake;
+  if (!dec && !stake) return '';
+
+  let html = '<div class="card" style="padding:12px;margin-bottom:10px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">'
+    + '<div style="font-size:12px;font-weight:700">Decision Score & value</div>';
+  if (dec) {
+    const tierColor = dec.tier === 'final' ? 'var(--green)' : dec.tier === 'draft' ? 'var(--amber)' : 'var(--red)';
+    const tierBg = dec.tier === 'final' ? 'var(--green-soft)' : dec.tier === 'draft' ? 'var(--amber-soft)' : 'rgba(232,80,80,0.10)';
+    html += '<span style="background:' + tierBg + ';color:' + tierColor + ';padding:3px 10px;border-radius:3px;font-size:11px;font-weight:800;text-transform:uppercase">'
+      + dec.tier + ' · ' + dec.score + '/' + dec.maxScore + '</span>';
+  }
+  html += '</div>';
+
+  if (dec) {
+    // Reason list
+    const reasons = (dec.reasons || []).map(r => {
+      const positive = r.indexOf('(+') !== -1;
+      const color = positive ? 'var(--green)' : 'var(--text-3)';
+      return '<li style="padding:2px 0;font-size:11px;color:' + color + '">' + esc(r) + '</li>';
+    }).join('');
+    html += '<ul style="margin:0;padding-left:16px;margin-bottom:8px">' + reasons + '</ul>';
+  }
+
+  if (stake) {
+    const evPct = stake.ev != null ? (stake.ev * 100) : null;
+    const evColor = evPct == null ? 'var(--text-3)' : evPct > 0 ? 'var(--green)' : 'var(--red)';
+    const stakeColor = stake.stake > 0 ? 'var(--green)' : 'var(--text-3)';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;padding:8px;background:var(--surface-2);border-radius:var(--r-xs);margin-top:4px">'
+      + '<div><div style="font-size:9px;color:var(--text-3);text-transform:uppercase">Odds</div><div style="font-size:14px;font-weight:800">' + (stake.odds != null ? stake.odds.toFixed(2) : '—') + '</div></div>'
+      + '<div><div style="font-size:9px;color:var(--text-3);text-transform:uppercase">Net EV</div><div style="font-size:14px;font-weight:800;color:' + evColor + '">' + (evPct == null ? '—' : (evPct > 0 ? '+' : '') + evPct.toFixed(1) + '%') + '</div></div>'
+      + '<div><div style="font-size:9px;color:var(--text-3);text-transform:uppercase">Kelly stake</div><div style="font-size:14px;font-weight:800;color:' + stakeColor + '">' + stake.stake.toFixed(2) + ' <span style="font-size:10px;color:var(--text-3);font-weight:500">on ' + (stake.bankroll || 100) + '</span></div></div>'
+      + '<div><div style="font-size:9px;color:var(--text-3);text-transform:uppercase">f* / bankroll</div><div style="font-size:14px;font-weight:800">' + (stake.fractionOfBankroll != null ? (stake.fractionOfBankroll * 100).toFixed(1) + '%' : '—') + '</div></div>'
+      + '</div>';
+    if (stake.stake === 0 && stake.fullKelly != null && stake.fullKelly <= 0) {
+      html += '<div style="font-size:10px;color:var(--text-3);margin-top:6px">No positive edge at these odds → recommended stake is 0.</div>';
+    }
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function renderMatchPrediction(d) {
@@ -8644,6 +8832,12 @@ function renderMatchPrediction(d) {
     + '</div>'
     + '<div style="font-size:10px;color:var(--text-3);margin-top:8px;display:flex;gap:14px;flex-wrap:wrap">' + bttsSummary + ' · ' + csSummary + '</div>'
     + '</div>';
+
+  // Context modifiers (fortress / momentum / fatigue / H2H / importance / referee / knockout)
+  html += renderContextModifiers(d);
+
+  // Decision Score & Kelly stake (only if odds were supplied)
+  html += renderDecisionAndStake(d);
 
   // 1X2 comparison table
   html += '<div class="card" style="padding:12px;margin-bottom:10px">'
