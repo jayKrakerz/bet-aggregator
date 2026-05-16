@@ -92,7 +92,7 @@ export interface OuLookupResult {
     /** Populated when source='espn'. Same fields as ApiFootballForm, different source. */
     espnHomeForm: EspnTeamForm | null;
     espnAwayForm: EspnTeamForm | null;
-    /** Populated when source='flashscore'. Derived from flashscore.mobi's 14-day rolling results. */
+    /** Populated when source='flashscore'. Derived from flashscore.mobi's 60-day rolling results. */
     flashscoreHomeForm: FlashscoreTeamForm | null;
     flashscoreAwayForm: FlashscoreTeamForm | null;
   };
@@ -380,9 +380,9 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
 
   if (!matched) {
     if (hasApiFootballKey()) {
-      reason = 'Neither local CSVs, ESPN, API-Football, nor flashscore.mobi found these teams in the last 14 days. They may be very low-tier (reserves, U-teams), exhibition friendlies, or names that drifted between sources. Used a generic football prior.';
+      reason = 'Neither local CSVs, ESPN, API-Football, nor flashscore.mobi found these teams in the last 60 days. The fixture may be very low-tier (reserves, U-teams), exhibition friendlies, or use names that drifted between sources. Used a generic football prior.';
     } else {
-      reason = 'No league coverage for this matchup — used a generic football prior. Local data covers 35 leagues / 700+ teams; ESPN adds ~20 more; flashscore.mobi covers another ~150 leagues over a 14-day rolling window. To extend further with H2H + injuries set FOOTBALL_API_KEY env var (free signup at api-football.com).';
+      reason = 'No league coverage for this matchup — used a generic football prior. Local data covers ~35 leagues / 700+ teams; ESPN adds ~55 more; flashscore.mobi covers another ~150 leagues over a 60-day rolling window. To unlock 1300+ leagues with H2H + injuries set FOOTBALL_API_KEY env var (free signup at api-football.com).';
     }
   }
 

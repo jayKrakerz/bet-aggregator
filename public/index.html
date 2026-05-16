@@ -8555,13 +8555,20 @@ function renderQualityBanner(d) {
   if (!q) return '';
   const grade = q.grade || 'partial';
   const reasons = q.reasons || [];
-  // Colour scheme: green/blue/amber/red mapped to existing tokens.
+  // Distinguish "no coverage" from "junk fuzzy match" — both currently
+  // get graded `unreliable` but they need different fixes.
+  const isNoCoverage = !!(d.base && (d.base.source === 'generic' || d.base.usedFallback));
+  const apiKeyEnabled = !!(d.base && d.base.apiFootball && d.base.apiFootball.enabled);
+
   const cfg = {
     solid:      { color: 'var(--green)',  bg: 'var(--green-soft)',          icon: '✅', title: 'Solid prediction',     subtitle: 'Both teams resolved cleanly in matching data sources.' },
     partial:    { color: 'var(--blue)',   bg: 'rgba(78,148,255,0.10)',      icon: 'ℹ️', title: 'Partial confidence',    subtitle: 'Cross-source or one-sided data — treat with mild caution.' },
     weak:       { color: 'var(--amber)',  bg: 'var(--amber-soft)',          icon: '⚠️', title: 'Weak match',            subtitle: 'Fuzzy / cross-league match — sanity-check before staking.' },
-    unreliable: { color: 'var(--red)',    bg: 'rgba(240,96,96,0.10)',       icon: '🛑', title: 'Unreliable prediction', subtitle: 'Lambdas come from cross-league fuzzy match or generic prior — DO NOT bet this.' },
+    unreliable: isNoCoverage
+      ? { color: 'var(--amber)', bg: 'var(--amber-soft)',   icon: '📭', title: 'No coverage for this fixture', subtitle: 'None of our data sources index these teams — the prediction is a generic football average, not a real model.' }
+      : { color: 'var(--red)',   bg: 'rgba(240,96,96,0.10)', icon: '🛑', title: 'Unreliable prediction',         subtitle: 'Lambdas come from a cross-league fuzzy match — DO NOT bet this.' },
   }[grade] || { color: 'var(--text-3)', bg: 'var(--surface-2)', icon: '·', title: 'Unknown', subtitle: '' };
+
   // Solid predictions get a slim badge; everything else gets the full banner.
   if (grade === 'solid') {
     return '<div style="display:flex;align-items:center;gap:6px;margin:-2px 0 10px;font-size:11px;color:' + cfg.color + ';font-weight:700">'
@@ -8569,17 +8576,42 @@ function renderQualityBanner(d) {
       + '<span style="color:var(--text-3);font-weight:500">· ' + esc(cfg.subtitle) + '</span>'
       + '</div>';
   }
+
+  // Reasons list — same for partial/weak/unreliable.
   const list = reasons.length > 0
     ? '<ul style="margin:6px 0 0;padding-left:18px;font-size:11px;color:var(--text-2);line-height:1.5">'
       + reasons.map(r => '<li style="padding:1px 0">' + esc(r) + '</li>').join('')
       + '</ul>'
     : '';
+
+  // Actionable next-step block for no-coverage cases. The UI nudges you
+  // toward the cheapest fix (API-Football has a free tier covering 1300+
+  // leagues) and explicitly tells you what we DO cover so you can stick
+  // to high-confidence fixtures in the meantime.
+  let nextSteps = '';
+  if (grade === 'unreliable' && isNoCoverage) {
+    const items = [];
+    if (!apiKeyEnabled) {
+      items.push('<li><b>Free</b>: <a href="https://www.api-football.com/" target="_blank" rel="noopener" style="color:var(--blue)">sign up for API-Football</a> (100 req/day free, covers 1300+ leagues including most niche African / South American / women\'s comps) — then set the <code style="background:var(--surface-2);padding:1px 5px;border-radius:3px">FOOTBALL_API_KEY</code> env var.</li>');
+    } else {
+      items.push('<li>API-Football key is configured but didn\'t find these teams either. Double-check the spelling — Sportybet sometimes uses local-language names that the API indexes differently.</li>');
+    }
+    items.push('<li><b>Sanity check the spelling</b>: try alternative names (e.g. "Real Madrid" not "Madrid CF", "Bayern Munich" not "FC Bayern").</li>');
+    items.push('<li><b>Drop the league hint</b>: it\'s used as a gate — without it the matcher will try every source and you\'ll see how close it can get.</li>');
+    items.push('<li>Our gold-standard coverage: 35 football-data.co.uk leagues (top European tiers, MLS, Brazilian Série A, J League, Liga MX, etc.) + ~55 ESPN leagues (lower European divs, most South + Central America, big Asian leagues, Africa top flights).</li>');
+    nextSteps = '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:var(--r-xs);border:1px dashed var(--border)">'
+      + '<div style="font-size:11px;font-weight:700;color:var(--text-2);margin-bottom:6px">How to get a real prediction for this fixture:</div>'
+      + '<ul style="margin:0;padding-left:18px;font-size:11px;color:var(--text-2);line-height:1.6">' + items.join('') + '</ul>'
+      + '</div>';
+  }
+
   return '<div class="card" style="padding:12px;margin-bottom:10px;border-color:' + cfg.color + ';border-left-width:4px;background:' + cfg.bg + '">'
     + '<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:' + cfg.color + '">'
     + '<span style="font-size:18px">' + cfg.icon + '</span>' + cfg.title + ' · ' + (q.score != null ? q.score + '/100' : '')
     + '</div>'
     + '<div style="font-size:11px;color:var(--text-2);margin-top:4px">' + esc(cfg.subtitle) + '</div>'
     + list
+    + nextSteps
     + '</div>';
 }
 

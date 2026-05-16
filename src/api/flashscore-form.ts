@@ -21,7 +21,9 @@ import { logger } from '../utils/logger.js';
 
 const BASE = 'https://www.flashscore.mobi';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 13_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Mobile/15E148 Safari/604.1';
-const DAYS_BACK = 30;
+// 60-day window — catches off-season leagues (Scandinavian summer break,
+// Latin American Apertura/Clausura transitions) that a 30-day window misses.
+const DAYS_BACK = 60;
 const INDEX_TTL = 60 * 60 * 1000;        // 1h
 const FETCH_TIMEOUT = 12_000;
 const GENERIC_HOME_LAMBDA = 1.55;
