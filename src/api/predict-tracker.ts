@@ -44,6 +44,11 @@ export interface PredictionLog {
   status: 'pending' | 'won' | 'lost' | 'void';
   settledAt: string | null;
   actualScore: { home: number; away: number } | null;
+  /** Probability we assigned to the picked outcome, 0..1. Optional
+   *  (older entries logged before Brier/log-loss tracking lack it). */
+  pickProb?: number;
+  /** Decimal odds at time of prediction. Optional — unlocks ROI when set. */
+  odds?: number;
 }
 
 interface PersistedLog {
@@ -136,6 +141,8 @@ export async function logPrediction(p: {
   confidence: number;
   expHome: number;
   expAway: number;
+  pickProb?: number;
+  odds?: number;
 }): Promise<void> {
   await ensureLoaded();
   const date = new Date().toISOString().slice(0, 10);
@@ -154,6 +161,8 @@ export async function logPrediction(p: {
     status: 'pending',
     settledAt: null,
     actualScore: null,
+    pickProb: typeof p.pickProb === 'number' && Number.isFinite(p.pickProb) ? p.pickProb : undefined,
+    odds: typeof p.odds === 'number' && Number.isFinite(p.odds) && p.odds > 1.01 ? p.odds : undefined,
   });
   if (entries.length > LOG_CAP) entries = entries.slice(-LOG_CAP);
   schedulePersist();
@@ -197,12 +206,17 @@ function checkPick(pick: 'Home' | 'Draw' | 'Away', hg: number, ag: number): bool
 }
 
 /** Recent hit-rate over the last HIT_RATE_WINDOW settled predictions, and the
- *  multiplier we apply to displayed confidence (centered on 1.0 at 70% hit-rate). */
+ *  multiplier we apply to displayed confidence (centered on 1.0 at 70% hit-rate).
+ *  Also returns Brier score + log-loss (over entries that carry `pickProb`)
+ *  and ROI (over entries that carry `odds`). All three are NaN-safe. */
 export async function getCalibration(): Promise<{
   totalSettled: number;
   recentWindow: number;
   hitRate: number;            // 0..1, NaN-safe
   confidenceMult: number;     // 0.7..1.2
+  brier: { score: number; n: number };       // 0..1, lower is better
+  logLoss: { score: number; n: number };     // 0..∞, lower is better
+  roi: { profit: number; n: number; pct: number }; // ROI on 1-unit flat stake
   lastSettled: PredictionLog[];
   pendingCount: number;
 }> {
@@ -224,15 +238,53 @@ export async function getCalibration(): Promise<{
     mult = Math.max(0.7, Math.min(1.2, mult));
   }
 
+  // Brier + log-loss over entries that carry a pickProb. Outcome is binary
+  // (did the pick win?), so this is two-class Brier / cross-entropy on the
+  // picked outcome — same shape FootStats uses.
+  let brierSum = 0, brierN = 0;
+  let logSum = 0, logN = 0;
+  // ROI: stake 1 unit per pick. Win returns `odds`; loss returns 0. Profit
+  // = sum(returns) − n.
+  let roiReturns = 0, roiN = 0;
+  for (const e of settled) {
+    const won = e.status === 'won' ? 1 : 0;
+    if (typeof e.pickProb === 'number' && e.pickProb > 0 && e.pickProb < 1) {
+      const p = e.pickProb;
+      brierSum += (p - won) ** 2;
+      brierN++;
+      // Clip to avoid log(0). Standard log-loss clip range.
+      const pClip = Math.max(1e-9, Math.min(1 - 1e-9, p));
+      logSum += -(won * Math.log(pClip) + (1 - won) * Math.log(1 - pClip));
+      logN++;
+    }
+    if (typeof e.odds === 'number' && e.odds > 1.01) {
+      roiReturns += won ? e.odds : 0;
+      roiN++;
+    }
+  }
+  const brierScore = brierN > 0 ? brierSum / brierN : NaN;
+  const logLossScore = logN > 0 ? logSum / logN : NaN;
+  const roiPct = roiN > 0 ? ((roiReturns - roiN) / roiN) * 100 : NaN;
+
   return {
     totalSettled: settled.length,
     recentWindow: total,
     hitRate,
     confidenceMult: Math.round(mult * 1000) / 1000,
+    brier: { score: Number.isFinite(brierScore) ? round4(brierScore) : NaN, n: brierN },
+    logLoss: { score: Number.isFinite(logLossScore) ? round4(logLossScore) : NaN, n: logN },
+    roi: {
+      profit: roiN > 0 ? round2(roiReturns - roiN) : 0,
+      n: roiN,
+      pct: Number.isFinite(roiPct) ? round2(roiPct) : NaN,
+    },
     lastSettled: settled.slice(-10).reverse(),
     pendingCount: entries.filter(e => e.status === 'pending').length,
   };
 }
+
+function round2(x: number): number { return Math.round(x * 100) / 100; }
+function round4(x: number): number { return Math.round(x * 10000) / 10000; }
 
 /** Read settled predictions with both expected and actual scores recorded —
  *  used by walk-forward λ calibration to compute per-side goal-volume bias. */

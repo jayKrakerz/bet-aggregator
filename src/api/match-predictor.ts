@@ -26,6 +26,7 @@ import { analyzeH2HPatterns, type H2HPatterns } from './h2h-patterns.js';
 import { getLambdaCalibration, type CalibrationFactors } from './lambda-calibration.js';
 import { analyzeImportancePair, type ImportanceReport } from './importance-index.js';
 import { analyzeReferee, type RefereeAnalysis } from './referee-bias.js';
+import { analyzeKnockout, type KnockoutCorrection } from './knockout-correction.js';
 
 // ── Tunables ────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ export interface LineupImpact {
   awayLambdaMult: number;   // multiplier applied to away λ
 }
 
-/** Contextual modifiers beyond injuries — fortress + momentum + fatigue + H2H + importance + referee. */
+/** Contextual modifiers beyond injuries — fortress + momentum + fatigue + H2H + importance + referee + knockout. */
 export interface ContextImpact {
   fortress: { active: boolean; homeUnbeatenStreak: number; awayLambdaMult: number };
   homeMomentum: { streak: number; type: 'hot' | 'cold' | 'neutral'; lambdaMult: number };
@@ -93,6 +94,7 @@ export interface ContextImpact {
   h2hPatterns: H2HPatterns;
   importance: ImportanceReport;
   referee: RefereeAnalysis;
+  knockout: KnockoutCorrection;
 }
 
 export interface BlendedVerdict {
@@ -363,12 +365,35 @@ function r3(x: number): number { return Math.round(x * 1000) / 1000; }
 
 // ── Public entry point ────────────────────────────────
 
+export interface PredictMatchFullOptions {
+  league?: string;
+  referee?: string;
+  /** First-leg score from the *current home's* perspective — when set,
+   *  triggers the knockout correction. */
+  firstLegHome?: number;
+  firstLegAway?: number;
+  /** Optional decimal odds for the predictor's pick — when set, gets
+   *  logged with the prediction so ROI can be computed at settlement. */
+  odds?: number;
+}
+
 export async function predictMatchFull(
   home: string,
   away: string,
-  leagueHint?: string,
-  referee?: string,
+  optsOrLeague?: string | PredictMatchFullOptions,
+  refereeArg?: string,
 ): Promise<MatchPrediction> {
+  // Back-compat: previously this fn took (home, away, league?, referee?).
+  // Now it takes either a string league OR an options object so we can
+  // pass first-leg scores + odds without ballooning the arg list.
+  const opts: PredictMatchFullOptions = typeof optsOrLeague === 'string' || optsOrLeague === undefined
+    ? { league: optsOrLeague, referee: refereeArg }
+    : optsOrLeague;
+  const leagueHint = opts.league;
+  const referee = opts.referee;
+  const firstLegHome = opts.firstLegHome;
+  const firstLegAway = opts.firstLegAway;
+  const odds = opts.odds;
   // Base lookup + injuries + Elo + fatigue + calibration + importance + referee
   // in parallel — none depend on each other. H2H patterns are computed off
   // base.factors.h2h after the base resolves (no extra network call).
@@ -399,13 +424,14 @@ export async function predictMatchFull(
   ]);
 
   const h2hPatterns = analyzeH2HPatterns(base.factors.h2h, base.homeNormalized, base.awayNormalized);
+  const knockout = analyzeKnockout(firstLegHome, firstLegAway);
   // Walk-forward λ correction applied before any contextual modifier fires.
   const baseH = base.expected.home * calibration.factorHome;
   const baseA = base.expected.away * calibration.factorAway;
 
   const { adjustedH: linH, adjustedA: linA, impact } = applyLineupImpact(baseH, baseA, homeInj, awayInj);
   const { adjustedH, adjustedA, context } = applyContextImpact(
-    linH, linA, base, fatigue, h2hPatterns, importance, refereeAnalysis,
+    linH, linA, base, fatigue, h2hPatterns, importance, refereeAnalysis, knockout,
   );
   const matrix = buildMatrix(adjustedH, adjustedA);
 
@@ -418,6 +444,13 @@ export async function predictMatchFull(
   const calibrationMult = await getCachedConfidenceMult();
   const verdict = blend(adjusted1x2, eloRes, base.matched, calibrationMult);
 
+  // Pick probability — needed for Brier + log-loss when the prediction
+  // settles. Verdict pct fields are 0–100, normalise to 0..1.
+  const pickPct = verdict.pick === 'Home' ? verdict.homePct
+    : verdict.pick === 'Away' ? verdict.awayPct
+    : verdict.drawPct;
+  const pickProb = pickPct / 100;
+
   // Fire-and-forget: log this prediction so the tracker can later settle and
   // refine the calibration multiplier. Errors swallowed — never block the
   // user-facing response on the tracker.
@@ -428,6 +461,8 @@ export async function predictMatchFull(
     confidence: verdict.confidence,
     expHome: adjustedH,
     expAway: adjustedA,
+    pickProb,
+    odds,
   }).catch(err => logger.warn({ err }, 'predict-tracker: logPrediction failed'));
 
   return {
@@ -497,6 +532,7 @@ function applyContextImpact(
   h2h: H2HPatterns,
   importanceRes: ImportanceReport | null,
   refereeRes: RefereeAnalysis | null,
+  knockout: KnockoutCorrection,
 ): { adjustedH: number; adjustedA: number; context: ContextImpact } {
   const sig = readContextSignals(base);
 
@@ -542,8 +578,14 @@ function applyContextImpact(
   const referee = refereeRes ?? NEUTRAL_REFEREE;
   const refMult = referee.lambdaMult;
 
-  const adjustedH = baseH * homeM.mult * homeAttackFatigue * homeH2H * homeImp * refMult;
-  const adjustedA = baseA * fortressMult * awayM.mult * awayAttackFatigue * awayH2H * awayImp * refMult;
+  // Knockout: applied per side as attack × multiplier ÷ opponent defense
+  // multiplier, mirroring the bot-main algebra. When not in a knockout
+  // tie, all multipliers are 1 so this is a no-op.
+  const homeKnockoutAttack = knockout.homeAttackMult / knockout.awayDefenseMult;
+  const awayKnockoutAttack = knockout.awayAttackMult / knockout.homeDefenseMult;
+
+  const adjustedH = baseH * homeM.mult * homeAttackFatigue * homeH2H * homeImp * refMult * homeKnockoutAttack;
+  const adjustedA = baseA * fortressMult * awayM.mult * awayAttackFatigue * awayH2H * awayImp * refMult * awayKnockoutAttack;
 
   return {
     adjustedH,
@@ -560,6 +602,7 @@ function applyContextImpact(
       h2hPatterns: h2h,
       importance,
       referee,
+      knockout,
     },
   };
 }

@@ -1172,28 +1172,41 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // GET /predictions/match-predict?home=X&away=Y&league=Z&ref=R&odds=N&bankroll=N&tax=N
+  //                                 &firstLegHome=N&firstLegAway=N
   //   — full match forecast: top-10 scorelines, Asian handicap, HT/FT,
   //   clean sheets, injury-adjusted lambdas, plus an Elo + Poisson blended
   //   verdict. When `odds` is supplied, also returns Decision Score, net EV
   //   and a fractional-Kelly stake recommendation. `bankroll` defaults to
   //   100 units; `tax` is a 0–1 payout-tax rate (e.g. 0.12 for Poland).
   //   When `ref` is supplied, applies a referee λ multiplier
-  //   (cards-heavy → ×0.95, goals-heavy → ×1.05).
+  //   (cards-heavy → ×0.95, goals-heavy → ×1.05). When `firstLegHome` +
+  //   `firstLegAway` are supplied, applies a knockout/two-leg correction
+  //   based on the aggregate margin from the current home's perspective.
   app.get('/match-predict', async (request, reply) => {
     const q = request.query as {
       home?: string; away?: string; league?: string; ref?: string;
       odds?: string; bankroll?: string; tax?: string;
+      firstLegHome?: string; firstLegAway?: string;
     };
     if (!q.home || !q.away) return reply.status(400).send({ error: 'Provide home and away team names' });
     if (q.home.length > 80 || q.away.length > 80 || (q.league && q.league.length > 80) || (q.ref && q.ref.length > 80)) {
       return reply.status(400).send({ error: 'Team, league, or referee name too long' });
     }
-    const result = await predictMatchFull(q.home, q.away, q.league, q.ref);
 
     const odds = q.odds ? Number(q.odds) : undefined;
     const bankroll = q.bankroll ? Number(q.bankroll) : 100;
     const tax = q.tax ? Math.max(0, Math.min(1, Number(q.tax))) : 0;
     const validOdds = typeof odds === 'number' && Number.isFinite(odds) && odds > 1.01;
+    const firstLegHome = q.firstLegHome ? Number(q.firstLegHome) : undefined;
+    const firstLegAway = q.firstLegAway ? Number(q.firstLegAway) : undefined;
+
+    const result = await predictMatchFull(q.home, q.away, {
+      league: q.league,
+      referee: q.ref,
+      firstLegHome: Number.isFinite(firstLegHome) ? firstLegHome : undefined,
+      firstLegAway: Number.isFinite(firstLegAway) ? firstLegAway : undefined,
+      odds: validOdds ? odds : undefined,
+    });
 
     const calibration = await getMatchPredictCalibration();
     const hitRate = Number.isFinite(calibration.hitRate) ? calibration.hitRate : undefined;
