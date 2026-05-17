@@ -8926,6 +8926,7 @@ function renderMatchPrediction(d) {
     + cmpRow('Poisson', b.homePct, b.drawPct, b.awayPct, 'var(--green)')
     + cmpRow('Poisson (adj)', adj1x2.homePct, adj1x2.drawPct, adj1x2.awayPct, 'var(--purple)')
     + (elo && elo.confident ? cmpRow('Elo (n=' + elo.matchesSeen + ')', elo.homeWinPct, elo.drawPct, elo.awayWinPct, 'var(--blue)') : '<tr><td colspan="4" style="padding:4px 8px;font-size:10px;color:var(--text-3);font-style:italic">Elo: insufficient match history (need bootstrap)</td></tr>')
+    + (d.clubElo ? cmpRow('ClubElo (' + Math.round(d.clubElo.home.elo) + ' vs ' + Math.round(d.clubElo.away.elo) + ')', d.clubElo.homeWinPct, d.clubElo.drawPct, d.clubElo.awayWinPct, 'var(--text-3)') : '')
     + cmpRow('Blended', v.homePct, v.drawPct, v.awayPct, 'var(--amber)')
     + '</tbody></table></div>';
 

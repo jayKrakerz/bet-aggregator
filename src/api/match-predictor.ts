@@ -27,6 +27,7 @@ import { getLambdaCalibration, type CalibrationFactors } from './lambda-calibrat
 import { analyzeImportancePair, type ImportanceReport } from './importance-index.js';
 import { analyzeReferee, type RefereeAnalysis } from './referee-bias.js';
 import { analyzeKnockout, type KnockoutCorrection } from './knockout-correction.js';
+import { clubEloPrediction, type ClubEloEntry } from './clubelo-fetcher.js';
 
 // ── Tunables ────────────────────────────────────────────
 
@@ -149,6 +150,17 @@ export interface MatchPrediction {
 
   // Elo + blended verdict.
   elo: EloPrediction | null;
+  /** Third-party Elo from clubelo.com (top European clubs). Used as a
+   *  sanity-check row in the UI's 1X2 model comparison; does NOT feed
+   *  into the blended verdict (kept separate so the existing blend math
+   *  is unchanged). */
+  clubElo: {
+    home: ClubEloEntry;
+    away: ClubEloEntry;
+    homeWinPct: number;
+    drawPct: number;
+    awayWinPct: number;
+  } | null;
   verdict: BlendedVerdict;
 }
 
@@ -397,7 +409,7 @@ export async function predictMatchFull(
   // Base lookup + injuries + Elo + fatigue + calibration + importance + referee
   // in parallel — none depend on each other. H2H patterns are computed off
   // base.factors.h2h after the base resolves (no extra network call).
-  const [base, homeInj, awayInj, eloRes, fatigue, calibration, importance, refereeAnalysis] = await Promise.all([
+  const [base, homeInj, awayInj, eloRes, fatigue, calibration, importance, refereeAnalysis, clubElo] = await Promise.all([
     lookupOU(home, away, leagueHint),
     hasInjurySource() ? getInjuryReport(home).catch(err => {
       logger.warn({ err, team: home }, 'home injury fetch failed');
@@ -419,6 +431,10 @@ export async function predictMatchFull(
     }),
     analyzeReferee(referee).catch(err => {
       logger.warn({ err, referee }, 'referee analysis failed');
+      return null;
+    }),
+    clubEloPrediction(home, away).catch(err => {
+      logger.warn({ err, home, away }, 'clubelo lookup failed');
       return null;
     }),
   ]);
@@ -487,6 +503,7 @@ export async function predictMatchFull(
     },
     context,
     elo: eloRes,
+    clubElo,
     verdict,
   };
 }

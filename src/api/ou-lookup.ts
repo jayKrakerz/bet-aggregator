@@ -30,6 +30,7 @@ import { lookupViaApiFootball, hasApiFootballKey, getApiFootballQuota, type ApiF
 import { lookupViaEspn, preloadEspnTeams, type EspnTeamForm } from './espn-form.js';
 import { lookupViaFlashscore, type FlashscoreTeamForm } from './flashscore-form.js';
 import { lookupViaOnefootball, type OnefootballTeamForm } from './onefootball-form.js';
+import { lookupViaOpenLigaDb, type OpenLigaDbTeamForm } from './openligadb-form.js';
 
 export interface OuLine {
   line: number;
@@ -73,7 +74,7 @@ export interface OuLookupResult {
   /** True when neither CSV-Poisson nor API-Football could resolve both teams. */
   usedFallback: boolean;
   /** Which data source produced the prediction: */
-  source: 'csv-poisson' | 'espn' | 'api-football' | 'onefootball' | 'flashscore' | 'generic';
+  source: 'csv-poisson' | 'espn' | 'api-football' | 'onefootball' | 'openligadb' | 'flashscore' | 'generic';
   reason: string | null;
   expected: { home: number; away: number; total: number };
   ou: OuLine[];
@@ -96,6 +97,9 @@ export interface OuLookupResult {
     /** Populated when source='onefootball'. Last 12 results scraped from onefootball.com SSR data. */
     onefootballHomeForm: OnefootballTeamForm | null;
     onefootballAwayForm: OnefootballTeamForm | null;
+    /** Populated when source='openligadb'. German football API — covers bl1/bl2/bl3/DFB-Pokal. */
+    openligadbHomeForm: OpenLigaDbTeamForm | null;
+    openligadbAwayForm: OpenLigaDbTeamForm | null;
     /** Populated when source='flashscore'. Derived from flashscore.mobi's 60-day rolling results. */
     flashscoreHomeForm: FlashscoreTeamForm | null;
     flashscoreAwayForm: FlashscoreTeamForm | null;
@@ -290,6 +294,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
   let flashscoreAwayForm: FlashscoreTeamForm | null = null;
   let onefootballHomeForm: OnefootballTeamForm | null = null;
   let onefootballAwayForm: OnefootballTeamForm | null = null;
+  let openligadbHomeForm: OpenLigaDbTeamForm | null = null;
+  let openligadbAwayForm: OpenLigaDbTeamForm | null = null;
 
   try {
     pre = await predictMatch(home, away, league || undefined);
@@ -381,7 +387,31 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
     }
   }
 
-  // Fallback 4 (free): flashscore.mobi 60-day rolling results. Catches
+  // Fallback 4 (free): OpenLigaDB — the German football pyramid
+  // (Bundesliga 1/2/3 + DFB-Pokal). Only fallback that covers 3. Liga
+  // and DFB-Pokal cleanly. Clean JSON REST API, no auth.
+  if (!matched) {
+    try {
+      const oldResult = await lookupViaOpenLigaDb(home, away);
+      if (oldResult) {
+        expHome = oldResult.expHomeGoals;
+        expAway = oldResult.expAwayGoals;
+        usedFallback = false;
+        matched = true;
+        source = 'openligadb';
+        openligadbHomeForm = oldResult.homeForm;
+        openligadbAwayForm = oldResult.awayForm;
+        resolvedLeague = oldResult.league;
+        if (!oldResult.sameLeague) {
+          reason = 'Teams play in different German tiers — lambdas are best-effort across tiers, treat as approximate.';
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, 'OU lookup: OpenLigaDB fallback failed');
+    }
+  }
+
+  // Fallback 5 (free): flashscore.mobi 60-day rolling results. Catches
   // the very niche leagues none of the above cover — women's regional
   // comps, Bhutan Premier, Australian state leagues, etc. Plain HTTP, no
   // Cloudflare, no key. Cold cost: ~30 page fetches once per hour.
@@ -483,6 +513,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
     espnAwayForm,
     onefootballHomeForm,
     onefootballAwayForm,
+    openligadbHomeForm,
+    openligadbAwayForm,
     flashscoreHomeForm,
     flashscoreAwayForm,
     homeForm,
@@ -517,6 +549,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
       espnAwayForm,
       onefootballHomeForm,
       onefootballAwayForm,
+      openligadbHomeForm,
+      openligadbAwayForm,
       flashscoreHomeForm,
       flashscoreAwayForm,
     },
@@ -567,6 +601,8 @@ interface QualityInputs {
   espnAwayForm: EspnTeamForm | null;
   onefootballHomeForm: OnefootballTeamForm | null;
   onefootballAwayForm: OnefootballTeamForm | null;
+  openligadbHomeForm: OpenLigaDbTeamForm | null;
+  openligadbAwayForm: OpenLigaDbTeamForm | null;
   flashscoreHomeForm: FlashscoreTeamForm | null;
   flashscoreAwayForm: FlashscoreTeamForm | null;
   homeForm: TeamFormDetail | null;
@@ -595,6 +631,8 @@ function assessQuality(q: QualityInputs): QualityAssessment {
   } else if (q.source === 'onefootball') {
     reasons.push('Matched via Onefootball SSR data (good confidence — structured JSON).');
     score -= 5;
+  } else if (q.source === 'openligadb') {
+    reasons.push('Matched via OpenLigaDB (high confidence — official German football REST API).');
   } else if (q.source === 'flashscore') {
     reasons.push('Matched via flashscore.mobi rolling-60d index (lower confidence — fuzzy name matching).');
     score -= 15;
@@ -619,6 +657,13 @@ function assessQuality(q: QualityInputs): QualityAssessment {
   } else if (q.source === 'onefootball' && of && !ofSame) {
     reasons.push('Teams matched in DIFFERENT Onefootball competitions — cross-league lambdas, treat as approximate.');
     score -= 30;
+  } else if (q.source === 'openligadb') {
+    const old = q.openligadbHomeForm && q.openligadbAwayForm;
+    const oldSame = old && q.openligadbHomeForm!.league === q.openligadbAwayForm!.league;
+    if (old && !oldSame) {
+      reasons.push('Teams play in DIFFERENT German tiers — cross-tier lambdas, treat as approximate.');
+      score -= 25;
+    }
   } else if (q.source === 'flashscore' && fs && !fsSame) {
     reasons.push('Teams matched in DIFFERENT flashscore competitions — cross-league lambdas, very unreliable.');
     score -= 35;
