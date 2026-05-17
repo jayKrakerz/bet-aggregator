@@ -31,6 +31,7 @@ import { lookupViaEspn, preloadEspnTeams, type EspnTeamForm } from './espn-form.
 import { lookupViaFlashscore, type FlashscoreTeamForm } from './flashscore-form.js';
 import { lookupViaOnefootball, type OnefootballTeamForm } from './onefootball-form.js';
 import { lookupViaOpenLigaDb, type OpenLigaDbTeamForm } from './openligadb-form.js';
+import { lookupCrossRef, type CrossRef } from './sportsdb-resolver.js';
 
 export interface OuLine {
   line: number;
@@ -100,6 +101,11 @@ export interface OuLookupResult {
     /** Populated when source='openligadb'. German football API — covers bl1/bl2/bl3/DFB-Pokal. */
     openligadbHomeForm: OpenLigaDbTeamForm | null;
     openligadbAwayForm: OpenLigaDbTeamForm | null;
+    /** TheSportsDB cross-reference (canonical name, alt names, ESPN/API-Football IDs).
+     *  When present, the lookup chain ran against the canonical name instead of
+     *  the user's raw input. */
+    crossRefHome: CrossRef | null;
+    crossRefAway: CrossRef | null;
     /** Populated when source='flashscore'. Derived from flashscore.mobi's 60-day rolling results. */
     flashscoreHomeForm: FlashscoreTeamForm | null;
     flashscoreAwayForm: FlashscoreTeamForm | null;
@@ -273,9 +279,20 @@ function expandAlias(name: string): string {
 export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: string): Promise<OuLookupResult> {
   // Strip any SRL marker, then expand common aliases (e.g. "Manchester City"
   // → "Man City") so the predictor's fuzzy matcher can hit the CSV form.
-  const home = expandAlias(stripSrl(homeIn).trim());
-  const away = expandAlias(stripSrl(awayIn).trim());
+  let home = expandAlias(stripSrl(homeIn).trim());
+  let away = expandAlias(stripSrl(awayIn).trim());
   const league = leagueHint?.trim() || null;
+
+  // TheSportsDB cross-reference: if either input maps to a known team in
+  // our cross-ref index, swap to the canonical name so every downstream
+  // source matches against the same normalized spelling. Best-effort —
+  // never block on this and never overwrite if no match was found.
+  const [crossRefHome, crossRefAway] = await Promise.all([
+    lookupCrossRef(home).catch(err => { logger.warn({ err, home }, 'sportsdb cross-ref home failed'); return null; }),
+    lookupCrossRef(away).catch(err => { logger.warn({ err, away }, 'sportsdb cross-ref away failed'); return null; }),
+  ]);
+  if (crossRefHome) home = crossRefHome.canonicalName;
+  if (crossRefAway) away = crossRefAway.canonicalName;
 
   // Real-world Poisson on local CSVs — primary signal (35 leagues, 700+ teams).
   let expHome = GENERIC_AVG_HOME_GOALS;
@@ -553,6 +570,8 @@ export async function lookupOU(homeIn: string, awayIn: string, leagueHint?: stri
       openligadbAwayForm,
       flashscoreHomeForm,
       flashscoreAwayForm,
+      crossRefHome,
+      crossRefAway,
     },
     srl: {
       leaguePrior: srlLeaguePrior,
