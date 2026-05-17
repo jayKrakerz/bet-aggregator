@@ -18,6 +18,7 @@ import { getEsportsMatches } from '../pinnacle-esports.js';
 import { getArbCandidates } from '../arb-candidates.js';
 import { getFlashLiveMatches, toSportyFormat } from '../flashscore-live.js';
 import { getSportyLiveGames } from '../sportybet-live.js';
+import { probeCoverage } from '../coverage-check.js';
 import { getLiveValuePicks } from '../live-value-picks.js';
 import { getLateLockPicks } from '../late-lock-scanner.js';
 import { getPromoEdges } from '../promo-detector.js';
@@ -785,16 +786,23 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
 
   // GET /predictions/live-games — all live games across all sports from Sportybet
   // Optional: ?sport=Football&refresh=1
+  // Football games are annotated with a `coverage` field so the UI can mark
+  // fixtures that would fall through to the generic prior in the predictor.
   app.get('/live-games', async (request, reply) => {
     const query = request.query as { sport?: string; refresh?: string };
     const forceRefresh = query.refresh === '1';
 
     const result = await getSportyLiveGames(forceRefresh);
 
+    const annotate = (games: typeof result.games) =>
+      games.map(g => g.sport.toLowerCase() === 'football'
+        ? { ...g, coverage: probeCoverage(g.homeTeamName, g.awayTeamName, g.league) }
+        : g);
+
     // Filter by sport if requested
     if (query.sport) {
       const sportFilter = query.sport.toLowerCase();
-      const filtered = result.games.filter(g => g.sport.toLowerCase() === sportFilter);
+      const filtered = annotate(result.games.filter(g => g.sport.toLowerCase() === sportFilter));
       void reply.header('Cache-Control', 'public, max-age=60');
       return {
         games: filtered,
@@ -807,7 +815,7 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
     }
 
     void reply.header('Cache-Control', 'public, max-age=60');
-    return result;
+    return { ...result, games: annotate(result.games) };
   });
 
   // POST /predictions/discover — discover new codes by mutating known codes

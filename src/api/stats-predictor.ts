@@ -577,6 +577,23 @@ export interface H2HDetail {
   recent: Array<{ home: string; away: string; homeGoals: number; awayGoals: number }>;
 }
 
+/**
+ * Synchronous in-memory check: does this team appear in our football-data
+ * CSV cache? Only checks already-loaded leagues — never fetches. Used by
+ * the coverage probe to flag uncovered live games without paying per-game
+ * HTTP cost.
+ */
+export function hasCsvTeam(team: string, leagueHint?: string): { league: string; teamName: string } | null {
+  const cached = findCachedLeague(team, leagueHint);
+  if (!cached) return null;
+  const { config, data } = cached;
+  const fromHome = bestKey(team, data.homeTeams.keys());
+  const fromAway = bestKey(team, data.awayTeams.keys());
+  const best = (fromHome?.score ?? 0) >= (fromAway?.score ?? 0) ? fromHome : fromAway;
+  if (!best || best.score < 60) return null;  // require confident match
+  return { league: config.name, teamName: best.key };
+}
+
 function findCachedLeague(team: string, leagueHint?: string): { config: LeagueConfig; data: LeagueData } | null {
   if (leagueHint) {
     const lc = findLeagueByName(leagueHint);

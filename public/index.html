@@ -1683,12 +1683,18 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
 
   <div id="mp-result"></div>
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;gap:8px;flex-wrap:wrap">
     <div style="font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px">
       <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);animation:lgPulse 1.4s ease-in-out infinite"></span>
       Live SportyBet · Football
     </div>
-    <button id="mp-live-refresh" class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:11px">Refresh</button>
+    <div style="display:flex;align-items:center;gap:10px">
+      <label style="font-size:11px;color:var(--text-3);cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px">
+        <input type="checkbox" id="mp-live-hide-uncovered" style="cursor:pointer;accent-color:var(--purple)">
+        Hide 📭 uncovered
+      </label>
+      <button id="mp-live-refresh" class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:11px">Refresh</button>
+    </div>
   </div>
   <div id="mp-live"><div class="empty" style="padding:14px;font-size:12px">Loading live games…</div></div>
 </div>
@@ -8438,6 +8444,8 @@ function bindPredictorForm() {
   }
   const refreshBtn = document.getElementById('mp-live-refresh');
   if (refreshBtn) refreshBtn.onclick = () => loadPredictorLive(true);
+  const hideToggle = document.getElementById('mp-live-hide-uncovered');
+  if (hideToggle) hideToggle.onchange = () => renderPredictorLive();
   _mpBound = true;
   loadPredictorLive(false);
   if (!_mpLiveTimer) {
@@ -8471,11 +8479,21 @@ async function loadPredictorLive(forceRefresh) {
 function renderPredictorLive() {
   const out = document.getElementById('mp-live');
   if (!out) return;
-  const games = _mpLiveData;
-  if (!games.length) {
+  const allGames = _mpLiveData;
+  if (!allGames.length) {
     out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px">No live football games right now.</div>';
     return;
   }
+  const hideUncovered = !!(document.getElementById('mp-live-hide-uncovered') && document.getElementById('mp-live-hide-uncovered').checked);
+  const isUncovered = (g) => g.coverage && g.coverage.source === 'none';
+  const games = hideUncovered ? allGames.filter(g => !isUncovered(g)) : allGames;
+  const uncoveredCount = allGames.filter(isUncovered).length;
+
+  if (!games.length) {
+    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px">All ' + allGames.length + ' live game(s) are 📭 uncovered — uncheck the filter or extend coverage (e.g. FOOTBALL_API_KEY).</div>';
+    return;
+  }
+
   const groups = new Map();
   for (const g of games) {
     const key = (g.country || '') + ' · ' + (g.league || '');
@@ -8491,19 +8509,34 @@ function renderPredictorLive() {
       const status = g.matchStatus || 'Live';
       const minLabel = minute ? minute + '\'' : status;
       const o = g.odds || {};
+      const cov = g.coverage || {};
+      const uncovered = cov.source === 'none';
+      const partial = cov.source && cov.source !== 'none' && cov.confident === false;
+      let covBadge = '';
+      if (uncovered) {
+        covBadge = '<span title="No data in any in-memory source — the predictor would return a generic prior" style="font-size:9px;background:var(--amber-soft);color:var(--amber);padding:1px 5px;border-radius:3px;font-weight:700;margin-right:6px">📭 No data</span>';
+      } else if (partial) {
+        covBadge = '<span title="Teams found in different competitions or weak fuzzy match — prediction may be cross-league" style="font-size:9px;background:rgba(247,183,49,0.06);color:var(--amber);padding:1px 5px;border-radius:3px;font-weight:600;margin-right:6px">⚠️ ' + esc(cov.source) + '</span>';
+      } else if (cov.source) {
+        covBadge = '<span title="Confident match via ' + esc(cov.source) + '" style="font-size:9px;background:var(--green-soft);color:var(--green);padding:1px 5px;border-radius:3px;font-weight:600;margin-right:6px">✓ ' + esc(cov.source) + '</span>';
+      }
+      const cardStyle = uncovered ? 'opacity:.55' : '';
       const oddCell = (label, val) => '<span class="mp-live-odd"><b>' + label + '</b>' + (val && val > 1 ? val.toFixed(2) : '–') + '</span>';
-      html += '<div class="mp-live-card" onclick="fillPredictorFromLive(' + JSON.stringify(g.eventId).replace(/"/g, '&quot;') + ')">'
+      html += '<div class="mp-live-card" style="' + cardStyle + '" onclick="fillPredictorFromLive(' + JSON.stringify(g.eventId).replace(/"/g, '&quot;') + ')">'
         + '<div class="mp-live-row">'
         + '<div class="mp-live-min">' + esc(minLabel) + '</div>'
         + '<div class="mp-live-teams"><div class="home">' + esc(g.homeTeamName) + '</div><div class="away">' + esc(g.awayTeamName) + '</div></div>'
         + '<div class="mp-live-score">' + esc(scores[0] || '0') + '<br>' + esc(scores[1] || '0') + '</div>'
         + '<div class="mp-live-odds">' + oddCell('1', o.home) + oddCell('X', o.draw) + oddCell('2', o.away) + '</div>'
         + '</div>'
-        + '<div class="mp-live-meta">Tap to load into predictor · O2.5 ' + (o.over25 ? o.over25.toFixed(2) : '–') + ' / U2.5 ' + (o.under25 ? o.under25.toFixed(2) : '–') + ' · BTTS ' + (o.bttsYes ? o.bttsYes.toFixed(2) : '–') + ' / ' + (o.bttsNo ? o.bttsNo.toFixed(2) : '–') + '</div>'
+        + '<div class="mp-live-meta">' + covBadge + 'Tap to load · O2.5 ' + (o.over25 ? o.over25.toFixed(2) : '–') + ' / U2.5 ' + (o.under25 ? o.under25.toFixed(2) : '–') + ' · BTTS ' + (o.bttsYes ? o.bttsYes.toFixed(2) : '–') + ' / ' + (o.bttsNo ? o.bttsNo.toFixed(2) : '–') + '</div>'
         + '</div>';
     }
   }
-  html += '<div style="text-align:center;padding:6px;font-size:10px;color:var(--text-3)">' + games.length + ' live · auto-refresh every 60s</div>';
+  const footer = hideUncovered && uncoveredCount > 0
+    ? games.length + ' shown · ' + uncoveredCount + ' uncovered hidden · auto-refresh 60s'
+    : games.length + ' live' + (uncoveredCount > 0 ? ' · ' + uncoveredCount + ' uncovered (📭)' : '') + ' · auto-refresh 60s';
+  html += '<div style="text-align:center;padding:6px;font-size:10px;color:var(--text-3)">' + footer + '</div>';
   out.innerHTML = html;
 }
 
