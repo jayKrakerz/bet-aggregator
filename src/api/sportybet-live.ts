@@ -94,7 +94,28 @@ let upcomingCache: LiveGamesResult | null = null;
 let upcomingCacheTime = 0;
 const UPCOMING_CACHE_TTL = 5 * 60_000; // 5 minutes — upcoming fixtures change slowly
 
-const FOOTBALL_SPORT = { id: 'sr:sport:1', name: 'Football' };
+const ESPN_SOCCER_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard';
+
+const LEAGUE_MAP: Record<string, { name: string; country: string }> = {
+  'premier-league':    { name: 'Premier League',    country: 'England' },
+  'laliga':            { name: 'La Liga',            country: 'Spain' },
+  'bundesliga':        { name: 'Bundesliga',         country: 'Germany' },
+  'ligue-1':           { name: 'Ligue 1',            country: 'France' },
+  'italian-serie-a':   { name: 'Serie A',            country: 'Italy' },
+  'serie-a':           { name: 'Serie A',            country: 'Italy' },
+  'champions-league':  { name: 'Champions League',   country: 'Europe' },
+  'europa-league':     { name: 'Europa League',      country: 'Europe' },
+  'conference-league': { name: 'Conference League',  country: 'Europe' },
+  'eredivisie':        { name: 'Eredivisie',         country: 'Netherlands' },
+  'primeira-liga':     { name: 'Primeira Liga',      country: 'Portugal' },
+};
+
+function parseESPNLeague(slug: string): { name: string; country: string } {
+  const cleaned = slug.replace(/^\d{4}-\d{2}-/, '');
+  if (LEAGUE_MAP[cleaned]) return LEAGUE_MAP[cleaned];
+  const name = cleaned.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return { name, country: '' };
+}
 
 // ── API Types ────────────────────────────────────────────
 
@@ -315,34 +336,78 @@ export async function getSportyLiveGames(forceRefresh = false): Promise<LiveGame
   return result;
 }
 
-// Fetch upcoming football matches starting within the next 3 hours.
+// Fetch upcoming football matches starting within the next 3 hours via ESPN.
+// Sportybet's liveOrPrematchEvents API only exposes in-play games; ESPN's
+// public scoreboard is used as the fixture source instead.
 export async function getSportyUpcomingGames(forceRefresh = false): Promise<LiveGamesResult> {
   if (!forceRefresh && upcomingCache && Date.now() - upcomingCacheTime < UPCOMING_CACHE_TTL) {
     return upcomingCache;
   }
 
   const startMs = Date.now();
-  const cutoff = Date.now() + 3 * 60 * 60 * 1000;
+  const now = Date.now();
+  const cutoff = now + 3 * 60 * 60 * 1000;
 
-  const games = await fetchLiveSport(FOOTBALL_SPORT.id, FOOTBALL_SPORT.name, 'Prematch');
-  const filtered = games.filter(g => g.startTime > Date.now() && g.startTime <= cutoff);
-  filtered.sort((a, b) => a.startTime - b.startTime);
+  const res = await fetch(ESPN_SOCCER_URL, {
+    headers: { 'User-Agent': UA },
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => null);
+
+  const games: LiveGame[] = [];
+
+  if (res?.ok) {
+    const json = await res.json() as { events?: unknown[] };
+    for (const ev of (json.events || []) as Record<string, unknown>[]) {
+      const startTime = new Date(ev.date as string).getTime();
+      if (startTime <= now || startTime > cutoff) continue;
+
+      const comp = (Array.isArray(ev.competitions) ? ev.competitions[0] : ev.competitions) as Record<string, unknown> | undefined;
+      const competitors = (comp?.competitors as Record<string, unknown>[] | undefined) || [];
+      const home = competitors.find(c => c.homeAway === 'home');
+      const away = competitors.find(c => c.homeAway === 'away');
+      const homeTeamName = (home?.team as Record<string,string> | undefined)?.displayName || String(home?.name ?? '');
+      const awayTeamName = (away?.team as Record<string,string> | undefined)?.displayName || String(away?.name ?? '');
+      if (!homeTeamName || !awayTeamName) continue;
+
+      const { name: league, country } = parseESPNLeague(String((ev.season as Record<string,unknown>)?.slug ?? ev.name ?? ''));
+
+      games.push({
+        eventId: 'espn-' + String(ev.id),
+        gameId: '',
+        homeTeamName,
+        awayTeamName,
+        score: '0:0',
+        gameScore: [],
+        minute: null,
+        matchStatus: 'Not started',
+        period: '',
+        startTime,
+        sport: 'Football',
+        sportId: 'sr:sport:1',
+        country,
+        league,
+        tournamentId: '',
+        totalMarkets: 0,
+        markets: [],
+        isUpcoming: true,
+        odds: { home: 0, draw: 0, away: 0, over25: null, under25: null, bttsYes: null, bttsNo: null },
+      });
+    }
+    games.sort((a, b) => a.startTime - b.startTime);
+  }
 
   const result: LiveGamesResult = {
-    games: filtered,
-    totalCount: filtered.length,
-    bySport: filtered.length > 0 ? { Football: filtered.length } : {},
+    games,
+    totalCount: games.length,
+    bySport: games.length > 0 ? { Football: games.length } : {},
     scrapedAt: new Date().toISOString(),
-    source: 'sportybet-gh',
+    source: 'espn',
   };
 
   upcomingCache = result;
   upcomingCacheTime = Date.now();
 
-  logger.info({
-    total: filtered.length,
-    elapsed: Date.now() - startMs,
-  }, 'Sportybet upcoming football games fetched');
+  logger.info({ total: games.length, elapsed: Date.now() - startMs }, 'ESPN upcoming football fixtures fetched');
 
   return result;
 }
