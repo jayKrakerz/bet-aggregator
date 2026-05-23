@@ -346,7 +346,7 @@ export async function getSportyUpcomingGames(forceRefresh = false): Promise<Live
 
   const startMs = Date.now();
   const now = Date.now();
-  const cutoff = now + 3 * 60 * 60 * 1000;
+  const cutoff = now + 6 * 60 * 60 * 1000;
 
   const res = await fetch(ESPN_SOCCER_URL, {
     headers: { 'User-Agent': UA },
