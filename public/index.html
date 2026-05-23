@@ -8498,9 +8498,8 @@ function renderPredictorLive() {
   }
   const hideUncovered = !!(document.getElementById('mp-live-hide-uncovered') && document.getElementById('mp-live-hide-uncovered').checked);
   const isUncovered = (g) => g.coverage && g.coverage.source === 'none';
-  const filterGames = (list) => hideUncovered ? list.filter(g => !isUncovered(g)) : list;
-  const liveFiltered = filterGames(liveGames);
-  const upcomingFiltered = filterGames(upcomingGames);
+  const liveFiltered = hideUncovered ? liveGames.filter(g => !isUncovered(g)) : liveGames;
+  const upcomingFiltered = upcomingGames; // hide-uncovered doesn't apply to upcoming — user opted in
   const uncoveredCount = allGames.filter(isUncovered).length;
 
   if (!liveFiltered.length && !upcomingFiltered.length) {
