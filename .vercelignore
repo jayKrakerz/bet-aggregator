@@ -9,3 +9,5 @@ docker-compose.yml
 .env*
 CLAUDE.md
 vitest.config.ts
+data/
+node_modules/
