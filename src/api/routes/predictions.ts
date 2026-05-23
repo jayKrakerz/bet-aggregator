@@ -17,7 +17,7 @@ import { getDroppingOdds } from '../oddspedia-dropping-odds.js';
 import { getEsportsMatches } from '../pinnacle-esports.js';
 import { getArbCandidates } from '../arb-candidates.js';
 import { getFlashLiveMatches, toSportyFormat } from '../flashscore-live.js';
-import { getSportyLiveGames } from '../sportybet-live.js';
+import { getSportyLiveGames, getSportyUpcomingGames } from '../sportybet-live.js';
 import { probeCoverage } from '../coverage-check.js';
 import { getLiveValuePicks } from '../live-value-picks.js';
 import { getLateLockPicks } from '../late-lock-scanner.js';
@@ -785,37 +785,43 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // GET /predictions/live-games — all live games across all sports from Sportybet
-  // Optional: ?sport=Football&refresh=1
+  // Optional: ?sport=Football&refresh=1&upcoming=1
   // Football games are annotated with a `coverage` field so the UI can mark
   // fixtures that would fall through to the generic prior in the predictor.
   app.get('/live-games', async (request, reply) => {
-    const query = request.query as { sport?: string; refresh?: string };
+    const query = request.query as { sport?: string; refresh?: string; upcoming?: string };
     const forceRefresh = query.refresh === '1';
+    const includeUpcoming = query.upcoming === '1';
 
-    const result = await getSportyLiveGames(forceRefresh);
-
-    const annotate = (games: typeof result.games) =>
+    const annotate = <T extends { sport: string; homeTeamName: string; awayTeamName: string; league: string }>(games: T[]) =>
       games.map(g => g.sport.toLowerCase() === 'football'
         ? { ...g, coverage: probeCoverage(g.homeTeamName, g.awayTeamName, g.league) }
         : g);
 
+    const [liveResult, upcomingResult] = await Promise.all([
+      getSportyLiveGames(forceRefresh),
+      includeUpcoming ? getSportyUpcomingGames(forceRefresh) : Promise.resolve(null),
+    ]);
+
+    let games = [...liveResult.games];
+    if (upcomingResult) games = [...games, ...upcomingResult.games];
+
     // Filter by sport if requested
     if (query.sport) {
       const sportFilter = query.sport.toLowerCase();
-      const filtered = annotate(result.games.filter(g => g.sport.toLowerCase() === sportFilter));
-      void reply.header('Cache-Control', 'public, max-age=60');
-      return {
-        games: filtered,
-        totalCount: filtered.length,
-        allSportsCount: result.totalCount,
-        bySport: result.bySport,
-        scrapedAt: result.scrapedAt,
-        source: result.source,
-      };
+      games = games.filter(g => g.sport.toLowerCase() === sportFilter);
     }
 
+    const annotated = annotate(games);
     void reply.header('Cache-Control', 'public, max-age=60');
-    return { ...result, games: annotate(result.games) };
+    return {
+      games: annotated,
+      totalCount: annotated.length,
+      allSportsCount: liveResult.totalCount,
+      bySport: liveResult.bySport,
+      scrapedAt: liveResult.scrapedAt,
+      source: liveResult.source,
+    };
   });
 
   // POST /predictions/discover — discover new codes by mutating known codes

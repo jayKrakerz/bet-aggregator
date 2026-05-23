@@ -1686,9 +1686,13 @@ button:focus-visible,.chip:focus-visible,.code-card:focus-visible{outline:2px so
   <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;gap:8px;flex-wrap:wrap">
     <div style="font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px">
       <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);animation:lgPulse 1.4s ease-in-out infinite"></span>
-      Live SportyBet · Football
+      SportyBet · Football
     </div>
-    <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <label style="font-size:11px;color:var(--text-3);cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px">
+        <input type="checkbox" id="mp-live-show-upcoming" style="cursor:pointer;accent-color:var(--purple)">
+        Show upcoming
+      </label>
       <label style="font-size:11px;color:var(--text-3);cursor:pointer;user-select:none;display:flex;align-items:center;gap:5px">
         <input type="checkbox" id="mp-live-hide-uncovered" style="cursor:pointer;accent-color:var(--purple)">
         Hide 📭 uncovered
@@ -8446,6 +8450,8 @@ function bindPredictorForm() {
   if (refreshBtn) refreshBtn.onclick = () => loadPredictorLive(true);
   const hideToggle = document.getElementById('mp-live-hide-uncovered');
   if (hideToggle) hideToggle.onchange = () => renderPredictorLive();
+  const upcomingToggle = document.getElementById('mp-live-show-upcoming');
+  if (upcomingToggle) upcomingToggle.onchange = () => loadPredictorLive(true);
   _mpBound = true;
   loadPredictorLive(false);
   if (!_mpLiveTimer) {
@@ -8461,18 +8467,22 @@ let _mpLiveData = [];
 async function loadPredictorLive(forceRefresh) {
   const out = document.getElementById('mp-live');
   if (!out) return;
+  const showUpcoming = !!(document.getElementById('mp-live-show-upcoming') && document.getElementById('mp-live-show-upcoming').checked);
   if (!forceRefresh && _mpLiveData.length) { renderPredictorLive(); return; }
   if (!_mpLiveData.length) {
-    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px"><div class="spinner" style="width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 6px"></div>Loading live football…</div>';
+    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px"><div class="spinner" style="width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .6s linear infinite;margin:0 auto 6px"></div>Loading football…</div>';
   }
   try {
-    const res = await fetch('/predictions/live-games?sport=Football' + (forceRefresh ? '&refresh=1' : ''));
+    let url = '/predictions/live-games?sport=Football';
+    if (forceRefresh) url += '&refresh=1';
+    if (showUpcoming) url += '&upcoming=1';
+    const res = await fetch(url);
     if (!res.ok) throw new Error('http ' + res.status);
     const json = await res.json();
     _mpLiveData = json.games || [];
     renderPredictorLive();
   } catch (e) {
-    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px;color:var(--red)">Failed to load live games. Tap Refresh to retry.</div>';
+    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px;color:var(--red)">Failed to load games. Tap Refresh to retry.</div>';
   }
 }
 
@@ -8480,63 +8490,104 @@ function renderPredictorLive() {
   const out = document.getElementById('mp-live');
   if (!out) return;
   const allGames = _mpLiveData;
+  const liveGames = allGames.filter(g => !g.isUpcoming);
+  const upcomingGames = allGames.filter(g => g.isUpcoming);
   if (!allGames.length) {
     out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px">No live football games right now.</div>';
     return;
   }
   const hideUncovered = !!(document.getElementById('mp-live-hide-uncovered') && document.getElementById('mp-live-hide-uncovered').checked);
   const isUncovered = (g) => g.coverage && g.coverage.source === 'none';
-  const games = hideUncovered ? allGames.filter(g => !isUncovered(g)) : allGames;
+  const filterGames = (list) => hideUncovered ? list.filter(g => !isUncovered(g)) : list;
+  const liveFiltered = filterGames(liveGames);
+  const upcomingFiltered = filterGames(upcomingGames);
   const uncoveredCount = allGames.filter(isUncovered).length;
 
-  if (!games.length) {
-    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px">All ' + allGames.length + ' live game(s) are 📭 uncovered — uncheck the filter or extend coverage (e.g. FOOTBALL_API_KEY).</div>';
+  if (!liveFiltered.length && !upcomingFiltered.length) {
+    out.innerHTML = '<div class="empty" style="padding:14px;font-size:12px">All ' + allGames.length + ' game(s) are 📭 uncovered — uncheck the filter or extend coverage (e.g. FOOTBALL_API_KEY).</div>';
     return;
   }
 
-  const groups = new Map();
-  for (const g of games) {
-    const key = (g.country || '') + ' · ' + (g.league || '');
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(g);
-  }
-  let html = '';
-  for (const [league, evs] of groups) {
-    html += '<div style="font-size:10px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin:10px 0 6px;padding:0 2px">' + esc(league) + ' · <span style="opacity:.7">' + evs.length + '</span></div>';
-    for (const g of evs) {
-      const scores = (g.score || '0:0').split(':');
-      const minute = g.minute || '';
-      const status = g.matchStatus || 'Live';
-      const minLabel = minute ? minute + '\'' : status;
-      const o = g.odds || {};
-      const cov = g.coverage || {};
-      const uncovered = cov.source === 'none';
-      const partial = cov.source && cov.source !== 'none' && cov.confident === false;
-      let covBadge = '';
-      if (uncovered) {
-        covBadge = '<span title="No data in any in-memory source — the predictor would return a generic prior" style="font-size:9px;background:var(--amber-soft);color:var(--amber);padding:1px 5px;border-radius:3px;font-weight:700;margin-right:6px">📭 No data</span>';
-      } else if (partial) {
-        covBadge = '<span title="Teams found in different competitions or weak fuzzy match — prediction may be cross-league" style="font-size:9px;background:rgba(247,183,49,0.06);color:var(--amber);padding:1px 5px;border-radius:3px;font-weight:600;margin-right:6px">⚠️ ' + esc(cov.source) + '</span>';
-      } else if (cov.source) {
-        covBadge = '<span title="Confident match via ' + esc(cov.source) + '" style="font-size:9px;background:var(--green-soft);color:var(--green);padding:1px 5px;border-radius:3px;font-weight:600;margin-right:6px">✓ ' + esc(cov.source) + '</span>';
-      }
-      const cardStyle = uncovered ? 'opacity:.55' : '';
-      const oddCell = (label, val) => '<span class="mp-live-odd"><b>' + label + '</b>' + (val && val > 1 ? val.toFixed(2) : '–') + '</span>';
-      html += '<div class="mp-live-card" style="' + cardStyle + '" onclick="fillPredictorFromLive(' + JSON.stringify(g.eventId).replace(/"/g, '&quot;') + ')">'
-        + '<div class="mp-live-row">'
-        + '<div class="mp-live-min">' + esc(minLabel) + '</div>'
-        + '<div class="mp-live-teams"><div class="home">' + esc(g.homeTeamName) + '</div><div class="away">' + esc(g.awayTeamName) + '</div></div>'
-        + '<div class="mp-live-score">' + esc(scores[0] || '0') + '<br>' + esc(scores[1] || '0') + '</div>'
-        + '<div class="mp-live-odds">' + oddCell('1', o.home) + oddCell('X', o.draw) + oddCell('2', o.away) + '</div>'
-        + '</div>'
-        + '<div class="mp-live-meta">' + covBadge + 'Tap to load · O2.5 ' + (o.over25 ? o.over25.toFixed(2) : '–') + ' / U2.5 ' + (o.under25 ? o.under25.toFixed(2) : '–') + ' · BTTS ' + (o.bttsYes ? o.bttsYes.toFixed(2) : '–') + ' / ' + (o.bttsNo ? o.bttsNo.toFixed(2) : '–') + '</div>'
-        + '</div>';
+  const buildCovBadge = (cov) => {
+    if (!cov || !cov.source) return '';
+    if (cov.source === 'none') return '<span title="No data in any in-memory source — the predictor would return a generic prior" style="font-size:9px;background:var(--amber-soft);color:var(--amber);padding:1px 5px;border-radius:3px;font-weight:700;margin-right:6px">📭 No data</span>';
+    if (cov.confident === false) return '<span title="Teams found in different competitions or weak fuzzy match — prediction may be cross-league" style="font-size:9px;background:rgba(247,183,49,0.06);color:var(--amber);padding:1px 5px;border-radius:3px;font-weight:600;margin-right:6px">⚠️ ' + esc(cov.source) + '</span>';
+    return '<span title="Confident match via ' + esc(cov.source) + '" style="font-size:9px;background:var(--green-soft);color:var(--green);padding:1px 5px;border-radius:3px;font-weight:600;margin-right:6px">✓ ' + esc(cov.source) + '</span>';
+  };
+
+  const oddCell = (label, val) => '<span class="mp-live-odd"><b>' + label + '</b>' + (val && val > 1 ? val.toFixed(2) : '–') + '</span>';
+
+  const buildGroup = (games, isUpcoming) => {
+    const groups = new Map();
+    for (const g of games) {
+      const key = (g.country || '') + ' · ' + (g.league || '');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(g);
     }
+    let html = '';
+    for (const [league, evs] of groups) {
+      html += '<div style="font-size:10px;color:var(--text-3);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin:10px 0 6px;padding:0 2px">' + esc(league) + ' · <span style="opacity:.7">' + evs.length + '</span></div>';
+      for (const g of evs) {
+        const o = g.odds || {};
+        const cov = g.coverage || {};
+        const uncovered = cov.source === 'none';
+        const covBadge = buildCovBadge(cov);
+        const cardStyle = uncovered ? 'opacity:.55' : '';
+        if (isUpcoming) {
+          const kickoff = g.startTime ? new Date(g.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '?';
+          html += '<div class="mp-live-card" style="' + cardStyle + '" onclick="fillPredictorFromLive(' + JSON.stringify(g.eventId).replace(/"/g, '&quot;') + ')">'
+            + '<div class="mp-live-row">'
+            + '<div class="mp-live-min" style="color:var(--text-3)">' + esc(kickoff) + '</div>'
+            + '<div class="mp-live-teams"><div class="home">' + esc(g.homeTeamName) + '</div><div class="away">' + esc(g.awayTeamName) + '</div></div>'
+            + '<div class="mp-live-score" style="color:var(--text-3);font-size:12px">–<br>–</div>'
+            + '<div class="mp-live-odds">' + oddCell('1', o.home) + oddCell('X', o.draw) + oddCell('2', o.away) + '</div>'
+            + '</div>'
+            + '<div class="mp-live-meta">' + covBadge + 'Tap to load · O2.5 ' + (o.over25 ? o.over25.toFixed(2) : '–') + ' / U2.5 ' + (o.under25 ? o.under25.toFixed(2) : '–') + ' · BTTS ' + (o.bttsYes ? o.bttsYes.toFixed(2) : '–') + ' / ' + (o.bttsNo ? o.bttsNo.toFixed(2) : '–') + '</div>'
+            + '</div>';
+        } else {
+          const scores = (g.score || '0:0').split(':');
+          const minute = g.minute || '';
+          const status = g.matchStatus || 'Live';
+          const minLabel = minute ? minute : status;
+          html += '<div class="mp-live-card" style="' + cardStyle + '" onclick="fillPredictorFromLive(' + JSON.stringify(g.eventId).replace(/"/g, '&quot;') + ')">'
+            + '<div class="mp-live-row">'
+            + '<div class="mp-live-min">' + esc(minLabel) + '</div>'
+            + '<div class="mp-live-teams"><div class="home">' + esc(g.homeTeamName) + '</div><div class="away">' + esc(g.awayTeamName) + '</div></div>'
+            + '<div class="mp-live-score">' + esc(scores[0] || '0') + '<br>' + esc(scores[1] || '0') + '</div>'
+            + '<div class="mp-live-odds">' + oddCell('1', o.home) + oddCell('X', o.draw) + oddCell('2', o.away) + '</div>'
+            + '</div>'
+            + '<div class="mp-live-meta">' + covBadge + 'Tap to load · O2.5 ' + (o.over25 ? o.over25.toFixed(2) : '–') + ' / U2.5 ' + (o.under25 ? o.under25.toFixed(2) : '–') + ' · BTTS ' + (o.bttsYes ? o.bttsYes.toFixed(2) : '–') + ' / ' + (o.bttsNo ? o.bttsNo.toFixed(2) : '–') + '</div>'
+            + '</div>';
+        }
+      }
+    }
+    return html;
+  };
+
+  let html = '';
+
+  if (liveFiltered.length) {
+    html += buildGroup(liveFiltered, false);
+  } else if (liveGames.length) {
+    html += '<div class="empty" style="padding:8px 2px;font-size:11px;color:var(--text-3)">' + liveGames.length + ' live game(s) all uncovered (📭)</div>';
   }
-  const footer = hideUncovered && uncoveredCount > 0
-    ? games.length + ' shown · ' + uncoveredCount + ' uncovered hidden · auto-refresh 60s'
-    : games.length + ' live' + (uncoveredCount > 0 ? ' · ' + uncoveredCount + ' uncovered (📭)' : '') + ' · auto-refresh 60s';
-  html += '<div style="text-align:center;padding:6px;font-size:10px;color:var(--text-3)">' + footer + '</div>';
+
+  if (upcomingFiltered.length) {
+    html += '<div style="font-size:11px;font-weight:800;color:var(--text-2);margin:14px 0 6px;padding:0 2px;display:flex;align-items:center;gap:6px">'
+      + '<span style="font-size:13px">🕐</span> Upcoming (next 3h)'
+      + '</div>';
+    html += buildGroup(upcomingFiltered, true);
+  }
+
+  const liveCount = liveFiltered.length;
+  const upcomingCount = upcomingFiltered.length;
+  const parts = [];
+  if (liveCount) parts.push(liveCount + ' live');
+  if (upcomingCount) parts.push(upcomingCount + ' upcoming');
+  if (hideUncovered && uncoveredCount > 0) parts.push(uncoveredCount + ' uncovered hidden');
+  else if (uncoveredCount > 0) parts.push(uncoveredCount + ' uncovered (📭)');
+  parts.push('auto-refresh 60s');
+  html += '<div style="text-align:center;padding:6px;font-size:10px;color:var(--text-3)">' + parts.join(' · ') + '</div>';
   out.innerHTML = html;
 }
 

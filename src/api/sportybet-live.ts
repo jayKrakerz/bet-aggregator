@@ -43,6 +43,7 @@ export interface LiveGame {
   tournamentId: string;
   totalMarkets: number;
   markets: LiveMarket[];
+  isUpcoming?: boolean;
   odds: {
     home: number;
     draw: number;
@@ -88,6 +89,12 @@ const SPORTS = [
 let cache: LiveGamesResult | null = null;
 let cacheTime = 0;
 const CACHE_TTL = 60_000; // 1 minute
+
+let upcomingCache: LiveGamesResult | null = null;
+let upcomingCacheTime = 0;
+const UPCOMING_CACHE_TTL = 5 * 60_000; // 5 minutes — upcoming fixtures change slowly
+
+const FOOTBALL_SPORT = { id: 'sr:sport:1', name: 'Football' };
 
 // ── API Types ────────────────────────────────────────────
 
@@ -205,12 +212,12 @@ function parseMarkets(apiMarkets: ApiMarket[]): LiveMarket[] {
 
 // ── Fetch ────────────────────────────────────────────────
 
-async function fetchLiveSport(sportId: string, sportName: string): Promise<LiveGame[]> {
+async function fetchLiveSport(sportId: string, sportName: string, group: 'Live' | 'Prematch' = 'Live'): Promise<LiveGame[]> {
   // Explicit marketId list — without this the API returns a compact subset
   // that omits Double Chance (10), Draw No Bet (11), BTTS (29), and Odd/Even (26).
   // Union of every market id consumed by downstream modules.
   const markets = '1,10,11,18,26,29';
-  const url = `https://www.sportybet.com/api/${COUNTRY}/factsCenter/liveOrPrematchEvents?_t=${Date.now()}&sportId=${encodeURIComponent(sportId)}&group=Live&marketId=${markets}&pageSize=100&pageNum=1`;
+  const url = `https://www.sportybet.com/api/${COUNTRY}/factsCenter/liveOrPrematchEvents?_t=${Date.now()}&sportId=${encodeURIComponent(sportId)}&group=${group}&marketId=${markets}&pageSize=100&pageNum=1`;
 
   const res = await fetch(url, {
     headers: { 'User-Agent': UA },
@@ -236,7 +243,7 @@ async function fetchLiveSport(sportId: string, sportName: string): Promise<LiveG
         score: ev.setScore || '0:0',
         gameScore: ev.gameScore || [],
         minute: parsePlayedSeconds(ev.playedSeconds),
-        matchStatus: ev.matchStatus || 'Live',
+        matchStatus: ev.matchStatus || (group === 'Prematch' ? 'Not started' : 'Live'),
         period: ev.period || '',
         startTime: ev.estimateStartTime,
         sport: sportName,
@@ -246,6 +253,7 @@ async function fetchLiveSport(sportId: string, sportName: string): Promise<LiveG
         tournamentId: tournament.id || '',
         totalMarkets: ev.totalMarketSize || markets.length,
         markets: parseMarkets(markets),
+        isUpcoming: group === 'Prematch',
         odds: extractOdds(markets),
       });
     }
@@ -303,6 +311,38 @@ export async function getSportyLiveGames(forceRefresh = false): Promise<LiveGame
     bySport,
     elapsed: Date.now() - startMs,
   }, 'Sportybet live games scraped');
+
+  return result;
+}
+
+// Fetch upcoming football matches starting within the next 3 hours.
+export async function getSportyUpcomingGames(forceRefresh = false): Promise<LiveGamesResult> {
+  if (!forceRefresh && upcomingCache && Date.now() - upcomingCacheTime < UPCOMING_CACHE_TTL) {
+    return upcomingCache;
+  }
+
+  const startMs = Date.now();
+  const cutoff = Date.now() + 3 * 60 * 60 * 1000;
+
+  const games = await fetchLiveSport(FOOTBALL_SPORT.id, FOOTBALL_SPORT.name, 'Prematch');
+  const filtered = games.filter(g => g.startTime > Date.now() && g.startTime <= cutoff);
+  filtered.sort((a, b) => a.startTime - b.startTime);
+
+  const result: LiveGamesResult = {
+    games: filtered,
+    totalCount: filtered.length,
+    bySport: filtered.length > 0 ? { Football: filtered.length } : {},
+    scrapedAt: new Date().toISOString(),
+    source: 'sportybet-gh',
+  };
+
+  upcomingCache = result;
+  upcomingCacheTime = Date.now();
+
+  logger.info({
+    total: filtered.length,
+    elapsed: Date.now() - startMs,
+  }, 'Sportybet upcoming football games fetched');
 
   return result;
 }
