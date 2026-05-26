@@ -58,6 +58,11 @@ const MOMENTUM_COLD_ATTACK = 0.92;     // 3+ Ls → -8% own λ
 const POISSON_WEIGHT_MATCHED = 0.7;
 const POISSON_WEIGHT_FALLBACK = 0.5;
 
+// Dixon-Coles (1997) low-score correlation correction.
+// ρ < 0 boosts 0-0 and 1-1 probabilities (both underestimated by independent
+// Poisson) and slightly reduces 0-1 / 1-0. Empirical range: -0.10 to -0.15.
+const DC_RHO = -0.13;
+
 // ── Public types ────────────────────────────────────────
 
 export interface Scoreline {
@@ -173,12 +178,23 @@ function pmf(k: number, lambda: number): number {
   return (Math.pow(lambda, k) * Math.exp(-lambda)) / f;
 }
 
+// Dixon-Coles τ factor — only non-trivial for the four low-score cells.
+// The net effect on the sum is exactly zero (analytically proven), so no
+// renormalisation is needed.
+function dcTau(h: number, a: number, lH: number, lA: number): number {
+  if (h === 0 && a === 0) return 1 - lH * lA * DC_RHO;
+  if (h === 0 && a === 1) return 1 + lH * DC_RHO;
+  if (h === 1 && a === 0) return 1 + lA * DC_RHO;
+  if (h === 1 && a === 1) return 1 - DC_RHO;
+  return 1;
+}
+
 function buildMatrix(lambdaH: number, lambdaA: number): number[][] {
   const m: number[][] = [];
   for (let h = 0; h <= MAX_GOALS; h++) {
     const row: number[] = [];
     for (let a = 0; a <= MAX_GOALS; a++) {
-      row.push(pmf(h, lambdaH) * pmf(a, lambdaA));
+      row.push(dcTau(h, a, lambdaH, lambdaA) * pmf(h, lambdaH) * pmf(a, lambdaA));
     }
     m.push(row);
   }

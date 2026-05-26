@@ -302,6 +302,16 @@ function factorial(n: number): number {
   return r;
 }
 
+// Dixon-Coles (1997) low-score correction. ρ ≈ -0.13 empirically.
+const DC_RHO = -0.13;
+function dcTau(h: number, a: number, lH: number, lA: number): number {
+  if (h === 0 && a === 0) return 1 - lH * lA * DC_RHO;
+  if (h === 0 && a === 1) return 1 + lH * DC_RHO;
+  if (h === 1 && a === 0) return 1 + lA * DC_RHO;
+  if (h === 1 && a === 1) return 1 - DC_RHO;
+  return 1;
+}
+
 /**
  * Build a goal probability matrix (up to maxGoals each side)
  * and derive 1X2, O/U 2.5, BTS probabilities.
@@ -316,7 +326,7 @@ function poissonPredict(expHome: number, expAway: number, maxGoals = 7) {
 
   for (let h = 0; h <= maxGoals; h++) {
     for (let a = 0; a <= maxGoals; a++) {
-      const p = poissonPmf(h, expHome) * poissonPmf(a, expAway);
+      const p = dcTau(h, a, expHome, expAway) * poissonPmf(h, expHome) * poissonPmf(a, expAway);
       if (h > a) homePct += p;
       else if (h === a) drawPct += p;
       else awayPct += p;
