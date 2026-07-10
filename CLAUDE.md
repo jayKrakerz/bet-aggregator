@@ -29,3 +29,6 @@ with a frontend dashboard.
 - All imports use `.js` extension (ESM)
 - No ORM, no database — all data is scraped live and cached in-memory
 - Config validated with zod in `src/config.ts`
+
+## Session Handoff
+- Before starting continuation work, read `TODO.md` for the latest task context and planned updates.

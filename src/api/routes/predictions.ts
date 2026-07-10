@@ -31,7 +31,7 @@ import { ingestFixtures, getHistoryStats, computeLeaguePriors, getStaleOpenEvent
 import { predictFixtures } from '../srl-predictor.js';
 import { computeCalibration } from '../srl-evaluator.js';
 import { lookupOU } from '../ou-lookup.js';
-import { predictMatchFull } from '../match-predictor.js';
+import { predictMatchFull, type MatchPrediction } from '../match-predictor.js';
 import { getCalibration as getMatchPredictCalibration } from '../predict-tracker.js';
 import { scoreCandidate } from '../decision-score.js';
 import { kellyStake, evNet } from '../kelly.js';
@@ -49,6 +49,85 @@ const CODE_PATTERN = /^[A-Za-z0-9]{4,8}$/;
 // numeric. Sport/market/outcome refs use the Betradar `sr:type:id` pattern.
 const BETRADAR_ID = /^sr:[a-z]+:[A-Za-z0-9_-]{1,50}$/;
 const NUMERIC_ID = /^\d+$/;
+
+type SlipScoreSelection = {
+  homeTeam: string;
+  awayTeam: string;
+  league?: string;
+  market: string;
+  pick: string;
+  odds: number;
+  eventId?: string;
+};
+
+function isSlipScoreSelection(s: unknown): s is SlipScoreSelection {
+  if (!s || typeof s !== 'object') return false;
+  const x = s as Record<string, unknown>;
+  return typeof x.homeTeam === 'string' && x.homeTeam.length > 0 && x.homeTeam.length <= 80
+    && typeof x.awayTeam === 'string' && x.awayTeam.length > 0 && x.awayTeam.length <= 80
+    && (x.league === undefined || typeof x.league === 'string')
+    && typeof x.market === 'string' && x.market.length > 0 && x.market.length <= 80
+    && typeof x.pick === 'string' && x.pick.length > 0 && x.pick.length <= 80
+    && typeof x.odds === 'number' && Number.isFinite(x.odds) && x.odds > 1.01 && x.odds <= 1000
+    && (x.eventId === undefined || typeof x.eventId === 'string');
+}
+
+function readOuLine(pick: string): number | null {
+  const match = pick.match(/(?:over|under)\s*(\d+(?:\.\d+)?)/i);
+  return match ? Number(match[1]) : null;
+}
+
+function pickModelProbability(prediction: MatchPrediction, market: string, pick: string): { probability: number | null; modelPick: string | null; reason: string } {
+  const m = market.toLowerCase();
+  const p = pick.toLowerCase();
+  const oneXtwo = prediction.adjusted1x2;
+
+  if (m === '1x2' || m.includes('1x2') || m.includes('match winner') || m.includes('moneyline')) {
+    if (p === '1' || p.includes('home') || p.includes(prediction.base.homeNormalized.toLowerCase().slice(0, 4))) {
+      return { probability: oneXtwo.homePct / 100, modelPick: 'Home', reason: 'Matched 1X2 home pick' };
+    }
+    if (p === '2' || p.includes('away') || p.includes(prediction.base.awayNormalized.toLowerCase().slice(0, 4))) {
+      return { probability: oneXtwo.awayPct / 100, modelPick: 'Away', reason: 'Matched 1X2 away pick' };
+    }
+    if (p === 'x' || p.includes('draw')) {
+      return { probability: oneXtwo.drawPct / 100, modelPick: 'Draw', reason: 'Matched 1X2 draw pick' };
+    }
+  }
+
+  if (m.includes('double chance')) {
+    if (p.includes('1x') || p.includes('x1') || (p.includes('home') && p.includes('draw'))) {
+      return { probability: (oneXtwo.homePct + oneXtwo.drawPct) / 100, modelPick: 'Home/Draw', reason: 'Matched double chance home-or-draw pick' };
+    }
+    if (p.includes('x2') || p.includes('2x') || (p.includes('away') && p.includes('draw'))) {
+      return { probability: (oneXtwo.awayPct + oneXtwo.drawPct) / 100, modelPick: 'Draw/Away', reason: 'Matched double chance draw-or-away pick' };
+    }
+    if (p.includes('12') || (p.includes('home') && p.includes('away'))) {
+      return { probability: (oneXtwo.homePct + oneXtwo.awayPct) / 100, modelPick: 'Home/Away', reason: 'Matched double chance no-draw pick' };
+    }
+  }
+
+  if (m.includes('over/under') || m.includes('total')) {
+    const line = readOuLine(pick);
+    const ou = line !== null ? prediction.base.ou.find(x => x.line === line) : undefined;
+    if (ou && p.includes('over')) return { probability: ou.overPct / 100, modelPick: `Over ${line}`, reason: `Matched O/U ${line} over pick` };
+    if (ou && p.includes('under')) return { probability: ou.underPct / 100, modelPick: `Under ${line}`, reason: `Matched O/U ${line} under pick` };
+  }
+
+  if (m.includes('both teams') || m.includes('btts') || m.includes('gg')) {
+    if (p.includes('yes') || p.includes('gg')) return { probability: prediction.adjustedBtts.yesPct / 100, modelPick: 'BTTS Yes', reason: 'Matched BTTS yes pick' };
+    if (p.includes('no') || p.includes('ng')) return { probability: prediction.adjustedBtts.noPct / 100, modelPick: 'BTTS No', reason: 'Matched BTTS no pick' };
+  }
+
+  return { probability: null, modelPick: null, reason: 'Market/pick is not supported by backend model scoring yet' };
+}
+
+function roundPct(x: number): number {
+  return Math.round(x * 1000) / 10;
+}
+
+function round4(x: number): number {
+  return Math.round(x * 10000) / 10000;
+}
 
 function isValidSelection(s: unknown): s is { eventId: string; marketId: string; outcomeId: string; specifier?: string; sportId: string } {
   if (!s || typeof s !== 'object') return false;
@@ -1249,6 +1328,117 @@ export const predictionsRoutes: FastifyPluginAsync = async (app) => {
 
     void reply.header('Cache-Control', 'public, max-age=300');
     return { ...result, decision, stake };
+  });
+
+  // POST /predictions/score-slip — model-score candidate selections before
+  // generating a Sportybet code. This is the backend gate used by the
+  // frontend generator so low odds are not treated as automatically safe.
+  app.post('/score-slip', async (request, reply) => {
+    const body = request.body as { selections?: unknown[]; minEdge?: number } | null;
+    if (!body?.selections || !Array.isArray(body.selections)) {
+      return reply.status(400).send({ error: 'Provide selections array' });
+    }
+
+    const selections = body.selections.slice(0, 25);
+    if (!selections.length) return reply.status(400).send({ error: 'No selections provided' });
+
+    const invalid = selections.find(s => !isSlipScoreSelection(s));
+    if (invalid) return reply.status(400).send({ error: 'Invalid selection format' });
+
+    const minEdge = Number.isFinite(body.minEdge) ? Math.max(-0.5, Math.min(1, Number(body.minEdge))) : 0;
+    const calibration = await getMatchPredictCalibration();
+    const hitRate = Number.isFinite(calibration.hitRate) ? calibration.hitRate : undefined;
+
+    const scored = await Promise.all((selections as SlipScoreSelection[]).map(async (selection) => {
+      try {
+        const prediction = await predictMatchFull(selection.homeTeam, selection.awayTeam, {
+          league: selection.league,
+          odds: selection.odds,
+        });
+        const model = pickModelProbability(prediction, selection.market, selection.pick);
+        const impliedProbability = 1 / selection.odds;
+        const edge = model.probability !== null ? model.probability * selection.odds - 1 : null;
+        const decision = scoreCandidate({ prediction, odds: selection.odds, hitRate });
+        const qualityWarn = prediction.base.quality.warn;
+        const accepted = model.probability !== null
+          && edge !== null
+          && edge >= minEdge
+          && decision.tier !== 'skip'
+          && !qualityWarn;
+
+        return {
+          ...selection,
+          supported: model.probability !== null,
+          accepted,
+          modelPick: model.modelPick,
+          modelProbability: model.probability !== null ? round4(model.probability) : null,
+          modelProbabilityPct: model.probability !== null ? roundPct(model.probability) : null,
+          impliedProbability: round4(impliedProbability),
+          impliedProbabilityPct: roundPct(impliedProbability),
+          edge: edge !== null ? round4(edge) : null,
+          edgePct: edge !== null ? roundPct(edge) : null,
+          decision,
+          quality: prediction.base.quality,
+          verdict: prediction.verdict,
+          reason: model.reason,
+          rejectReason: accepted ? null
+            : model.probability === null ? model.reason
+            : qualityWarn ? `Prediction quality ${prediction.base.quality.grade}: ${prediction.base.quality.reasons.join('; ')}`
+            : decision.tier === 'skip' ? 'Decision Score tier is skip'
+            : `Edge below minimum ${roundPct(minEdge)}%`,
+        };
+      } catch (err) {
+        return {
+          ...selection,
+          supported: false,
+          accepted: false,
+          modelPick: null,
+          modelProbability: null,
+          modelProbabilityPct: null,
+          impliedProbability: round4(1 / selection.odds),
+          impliedProbabilityPct: roundPct(1 / selection.odds),
+          edge: null,
+          edgePct: null,
+          decision: null,
+          quality: null,
+          verdict: null,
+          reason: 'Prediction failed',
+          rejectReason: (err as Error).message,
+        };
+      }
+    }));
+
+    const accepted = scored.filter(s => s.accepted);
+    const supported = scored.filter(s => s.modelProbability !== null);
+    const totalOdds = scored.reduce((acc, s) => acc * s.odds, 1);
+    const acceptedOdds = accepted.reduce((acc, s) => acc * s.odds, 1);
+    const slipProbability = supported.length === scored.length
+      ? scored.reduce((acc, s) => acc * (s.modelProbability ?? 0), 1)
+      : null;
+    const acceptedProbability = accepted.length > 0
+      ? accepted.reduce((acc, s) => acc * (s.modelProbability ?? 0), 1)
+      : null;
+
+    return {
+      data: scored,
+      accepted,
+      summary: {
+        totalSelections: scored.length,
+        supportedSelections: supported.length,
+        acceptedSelections: accepted.length,
+        minEdge,
+        totalOdds: Math.round(totalOdds * 100) / 100,
+        acceptedOdds: Math.round(acceptedOdds * 100) / 100,
+        slipProbability: slipProbability !== null ? round4(slipProbability) : null,
+        slipProbabilityPct: slipProbability !== null ? roundPct(slipProbability) : null,
+        slipEdge: slipProbability !== null ? round4(slipProbability * totalOdds - 1) : null,
+        slipEdgePct: slipProbability !== null ? roundPct(slipProbability * totalOdds - 1) : null,
+        acceptedProbability: acceptedProbability !== null ? round4(acceptedProbability) : null,
+        acceptedProbabilityPct: acceptedProbability !== null ? roundPct(acceptedProbability) : null,
+        acceptedEdge: acceptedProbability !== null ? round4(acceptedProbability * acceptedOdds - 1) : null,
+        acceptedEdgePct: acceptedProbability !== null ? roundPct(acceptedProbability * acceptedOdds - 1) : null,
+      },
+    };
   });
 
   // GET /predictions/match-predict/calibration — recent hit-rate and the

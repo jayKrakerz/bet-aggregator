@@ -3436,6 +3436,12 @@ function estimateProb(g) {
   const mkt = (g.market || '').toLowerCase();
   const pick = (g.pick || '').toLowerCase();
 
+  // Backend pre-match model probability from /predictions/score-slip.
+  // Stored as 0..1 so it can directly replace the heuristic estimate.
+  if (typeof g._backendModelProb === 'number' && g._backendModelProb > 0) {
+    return Math.min(0.98, Math.max(0.01, g._backendModelProb));
+  }
+
   // Live games come from the state-model which already computed a probability.
   // Use it directly — it knows the current score & time remaining.
   if (g._isLive && typeof g._modelProb === 'number' && g._modelProb > 0) {
@@ -3639,9 +3645,71 @@ function estimateProb(g) {
 function pickEfficiency(g) {
   const prob = g._prob || estimateProb(g);
   if (prob <= 0.01) return 0;
+  if (typeof g._backendEdge === 'number' && g._backendEdge > 0) return prob * (1 + g._backendEdge);
   const logOdds = Math.log(g.odds || 1);
   const risk = -Math.log(prob);
   return risk > 0 ? logOdds / risk : 0;
+}
+
+function scoreKey(g) {
+  return [g.eventId || '', g.homeTeam || '', g.awayTeam || '', g.market || '', g.pick || ''].join('|').toLowerCase();
+}
+
+async function applyBackendSlipScores(scored, targetOdds) {
+  const mktSupported = g => {
+    const m = (g.market || '').toLowerCase();
+    return m.includes('1x2') || m.includes('match winner') || m.includes('moneyline') ||
+      m.includes('double chance') || m.includes('over/under') || m.includes('total') ||
+      m.includes('both teams') || m.includes('btts') || m.includes('gg');
+  };
+
+  const candidates = [...scored]
+    .filter(g => !g._isLive && mktSupported(g) && g.homeTeam && g.awayTeam && g.odds > 1.01)
+    .sort((a, b) => (b._safety - a._safety) || (b._consensus - a._consensus) || (b._prob - a._prob))
+    .slice(0, 25);
+
+  if (!candidates.length) return scored;
+
+  // Higher target odds need more selectivity; low targets can accept tiny edge.
+  const minEdge = targetOdds >= 10 ? 0.03 : targetOdds >= 5 ? 0.015 : 0;
+
+  try {
+    const res = await fetch('/predictions/score-slip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        minEdge,
+        selections: candidates.map(g => ({
+          homeTeam: g.homeTeam,
+          awayTeam: g.awayTeam,
+          league: normalizeLeague(g.league) || g.league || '',
+          market: g.market,
+          pick: g.pick,
+          odds: g.odds,
+          eventId: g.eventId || '',
+        })),
+      }),
+    });
+    if (!res.ok) return scored;
+    const json = await res.json();
+    const byKey = new Map();
+    for (const s of (json.data || [])) byKey.set(scoreKey(s), s);
+
+    for (const g of scored) {
+      const s = byKey.get(scoreKey(g));
+      if (!s) continue;
+      g._backendSupported = !!s.supported;
+      g._backendAccepted = !!s.accepted;
+      g._backendModelProb = typeof s.modelProbability === 'number' ? s.modelProbability : null;
+      g._backendEdge = typeof s.edge === 'number' ? s.edge : null;
+      g._backendDecision = s.decision || null;
+      g._backendRejectReason = s.rejectReason || null;
+      if (g._backendModelProb) g._prob = g._backendModelProb;
+      if (s.accepted) g._safety = Math.min(100, g._safety + 8);
+    }
+  } catch {}
+
+  return scored;
 }
 
 // ===== GENERATE CODES =====
@@ -3791,6 +3859,7 @@ async function runDiscovery() {
     // Convert discovered codes to BookingCode format for display
     discoveredCodes = codes.map(c => ({
       code: c.code,
+      _parentCode: c.parentCode,
       source: 'Sportybet Network',
       sourceUrl: '',
       events: c.events,
@@ -4089,13 +4158,14 @@ async function pickDiversifiedSets(targetOdds) {
     return pickLiveOnlySets(available, targetOdds);
   }
   // Score each game with BOTH safety (for display) and calibrated probability (for selection)
-  const scored = available.map(g => ({
+  let scored = available.map(g => ({
     ...g,
     _safety: safetyScore(g),
     _consensus: getConsensus(g),
     _prob: estimateProb(g),
     _eff: 0,
   }));
+  scored = await applyBackendSlipScores(scored, targetOdds);
   // Calculate efficiency after prob is set
   scored.forEach(g => { g._eff = pickEfficiency(g); });
 
@@ -4138,7 +4208,8 @@ async function pickDiversifiedSets(targetOdds) {
       return g.odds >= C.minOdds
         && g.odds <= C.maxOdds
         && g._prob > 0.01
-        && g._safety >= safetyCutoff;
+        && g._safety >= safetyCutoff
+        && (g._backendSupported !== true || g._backendAccepted === true);
     });
 
     // Ideal odds per pick: what each pick should contribute to reach target
